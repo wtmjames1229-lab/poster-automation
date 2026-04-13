@@ -9,41 +9,20 @@ const BLUEPRINT_ID = 1159;
 const PRINT_PROVIDER_ID = 99; // Printify Choice
 
 // SET YOUR IMAGE PROMPT HERE
-const IMAGE_PROMPT = 'YOUR IMAGE PROMPT HERE';
+const IMAGE_PROMPT = 'snoopy wallpaper';
 
-// Selected vertical canvas variants with exact print area dimensions
+// Vertical canvas variants with exact 50% margin prices (in cents)
 const VERTICAL_VARIANTS = [
-  { id: 101413, w: 2400,  h: 3000  }, // 8x10
-  { id: 91641,  w: 3300,  h: 4200  }, // 11x14
-  { id: 91644,  w: 3600,  h: 5400  }, // 12x18
-  { id: 91647,  w: 4800,  h: 7200  }, // 16x24
-  { id: 91649,  w: 6000,  h: 7200  }, // 20x24
-  { id: 101411, w: 7200,  h: 9000  }, // 24x30
-  { id: 91654,  w: 9000,  h: 12000 }, // 30x40
-  { id: 91655,  w: 9600,  h: 14400 }, // 32x48
-  { id: 112955, w: 12000, h: 18000 }, // 40x60
+  { id: 101413, w: 2400,  h: 3000,  price: 2576  }, // 8x10
+  { id: 91641,  w: 3300,  h: 4200,  price: 3220  }, // 11x14
+  { id: 91644,  w: 3600,  h: 5400,  price: 4416  }, // 12x18
+  { id: 91647,  w: 4800,  h: 7200,  price: 5714  }, // 16x24
+  { id: 91649,  w: 6000,  h: 7200,  price: 7076  }, // 20x24
+  { id: 101411, w: 7200,  h: 9000,  price: 9198  }, // 24x30
+  { id: 91654,  w: 9000,  h: 12000, price: 12722 }, // 30x40
+  { id: 91655,  w: 9600,  h: 14400, price: 18628 }, // 32x48
+  { id: 112955, w: 12000, h: 18000, price: 25442 }, // 40x60
 ];
-
-async function getVariantCosts() {
-  console.log('Fetching variant costs from Printify...');
-  const res = await fetch(
-    `https://api.printify.com/v1/catalog/blueprints/${BLUEPRINT_ID}/print_providers/${PRINT_PROVIDER_ID}/variants.json`,
-    {
-      headers: { 'Authorization': `Bearer ${PRINTIFY_API_KEY}` }
-    }
-  );
-  const data = await res.json();
-  const costMap = {};
-  const variantIds = VERTICAL_VARIANTS.map(v => v.id);
-  for (const variant of data.variants) {
-    if (variantIds.includes(variant.id)) {
-      // cost is in cents, price at 50% margin = cost / 0.5
-      costMap[variant.id] = Math.ceil(variant.cost / 0.5);
-    }
-  }
-  console.log('Costs fetched:', costMap);
-  return costMap;
-}
 
 async function generateImage() {
   console.log('Generating image with Gemini...');
@@ -86,13 +65,13 @@ async function uploadToPrintify(base64Data) {
   return data.id;
 }
 
-async function createProduct(imageId, costMap) {
+async function createProduct(imageId) {
   console.log('Creating Printify product...');
 
   const variants = VERTICAL_VARIANTS.map(v => ({
     id: v.id,
     is_enabled: true,
-    price: costMap[v.id] || 9999
+    price: v.price
   }));
 
   const print_areas = VERTICAL_VARIANTS.map(v => ({
@@ -182,10 +161,9 @@ async function publishToEtsy(productId) {
 
 async function run() {
   try {
-    const costMap = await getVariantCosts();
     const base64Image = await generateImage();
     const imageId = await uploadToPrintify(base64Image);
-    const productId = await createProduct(imageId, costMap);
+    const productId = await createProduct(imageId);
     await enableEconomyShipping(productId);
     await publishToEtsy(productId);
     console.log('Done! New listing is live on Etsy.');
