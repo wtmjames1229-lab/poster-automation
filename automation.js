@@ -9,7 +9,7 @@ const BLUEPRINT_ID = 1159;
 const PRINT_PROVIDER_ID = 99; // Printify Choice
 
 // SET YOUR IMAGE PROMPT HERE
-const IMAGE_PROMPT = 'snoopy poster';
+const IMAGE_PROMPT = 'snoopy poster, flat design, minimalist, solid color background, no texture, no shadows, digital illustration style';';
 
 // Etsy fee rates
 const ETSY_TRANSACTION_FEE = 0.065;
