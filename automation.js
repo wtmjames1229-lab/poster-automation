@@ -24,6 +24,40 @@ const VERTICAL_VARIANTS = [
   { id: 112955, w: 12000, h: 18000, price: 25442 }, // 40x60
 ];
 
+async function generateListing() {
+  console.log('Generating listing content with Gemini...');
+  const res = await fetch(
+    `https://generativelanguage.googleapis.com/v1beta/models/gemini-3.1-flash-image-preview:generateContent?key=${NB_API_KEY}`,
+    {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        contents: [{
+          parts: [{ text: `Based on this art description: "${IMAGE_PROMPT}"
+          
+Generate an Etsy product listing in JSON format only, no markdown, no backticks, just raw JSON:
+{
+  "title": "catchy Etsy title under 140 chars including wall art canvas keywords",
+  "description": "3 paragraph Etsy product description, engaging and SEO friendly, mention canvas print, wall art, home decor, available sizes",
+  "tags": ["tag1","tag2","tag3","tag4","tag5","tag6","tag7","tag8","tag9","tag10","tag11","tag12","tag13"]
+}` }]
+        }],
+        generationConfig: { responseModalities: ['TEXT'] }
+      })
+    }
+  );
+  const data = await res.json();
+  const text = data?.candidates?.[0]?.content?.parts?.[0]?.text;
+  if (!text) throw new Error('Listing generation failed: ' + JSON.stringify(data));
+  try {
+    const listing = JSON.parse(text.trim());
+    console.log('Listing generated:', listing.title);
+    return listing;
+  } catch (e) {
+    throw new Error('Failed to parse listing JSON: ' + text);
+  }
+}
+
 async function generateImage() {
   console.log('Generating image with Gemini...');
   const res = await fetch(
@@ -65,7 +99,7 @@ async function uploadToPrintify(base64Data) {
   return data.id;
 }
 
-async function createProduct(imageId) {
+async function createProduct(imageId, listing) {
   console.log('Creating Printify product...');
 
   const variants = VERTICAL_VARIANTS.map(v => ({
@@ -97,7 +131,9 @@ async function createProduct(imageId) {
       'Content-Type': 'application/json'
     },
     body: JSON.stringify({
-      title: 'Matte Canvas Wall Art',
+      title: listing.title,
+      description: listing.description,
+      tags: listing.tags,
       blueprint_id: BLUEPRINT_ID,
       print_provider_id: PRINT_PROVIDER_ID,
       variants,
@@ -161,9 +197,10 @@ async function publishToEtsy(productId) {
 
 async function run() {
   try {
+    const listing = await generateListing();
     const base64Image = await generateImage();
     const imageId = await uploadToPrintify(base64Image);
-    const productId = await createProduct(imageId);
+    const productId = await createProduct(imageId, listing);
     await enableEconomyShipping(productId);
     await publishToEtsy(productId);
     console.log('Done! New listing is live on Etsy.');
