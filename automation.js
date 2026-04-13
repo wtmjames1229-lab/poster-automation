@@ -24,6 +24,27 @@ const VERTICAL_VARIANTS = [
   { id: 112955, w: 12000, h: 18000 }, // 40x60
 ];
 
+async function getVariantCosts() {
+  console.log('Fetching variant costs from Printify...');
+  const res = await fetch(
+    `https://api.printify.com/v1/catalog/blueprints/${BLUEPRINT_ID}/print_providers/${PRINT_PROVIDER_ID}/variants.json`,
+    {
+      headers: { 'Authorization': `Bearer ${PRINTIFY_API_KEY}` }
+    }
+  );
+  const data = await res.json();
+  const costMap = {};
+  const variantIds = VERTICAL_VARIANTS.map(v => v.id);
+  for (const variant of data.variants) {
+    if (variantIds.includes(variant.id)) {
+      // cost is in cents, price at 50% margin = cost / 0.5
+      costMap[variant.id] = Math.ceil(variant.cost / 0.5);
+    }
+  }
+  console.log('Costs fetched:', costMap);
+  return costMap;
+}
+
 async function generateImage() {
   console.log('Generating image with Gemini...');
   const res = await fetch(
@@ -65,12 +86,13 @@ async function uploadToPrintify(base64Data) {
   return data.id;
 }
 
-async function createProduct(imageId) {
+async function createProduct(imageId, costMap) {
   console.log('Creating Printify product...');
 
   const variants = VERTICAL_VARIANTS.map(v => ({
     id: v.id,
-    is_enabled: true
+    is_enabled: true,
+    price: costMap[v.id] || 9999
   }));
 
   const print_areas = VERTICAL_VARIANTS.map(v => ({
@@ -160,9 +182,10 @@ async function publishToEtsy(productId) {
 
 async function run() {
   try {
+    const costMap = await getVariantCosts();
     const base64Image = await generateImage();
     const imageId = await uploadToPrintify(base64Image);
-    const productId = await createProduct(imageId);
+    const productId = await createProduct(imageId, costMap);
     await enableEconomyShipping(productId);
     await publishToEtsy(productId);
     console.log('Done! New listing is live on Etsy.');
