@@ -9,7 +9,7 @@ const BLUEPRINT_ID = 1159;
 const PRINT_PROVIDER_ID = 99; // Printify Choice
 
 // SET YOUR IMAGE PROMPT HERE — use backticks, not single quotes
-const IMAGE_PROMPT = `snoopy wallpaper flat design, minimalist, solid color background, no texture, no shadows, digital illustration style`
+const IMAGE_PROMPT = `snoopy wallpaper flat design, minimalist, solid color background, no texture, no shadows, digital illustration style`;
 
 // Etsy fee rates
 const ETSY_TRANSACTION_FEE = 0.065;
@@ -158,6 +158,8 @@ async function createProduct(imageId, listing) {
 }
 
 async function enableEconomyShipping(productId) {
+  console.log('Waiting for product to be ready...');
+  await new Promise(r => setTimeout(r, 5000));
   console.log('Enabling economy shipping...');
   const res = await fetch(
     `https://api.printify.com/v2/shops/${SHOP_ID}/products/${productId}/shipping.json`,
@@ -175,12 +177,13 @@ async function enableEconomyShipping(productId) {
       })
     }
   );
-  const data = await res.json();
-  console.log('Shipping response:', JSON.stringify(data));
+  const text = await res.text();
+  console.log('Shipping response:', text);
 }
 
 async function publishToEtsy(productId) {
   console.log('Publishing to Etsy...');
+  await new Promise(r => setTimeout(r, 3000));
   const res = await fetch(
     `https://api.printify.com/v1/shops/${SHOP_ID}/products/${productId}/publish.json`,
     {
@@ -201,23 +204,28 @@ async function publishToEtsy(productId) {
       })
     }
   );
-  const data = await res.json();
-  console.log('Publish response:', JSON.stringify(data));
-  return data;
+  const text = await res.text();
+  console.log('Publish response:', text);
+  return text;
 }
 
 async function run() {
-  try {
-    const listing = await generateListing();
-    const base64Image = await generateImage();
-    const imageId = await uploadToPrintify(base64Image);
-    const productId = await createProduct(imageId, listing);
-    await enableEconomyShipping(productId);
-    await publishToEtsy(productId);
-    console.log('Done! New listing is live on Etsy.');
-  } catch (err) {
-    console.error('Pipeline failed:', err.message);
+  for (let i = 1; i <= 5; i++) {
+    console.log(`\n--- Generating listing ${i} of 5 ---`);
+    try {
+      const listing = await generateListing();
+      const base64Image = await generateImage();
+      const imageId = await uploadToPrintify(base64Image);
+      const productId = await createProduct(imageId, listing);
+      await enableEconomyShipping(productId);
+      await publishToEtsy(productId);
+      console.log(`Listing ${i} live on Etsy!`);
+      if (i < 5) await new Promise(r => setTimeout(r, 10000));
+    } catch (err) {
+      console.error(`Listing ${i} failed:`, err.message);
+    }
   }
+  console.log('Done! All 5 listings processed.');
 }
 
 run();
