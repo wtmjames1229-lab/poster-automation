@@ -9,7 +9,7 @@ const BLUEPRINT_ID = 1159;
 const PRINT_PROVIDER_ID = 99; // Printify Choice
 
 // SET YOUR IMAGE PROMPT HERE
-const IMAGE_PROMPT = 'Snoopy wallpaper';
+const IMAGE_PROMPT = 'YOUR IMAGE PROMPT HERE';
 
 // Selected vertical canvas variants with exact print area dimensions
 const VERTICAL_VARIANTS = [
@@ -27,7 +27,7 @@ const VERTICAL_VARIANTS = [
 async function generateImage() {
   console.log('Generating image with Gemini...');
   const res = await fetch(
-    `https://generativelanguage.googleapis.com/v1beta/models/gemini-2.0-flash-exp:generateContent?key=${NB_API_KEY}`,
+    `https://generativelanguage.googleapis.com/v1beta/models/gemini-2.0-flash-preview-image-generation:generateContent?key=${NB_API_KEY}`,
     {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
