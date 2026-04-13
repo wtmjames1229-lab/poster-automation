@@ -137,20 +137,60 @@ function pickPrompts() {
   return shuffled.slice(0, 5);
 }
 
-async function retry(fn, retries = 3, delay = 15000) {
-  for (let i = 0; i < retries; i++) {
+async function retry(fn, retries, delay) {
+  retries = retries || 3;
+  delay = delay || 15000;
+  for (var i = 0; i < retries; i++) {
     try {
       return await fn();
     } catch (err) {
       console.error("Attempt " + (i + 1) + " failed: " + err.message);
       if (i < retries - 1) {
         console.log("Retrying in " + (delay / 1000) + "s...");
-        await new Promise(r => setTimeout(r, delay));
+        await new Promise(function(r) { setTimeout(r, delay); });
       } else {
         throw err;
       }
     }
   }
+}
+
+// Crop and resize base64 image to exact 2:3 vertical ratio using sharp
+async function cropToVertical(base64Data) {
+  const sharp = require("sharp");
+  const inputBuffer = Buffer.from(base64Data, "base64");
+  const metadata = await sharp(inputBuffer).metadata();
+  const width = metadata.width;
+  const height = metadata.height;
+
+  // Target 2:3 ratio (width:height)
+  const targetRatio = 2 / 3;
+  const currentRatio = width / height;
+
+  let cropWidth, cropHeight, left, top;
+
+  if (currentRatio > targetRatio) {
+    // Image is too wide — crop width
+    cropHeight = height;
+    cropWidth = Math.floor(height * targetRatio);
+    left = Math.floor((width - cropWidth) / 2);
+    top = 0;
+  } else {
+    // Image is too tall — crop height
+    cropWidth = width;
+    cropHeight = Math.floor(width / targetRatio);
+    left = 0;
+    top = Math.floor((height - cropHeight) / 2);
+  }
+
+  const outputBuffer = await sharp(inputBuffer)
+    .extract({ left: left, top: top, width: cropWidth, height: cropHeight })
+    .resize(3000, 4500) // standardize to 3000x4500 (2:3)
+    .png()
+    .toBuffer();
+
+  console.log("Image cropped to 2:3 vertical ratio (" + width + "x" + height + " -> 3000x4500)");
+  return outputBuffer.toString("base64");
 }
 
 async function generateListing(prompt) {
@@ -186,9 +226,12 @@ async function generateImage(prompt) {
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify({
         contents: [{
-          parts: [{ text: prompt + " Generate as a high quality vertical portrait artwork, taller than wide, suitable for canvas wall art print, flat design, minimalist style, no text, no words, no letters, no typography." }]
+          parts: [{ text: prompt + " Generate as a tall vertical portrait poster artwork in 2:3 aspect ratio, taller than wide, fill the entire frame edge to edge with no white borders, no margins, suitable for canvas wall art print, flat design, minimalist illustration style, no text, no words, no letters." }]
         }],
-        generationConfig: { responseModalities: ["IMAGE", "TEXT"] }
+        generationConfig: {
+          responseModalities: ["IMAGE", "TEXT"],
+          imageConfig: { aspectRatio: "2:3" }
+        }
       })
     }
   );
@@ -197,7 +240,10 @@ async function generateImage(prompt) {
   const imagePart = parts && parts.find(function(p) { return p.inlineData; });
   if (!imagePart) throw new Error("Image generation failed: " + JSON.stringify(data));
   console.log("Image generated successfully");
-  return imagePart.inlineData.data;
+
+  // Crop to exact 2:3 vertical ratio
+  const croppedBase64 = await cropToVertical(imagePart.inlineData.data);
+  return croppedBase64;
 }
 
 async function uploadToPrintify(base64Data) {
@@ -307,18 +353,26 @@ async function publishToEtsy(productId) {
 }
 
 async function run() {
+  // Install sharp if not available
+  try {
+    require("sharp");
+  } catch (e) {
+    console.log("Installing sharp...");
+    require("child_process").execSync("npm install sharp", { stdio: "inherit" });
+  }
+
   const prompts = pickPrompts();
   console.log("Selected 5 unique prompts for this run");
 
-  for (let i = 0; i < 5; i++) {
-    const prompt = prompts[i];
+  for (var i = 0; i < 5; i++) {
+    var prompt = prompts[i];
     console.log("\n--- Listing " + (i + 1) + " of 5 ---");
     console.log("Prompt:", prompt);
     try {
-      const listing = await retry(function() { return generateListing(prompt); });
-      const base64Image = await retry(function() { return generateImage(prompt); });
-      const imageId = await uploadToPrintify(base64Image);
-      const productId = await createProduct(imageId, listing);
+      var listing = await retry(function() { return generateListing(prompt); });
+      var base64Image = await retry(function() { return generateImage(prompt); });
+      var imageId = await uploadToPrintify(base64Image);
+      var productId = await createProduct(imageId, listing);
       await enableEconomyShipping(productId);
       await publishToEtsy(productId);
       console.log("Listing " + (i + 1) + " live on Etsy!");
