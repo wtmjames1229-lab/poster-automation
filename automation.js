@@ -13,110 +13,106 @@ const ETSY_TRANSACTION_FEE = 0.065;
 const ETSY_PAYMENT_FEE = 0.03;
 const ETSY_LISTING_FEE = 20; // cents
 
-// 100 poster-friendly activity prompts featuring [CHARACTER1] and [CHARACTER2]
-// Replace [CHARACTER1] and [CHARACTER2] with your characters
 const PROMPTS = [
- // 100 poster-friendly activity prompts featuring Snoopy and Woodstock
-const PROMPTS = [
-  `Snoopy and Woodstock sitting together watching a sunset, warm golden sky`,
-  `Snoopy flying a kite with Woodstock sitting on top, blue sky and clouds`,
-  `Snoopy and Woodstock stargazing together on a hilltop at night`,
-  `Snoopy napping under a tree while Woodstock perches on a branch above`,
-  `Snoopy and Woodstock walking together through a field of sunflowers`,
-  `Snoopy and Woodstock sitting on a dock watching the water at sunset`,
-  `Snoopy reading a book outdoors while Woodstock sits nearby`,
-  `Snoopy and Woodstock dancing together in a field of flowers`,
-  `Snoopy and Woodstock sharing an umbrella in the rain`,
-  `Snoopy lying on top of his doghouse while Woodstock sits beside him`,
-  `Snoopy and Woodstock roasting marshmallows by a campfire at night`,
-  `Snoopy and Woodstock floating in the clouds on a sunny day`,
-  `Snoopy painting a picture on an easel while Woodstock watches`,
-  `Snoopy and Woodstock playing in autumn leaves, warm fall colors`,
-  `Snoopy and Woodstock looking at the moon together from a rooftop`,
-  `Snoopy and Woodstock in a hot air balloon over a colorful landscape`,
-  `Snoopy ice skating on a frozen pond with Woodstock on his head`,
-  `Snoopy and Woodstock gardening together, planting flowers`,
-  `Snoopy and Woodstock sitting in a cozy window watching it snow outside`,
-  `Snoopy playing guitar by a campfire while Woodstock listens`,
-  `Snoopy and Woodstock lying in a meadow looking up at the clouds`,
-  `Snoopy and Woodstock fishing together on a calm lake`,
-  `Snoopy and Woodstock sitting on a bench in a park in spring`,
-  `Snoopy and Woodstock building a sandcastle at the beach`,
-  `Snoopy and Woodstock watching fireworks light up the night sky`,
-  `Snoopy and Woodstock sledding down a snowy hill together`,
-  `Snoopy and Woodstock picking apples in an orchard in autumn`,
-  `Snoopy and Woodstock having a picnic on a sunny day`,
-  `Snoopy and Woodstock watching the sunrise from a hilltop`,
-  `Snoopy and Woodstock sitting on a crescent moon in the night sky`,
-  `Snoopy and Woodstock exploring a colorful garden in spring`,
-  `Snoopy and Woodstock swinging on a tire swing in summer`,
-  `Snoopy and Woodstock sitting by a cozy fireplace in winter`,
-  `Snoopy and Woodstock in a rowboat on a peaceful lake`,
-  `Snoopy and Woodstock playing in the snow making snowballs`,
-  `Snoopy and Woodstock sitting on a porch watching rain fall`,
-  `Snoopy and Woodstock chasing butterflies in a meadow`,
-  `Snoopy and Woodstock sitting on a mountain peak at sunrise`,
-  `Snoopy and Woodstock building a snowman together in winter`,
-  `Snoopy surfing a wave with Woodstock perched on his head`,
-  `Snoopy and Woodstock sitting in a treehouse among the leaves`,
-  `Snoopy and Woodstock lying on a blanket under the stars`,
-  `Snoopy and Woodstock playing in a sprinkler on a hot day`,
-  `Snoopy and Woodstock blowing dandelion seeds in the wind`,
-  `Snoopy and Woodstock sitting together in a colorful autumn forest`,
-  `Snoopy and Woodstock hiking through a scenic mountain trail`,
-  `Snoopy and Woodstock watching a rainbow after the rain`,
-  `Snoopy and Woodstock sitting in a field of lavender at dusk`,
-  `Snoopy and Woodstock floating lazily down a gentle river`,
-  `Snoopy and Woodstock decorating a Christmas tree together`,
-  `Snoopy cooking in a kitchen with Woodstock helping nearby`,
-  `Snoopy and Woodstock sitting on a lighthouse overlooking the ocean`,
-  `Snoopy and Woodstock collecting shells on a beach at sunset`,
-  `Snoopy and Woodstock sitting on a fence watching the countryside`,
-  `Snoopy and Woodstock walking through a snowy pine forest`,
-  `Snoopy and Woodstock sitting by a waterfall in a lush forest`,
-  `Snoopy and Woodstock watching hot air balloons rise at sunrise`,
-  `Snoopy and Woodstock sitting on a giant pumpkin in a fall field`,
-  `Snoopy and Woodstock skipping stones on a calm lake`,
-  `Snoopy and Woodstock playing in puddles after the rain`,
-  `Snoopy and Woodstock sitting together on a starry night beach`,
-  `Snoopy and Woodstock in a canoe on a misty morning lake`,
-  `Snoopy and Woodstock looking through a telescope at the stars`,
-  `Snoopy and Woodstock sitting on a swing at golden hour`,
-  `Snoopy and Woodstock flying paper airplanes in an open field`,
-  `Snoopy and Woodstock watching the northern lights in winter`,
-  `Snoopy and Woodstock sitting on a rooftop in a city at dusk`,
-  `Snoopy and Woodstock in a field of wildflowers at golden hour`,
-  `Snoopy and Woodstock splashing in the ocean waves`,
-  `Snoopy and Woodstock sitting on a log by a mountain stream`,
-  `Snoopy and Woodstock walking along a coastal cliff at sunset`,
-  `Snoopy and Woodstock playing in a pile of colorful leaves`,
-  `Snoopy and Woodstock sitting on a hammock between palm trees`,
-  `Snoopy and Woodstock exploring tide pools at the beach`,
-  `Snoopy and Woodstock watching a meteor shower in a dark sky`,
-  `Snoopy and Woodstock in a cozy cabin window with snow outside`,
-  `Snoopy and Woodstock sitting on a wooden bridge over a stream`,
-  `Snoopy and Woodstock in a rowboat surrounded by water lilies`,
-  `Snoopy and Woodstock sitting on a rooftop under a full moon`,
-  `Snoopy and Woodstock walking through a tunnel of blooming trees`,
-  `Snoopy and Woodstock sitting on a bale of hay in a field`,
-  `Snoopy and Woodstock watching the tide come in at the beach`,
-  `Snoopy and Woodstock sitting by a mountain lake reflection`,
-  `Snoopy and Woodstock in a garden at twilight with fireflies`,
-  `Snoopy and Woodstock having a snowball fight in winter`,
-  `Snoopy and Woodstock sitting on a pier watching boats`,
-  `Snoopy and Woodstock in a boat under a starry sky`,
-  `Snoopy and Woodstock sitting on a cliff edge watching the ocean`,
-  `Snoopy and Woodstock resting under a cherry blossom tree`,
-  `Snoopy and Woodstock sitting on a fence in a misty morning`,
-  `Snoopy and Woodstock watching ducks on a peaceful pond`,
-  `Snoopy and Woodstock sitting on a blanket in a lavender field`,
-  `Snoopy and Woodstock walking along a path in a foggy forest`,
-  `Snoopy and Woodstock sitting on a porch with hot drinks in winter`,
-  `Snoopy and Woodstock in a meadow with a rainbow in the background`,
-  `Snoopy and Woodstock sitting on a rock watching the river flow`,
-  `Snoopy and Woodstock in a sunflower field at peak summer`,
-  `Snoopy and Woodstock watching the sun rise over the mountains`,
-  `Snoopy and Woodstock sitting on a cloud above a colorful world`,
+  "Snoopy and Woodstock sitting together watching a sunset, warm golden sky",
+  "Snoopy flying a kite with Woodstock sitting on top, blue sky and clouds",
+  "Snoopy and Woodstock stargazing together on a hilltop at night",
+  "Snoopy napping under a tree while Woodstock perches on a branch above",
+  "Snoopy and Woodstock walking together through a field of sunflowers",
+  "Snoopy and Woodstock sitting on a dock watching the water at sunset",
+  "Snoopy reading a book outdoors while Woodstock sits nearby",
+  "Snoopy and Woodstock dancing together in a field of flowers",
+  "Snoopy and Woodstock sharing an umbrella in the rain",
+  "Snoopy lying on top of his doghouse while Woodstock sits beside him",
+  "Snoopy and Woodstock roasting marshmallows by a campfire at night",
+  "Snoopy and Woodstock floating in the clouds on a sunny day",
+  "Snoopy painting a picture on an easel while Woodstock watches",
+  "Snoopy and Woodstock playing in autumn leaves, warm fall colors",
+  "Snoopy and Woodstock looking at the moon together from a rooftop",
+  "Snoopy and Woodstock in a hot air balloon over a colorful landscape",
+  "Snoopy ice skating on a frozen pond with Woodstock on his head",
+  "Snoopy and Woodstock gardening together, planting flowers",
+  "Snoopy and Woodstock sitting in a cozy window watching it snow outside",
+  "Snoopy playing guitar by a campfire while Woodstock listens",
+  "Snoopy and Woodstock lying in a meadow looking up at the clouds",
+  "Snoopy and Woodstock fishing together on a calm lake",
+  "Snoopy and Woodstock sitting on a bench in a park in spring",
+  "Snoopy and Woodstock building a sandcastle at the beach",
+  "Snoopy and Woodstock watching fireworks light up the night sky",
+  "Snoopy and Woodstock sledding down a snowy hill together",
+  "Snoopy and Woodstock picking apples in an orchard in autumn",
+  "Snoopy and Woodstock having a picnic on a sunny day",
+  "Snoopy and Woodstock watching the sunrise from a hilltop",
+  "Snoopy and Woodstock sitting on a crescent moon in the night sky",
+  "Snoopy and Woodstock exploring a colorful garden in spring",
+  "Snoopy and Woodstock swinging on a tire swing in summer",
+  "Snoopy and Woodstock sitting by a cozy fireplace in winter",
+  "Snoopy and Woodstock in a rowboat on a peaceful lake",
+  "Snoopy and Woodstock playing in the snow making snowballs",
+  "Snoopy and Woodstock sitting on a porch watching rain fall",
+  "Snoopy and Woodstock chasing butterflies in a meadow",
+  "Snoopy and Woodstock sitting on a mountain peak at sunrise",
+  "Snoopy and Woodstock building a snowman together in winter",
+  "Snoopy surfing a wave with Woodstock perched on his head",
+  "Snoopy and Woodstock sitting in a treehouse among the leaves",
+  "Snoopy and Woodstock lying on a blanket under the stars",
+  "Snoopy and Woodstock playing in a sprinkler on a hot day",
+  "Snoopy and Woodstock blowing dandelion seeds in the wind",
+  "Snoopy and Woodstock sitting together in a colorful autumn forest",
+  "Snoopy and Woodstock hiking through a scenic mountain trail",
+  "Snoopy and Woodstock watching a rainbow after the rain",
+  "Snoopy and Woodstock sitting in a field of lavender at dusk",
+  "Snoopy and Woodstock floating lazily down a gentle river",
+  "Snoopy and Woodstock decorating a Christmas tree together",
+  "Snoopy cooking in a kitchen with Woodstock helping nearby",
+  "Snoopy and Woodstock sitting on a lighthouse overlooking the ocean",
+  "Snoopy and Woodstock collecting shells on a beach at sunset",
+  "Snoopy and Woodstock sitting on a fence watching the countryside",
+  "Snoopy and Woodstock walking through a snowy pine forest",
+  "Snoopy and Woodstock sitting by a waterfall in a lush forest",
+  "Snoopy and Woodstock watching hot air balloons rise at sunrise",
+  "Snoopy and Woodstock sitting on a giant pumpkin in a fall field",
+  "Snoopy and Woodstock skipping stones on a calm lake",
+  "Snoopy and Woodstock playing in puddles after the rain",
+  "Snoopy and Woodstock sitting together on a starry night beach",
+  "Snoopy and Woodstock in a canoe on a misty morning lake",
+  "Snoopy and Woodstock looking through a telescope at the stars",
+  "Snoopy and Woodstock sitting on a swing at golden hour",
+  "Snoopy and Woodstock flying paper airplanes in an open field",
+  "Snoopy and Woodstock watching the northern lights in winter",
+  "Snoopy and Woodstock sitting on a rooftop in a city at dusk",
+  "Snoopy and Woodstock in a field of wildflowers at golden hour",
+  "Snoopy and Woodstock splashing in the ocean waves",
+  "Snoopy and Woodstock sitting on a log by a mountain stream",
+  "Snoopy and Woodstock walking along a coastal cliff at sunset",
+  "Snoopy and Woodstock playing in a pile of colorful leaves",
+  "Snoopy and Woodstock sitting on a hammock between palm trees",
+  "Snoopy and Woodstock exploring tide pools at the beach",
+  "Snoopy and Woodstock watching a meteor shower in a dark sky",
+  "Snoopy and Woodstock in a cozy cabin window with snow outside",
+  "Snoopy and Woodstock sitting on a wooden bridge over a stream",
+  "Snoopy and Woodstock in a rowboat surrounded by water lilies",
+  "Snoopy and Woodstock sitting on a rooftop under a full moon",
+  "Snoopy and Woodstock walking through a tunnel of blooming trees",
+  "Snoopy and Woodstock sitting on a bale of hay in a field",
+  "Snoopy and Woodstock watching the tide come in at the beach",
+  "Snoopy and Woodstock sitting by a mountain lake reflection",
+  "Snoopy and Woodstock in a garden at twilight with fireflies",
+  "Snoopy and Woodstock having a snowball fight in winter",
+  "Snoopy and Woodstock sitting on a pier watching boats",
+  "Snoopy and Woodstock in a boat under a starry sky",
+  "Snoopy and Woodstock sitting on a cliff edge watching the ocean",
+  "Snoopy and Woodstock resting under a cherry blossom tree",
+  "Snoopy and Woodstock sitting on a fence in a misty morning",
+  "Snoopy and Woodstock watching ducks on a peaceful pond",
+  "Snoopy and Woodstock sitting on a blanket in a lavender field",
+  "Snoopy and Woodstock walking along a path in a foggy forest",
+  "Snoopy and Woodstock sitting on a porch with hot drinks in winter",
+  "Snoopy and Woodstock in a meadow with a rainbow in the background",
+  "Snoopy and Woodstock sitting on a rock watching the river flow",
+  "Snoopy and Woodstock in a sunflower field at peak summer",
+  "Snoopy and Woodstock watching the sun rise over the mountains",
+  "Snoopy and Woodstock sitting on a cloud above a colorful world",
 ];
 
 // Vertical canvas variants with production costs (in cents)
@@ -146,9 +142,9 @@ async function retry(fn, retries = 3, delay = 15000) {
     try {
       return await fn();
     } catch (err) {
-      console.error(`Attempt ${i + 1} failed: ${err.message}`);
+      console.error("Attempt " + (i + 1) + " failed: " + err.message);
       if (i < retries - 1) {
-        console.log(`Retrying in ${delay / 1000}s...`);
+        console.log("Retrying in " + (delay / 1000) + "s...");
         await new Promise(r => setTimeout(r, delay));
       } else {
         throw err;
@@ -158,101 +154,90 @@ async function retry(fn, retries = 3, delay = 15000) {
 }
 
 async function generateListing(prompt) {
-  console.log('Generating listing content with Gemini...');
+  console.log("Generating listing content with Gemini...");
   const res = await fetch(
-    `https://generativelanguage.googleapis.com/v1beta/models/gemini-3.1-flash-image-preview:generateContent?key=${NB_API_KEY}`,
+    "https://generativelanguage.googleapis.com/v1beta/models/gemini-3.1-flash-image-preview:generateContent?key=" + NB_API_KEY,
     {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
       body: JSON.stringify({
         contents: [{
-          parts: [{ text: `Based on this art description: "${prompt}"
-
-Generate an Etsy product listing. Respond with raw JSON only, no markdown, no backticks:
-{
-  "title": "catchy Etsy title under 140 chars with wall art canvas keywords",
-  "description": "3 paragraph Etsy product description, engaging and SEO friendly, mention canvas print, wall art, home decor, available in multiple sizes",
-  "tags": ["tag1","tag2","tag3","tag4","tag5","tag6","tag7","tag8","tag9","tag10","tag11","tag12","tag13"]
-}` }]
+          parts: [{ text: "Based on this art description: \"" + prompt + "\"\n\nGenerate an Etsy product listing. Respond with raw JSON only, no markdown, no backticks:\n{\n  \"title\": \"catchy Etsy title under 140 chars with wall art canvas keywords\",\n  \"description\": \"3 paragraph Etsy product description, engaging and SEO friendly, mention canvas print, wall art, home decor, available in multiple sizes\",\n  \"tags\": [\"tag1\",\"tag2\",\"tag3\",\"tag4\",\"tag5\",\"tag6\",\"tag7\",\"tag8\",\"tag9\",\"tag10\",\"tag11\",\"tag12\",\"tag13\"]\n}" }]
         }],
-        generationConfig: { responseModalities: ['TEXT'] }
+        generationConfig: { responseModalities: ["TEXT"] }
       })
     }
   );
   const data = await res.json();
-  const text = data?.candidates?.[0]?.content?.parts?.[0]?.text;
-  if (!text) throw new Error('Listing generation failed: ' + JSON.stringify(data));
-  const clean = text.replace(/```json|```/g, '').trim();
+  const text = data && data.candidates && data.candidates[0] && data.candidates[0].content && data.candidates[0].content.parts && data.candidates[0].content.parts[0] && data.candidates[0].content.parts[0].text;
+  if (!text) throw new Error("Listing generation failed: " + JSON.stringify(data));
+  const clean = text.replace(/```json|```/g, "").trim();
   const listing = JSON.parse(clean);
-  console.log('Listing generated:', listing.title);
+  console.log("Listing generated:", listing.title);
   return listing;
 }
 
 async function generateImage(prompt) {
-  console.log('Generating image with Gemini...');
+  console.log("Generating image with Gemini...");
   const res = await fetch(
-    `https://generativelanguage.googleapis.com/v1beta/models/gemini-3.1-flash-image-preview:generateContent?key=${NB_API_KEY}`,
+    "https://generativelanguage.googleapis.com/v1beta/models/gemini-3.1-flash-image-preview:generateContent?key=" + NB_API_KEY,
     {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
       body: JSON.stringify({
         contents: [{
-          parts: [{ text: prompt + ` Generate as a high quality vertical portrait artwork, taller than wide, suitable for canvas wall art print, flat design, minimalist style, no text, no words, no letters, no typography.` }]
+          parts: [{ text: prompt + " Generate as a high quality vertical portrait artwork, taller than wide, suitable for canvas wall art print, flat design, minimalist style, no text, no words, no letters, no typography." }]
         }],
-        generationConfig: { responseModalities: ['IMAGE', 'TEXT'] }
+        generationConfig: { responseModalities: ["IMAGE", "TEXT"] }
       })
     }
   );
   const data = await res.json();
-  const imagePart = data?.candidates?.[0]?.content?.parts?.find(p => p.inlineData);
-  if (!imagePart) throw new Error('Image generation failed: ' + JSON.stringify(data));
-  console.log('Image generated successfully');
+  const parts = data && data.candidates && data.candidates[0] && data.candidates[0].content && data.candidates[0].content.parts;
+  const imagePart = parts && parts.find(function(p) { return p.inlineData; });
+  if (!imagePart) throw new Error("Image generation failed: " + JSON.stringify(data));
+  console.log("Image generated successfully");
   return imagePart.inlineData.data;
 }
 
 async function uploadToPrintify(base64Data) {
-  console.log('Uploading image to Printify...');
-  const res = await fetch('https://api.printify.com/v1/uploads/images.json', {
-    method: 'POST',
+  console.log("Uploading image to Printify...");
+  const res = await fetch("https://api.printify.com/v1/uploads/images.json", {
+    method: "POST",
     headers: {
-      'Authorization': `Bearer ${PRINTIFY_API_KEY}`,
-      'Content-Type': 'application/json'
+      "Authorization": "Bearer " + PRINTIFY_API_KEY,
+      "Content-Type": "application/json"
     },
     body: JSON.stringify({
-      file_name: 'canvas_' + Date.now() + '.png',
+      file_name: "canvas_" + Date.now() + ".png",
       contents: base64Data
     })
   });
   const data = await res.json();
-  if (!data.id) throw new Error('Upload failed: ' + JSON.stringify(data));
-  console.log('Uploaded, image ID:', data.id);
+  if (!data.id) throw new Error("Upload failed: " + JSON.stringify(data));
+  console.log("Uploaded, image ID:", data.id);
   return data.id;
 }
 
 async function createProduct(imageId, listing) {
-  console.log('Creating Printify product...');
-  const variants = VERTICAL_VARIANTS.map(v => ({
-    id: v.id,
-    is_enabled: true,
-    price: calculatePrice(v.cost)
-  }));
-  const print_areas = VERTICAL_VARIANTS.map(v => ({
-    variant_ids: [v.id],
-    placeholders: [{
-      position: 'front',
-      images: [{
-        id: imageId,
-        x: 0.5, y: 0.5, scale: 1, angle: 0,
-        print_area_width: v.w,
-        print_area_height: v.h
+  console.log("Creating Printify product...");
+  const variants = VERTICAL_VARIANTS.map(function(v) {
+    return { id: v.id, is_enabled: true, price: calculatePrice(v.cost) };
+  });
+  const print_areas = VERTICAL_VARIANTS.map(function(v) {
+    return {
+      variant_ids: [v.id],
+      placeholders: [{
+        position: "front",
+        images: [{ id: imageId, x: 0.5, y: 0.5, scale: 1, angle: 0, print_area_width: v.w, print_area_height: v.h }]
       }]
-    }]
-  }));
-  const res = await fetch(`https://api.printify.com/v1/shops/${SHOP_ID}/products.json`, {
-    method: 'POST',
+    };
+  });
+  const res = await fetch("https://api.printify.com/v1/shops/" + SHOP_ID + "/products.json", {
+    method: "POST",
     headers: {
-      'Authorization': `Bearer ${PRINTIFY_API_KEY}`,
-      'Content-Type': 'application/json'
+      "Authorization": "Bearer " + PRINTIFY_API_KEY,
+      "Content-Type": "application/json"
     },
     body: JSON.stringify({
       title: listing.title,
@@ -260,27 +245,27 @@ async function createProduct(imageId, listing) {
       tags: listing.tags,
       blueprint_id: BLUEPRINT_ID,
       print_provider_id: PRINT_PROVIDER_ID,
-      variants,
-      print_areas
+      variants: variants,
+      print_areas: print_areas
     })
   });
   const data = await res.json();
-  if (!data.id) throw new Error('Product creation failed: ' + JSON.stringify(data));
-  console.log('Product created, ID:', data.id);
+  if (!data.id) throw new Error("Product creation failed: " + JSON.stringify(data));
+  console.log("Product created, ID:", data.id);
   return data.id;
 }
 
 async function enableEconomyShipping(productId) {
-  console.log('Waiting for product to be ready...');
-  await new Promise(r => setTimeout(r, 8000));
-  console.log('Enabling economy shipping...');
+  console.log("Waiting for product to be ready...");
+  await new Promise(function(r) { setTimeout(r, 8000); });
+  console.log("Enabling economy shipping...");
   const res = await fetch(
-    `https://api.printify.com/v2/shops/${SHOP_ID}/products/${productId}/shipping.json`,
+    "https://api.printify.com/v2/shops/" + SHOP_ID + "/products/" + productId + "/shipping.json",
     {
-      method: 'PUT',
+      method: "PUT",
       headers: {
-        'Authorization': `Bearer ${PRINTIFY_API_KEY}`,
-        'Content-Type': 'application/json'
+        "Authorization": "Bearer " + PRINTIFY_API_KEY,
+        "Content-Type": "application/json"
       },
       body: JSON.stringify({
         shipping_handling: {
@@ -291,19 +276,19 @@ async function enableEconomyShipping(productId) {
     }
   );
   const text = await res.text();
-  console.log('Shipping response:', text);
+  console.log("Shipping response:", text);
 }
 
 async function publishToEtsy(productId) {
-  console.log('Publishing to Etsy...');
-  await new Promise(r => setTimeout(r, 5000));
+  console.log("Publishing to Etsy...");
+  await new Promise(function(r) { setTimeout(r, 5000); });
   const res = await fetch(
-    `https://api.printify.com/v1/shops/${SHOP_ID}/products/${productId}/publish.json`,
+    "https://api.printify.com/v1/shops/" + SHOP_ID + "/products/" + productId + "/publish.json",
     {
-      method: 'POST',
+      method: "POST",
       headers: {
-        'Authorization': `Bearer ${PRINTIFY_API_KEY}`,
-        'Content-Type': 'application/json'
+        "Authorization": "Bearer " + PRINTIFY_API_KEY,
+        "Content-Type": "application/json"
       },
       body: JSON.stringify({
         title: true,
@@ -318,31 +303,31 @@ async function publishToEtsy(productId) {
     }
   );
   const text = await res.text();
-  console.log('Publish response:', text);
+  console.log("Publish response:", text);
 }
 
 async function run() {
   const prompts = pickPrompts();
-  console.log('Selected 5 unique prompts for this run');
+  console.log("Selected 5 unique prompts for this run");
 
   for (let i = 0; i < 5; i++) {
     const prompt = prompts[i];
-    console.log(`\n--- Listing ${i + 1} of 5 ---`);
-    console.log('Prompt:', prompt);
+    console.log("\n--- Listing " + (i + 1) + " of 5 ---");
+    console.log("Prompt:", prompt);
     try {
-      const listing = await retry(() => generateListing(prompt));
-      const base64Image = await retry(() => generateImage(prompt));
+      const listing = await retry(function() { return generateListing(prompt); });
+      const base64Image = await retry(function() { return generateImage(prompt); });
       const imageId = await uploadToPrintify(base64Image);
       const productId = await createProduct(imageId, listing);
       await enableEconomyShipping(productId);
       await publishToEtsy(productId);
-      console.log(`Listing ${i + 1} live on Etsy!`);
-      if (i < 4) await new Promise(r => setTimeout(r, 10000));
+      console.log("Listing " + (i + 1) + " live on Etsy!");
+      if (i < 4) await new Promise(function(r) { setTimeout(r, 10000); });
     } catch (err) {
-      console.error(`Listing ${i + 1} failed after retries:`, err.message);
+      console.error("Listing " + (i + 1) + " failed after retries:", err.message);
     }
   }
-  console.log('\nDone! All 5 listings processed.');
+  console.log("\nDone! All 5 listings processed.");
 }
 
 run();
