@@ -8,8 +8,8 @@ const SHOP_ID = '18634010';
 const BLUEPRINT_ID = 1159;
 const PRINT_PROVIDER_ID = 99; // Printify Choice
 
-// SET YOUR IMAGE PROMPT HERE
-const IMAGE_PROMPT = 'snoopy poster, flat design, minimalist, solid color background, no texture, no shadows, digital illustration style';';
+// SET YOUR IMAGE PROMPT HERE — use backticks, not single quotes
+const IMAGE_PROMPT = `snoopy wallpaper flat design, minimalist, solid color background, no texture, no shadows, digital illustration style`
 
 // Etsy fee rates
 const ETSY_TRANSACTION_FEE = 0.065;
@@ -30,11 +30,6 @@ const VERTICAL_VARIANTS = [
 ];
 
 // Calculate price for exactly 50% profit margin after all Etsy fees
-// profit_margin = (price - cost - etsy_fees) / price = 0.5
-// etsy_fees = price * (transaction + payment) + listing_fee
-// price - cost - price * 0.095 - 20 = 0.5 * price
-// price * (1 - 0.095 - 0.5) = cost + 20
-// price = (cost + 20) / 0.405
 function calculatePrice(cost) {
   return Math.ceil((cost + ETSY_LISTING_FEE) / (1 - ETSY_TRANSACTION_FEE - ETSY_PAYMENT_FEE - 0.5));
 }
@@ -83,7 +78,7 @@ async function generateImage() {
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({
         contents: [{
-          parts: [{ text: IMAGE_PROMPT + ' Generate as a high quality vertical portrait artwork, taller than wide, suitable for canvas wall art print.' }]
+          parts: [{ text: IMAGE_PROMPT + ` Generate as a high quality vertical portrait artwork, taller than wide, suitable for canvas wall art print.` }]
         }],
         generationConfig: { responseModalities: ['IMAGE', 'TEXT'] }
       })
@@ -123,14 +118,6 @@ async function createProduct(imageId, listing) {
     is_enabled: true,
     price: calculatePrice(v.cost)
   }));
-
-  // Log prices for verification
-  VERTICAL_VARIANTS.forEach(v => {
-    const price = calculatePrice(v.cost);
-    const profit = price - v.cost - Math.round(price * (ETSY_TRANSACTION_FEE + ETSY_PAYMENT_FEE)) - ETSY_LISTING_FEE;
-    const margin = Math.round((profit / price) * 100);
-    console.log(`Variant ${v.id}: cost=${v.cost} price=${price} margin=${margin}%`);
-  });
 
   const print_areas = VERTICAL_VARIANTS.map(v => ({
     variant_ids: [v.id],
