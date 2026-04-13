@@ -1,16 +1,28 @@
 // POD Automation Pipeline
-// Gemini (Nano Banana 2) → Printify → Etsy
+// Gemini → Printify → Etsy
 // Run with: node automation.js
 
 const NB_API_KEY = process.env.NB_API_KEY;
 const PRINTIFY_API_KEY = process.env.PRINTIFY_API_KEY;
-const SHOP_ID = 'YOUR_SHOP_ID';
-const BLUEPRINT_ID = 388;
-const PRINT_PROVIDER_ID = 1;
-const LISTING_TITLE = 'YOUR LISTING TITLE | Wall Art Poster';
+const SHOP_ID = '18634010';
+const BLUEPRINT_ID = 1159;
+const PRINT_PROVIDER_ID = 99; // Printify Choice
 
-// Describe your character and art style here
-const IMAGE_PROMPT = 'YOUR IMAGE PROMPT HERE';
+// SET YOUR IMAGE PROMPT HERE
+const IMAGE_PROMPT = 'Snoopy wallpaper';
+
+// Selected vertical canvas variants with exact print area dimensions
+const VERTICAL_VARIANTS = [
+  { id: 101413, w: 2400,  h: 3000  }, // 8x10
+  { id: 91641,  w: 3300,  h: 4200  }, // 11x14
+  { id: 91644,  w: 3600,  h: 5400  }, // 12x18
+  { id: 91647,  w: 4800,  h: 7200  }, // 16x24
+  { id: 91649,  w: 6000,  h: 7200  }, // 20x24
+  { id: 101411, w: 7200,  h: 9000  }, // 24x30
+  { id: 91654,  w: 9000,  h: 12000 }, // 30x40
+  { id: 91655,  w: 9600,  h: 14400 }, // 32x48
+  { id: 112955, w: 12000, h: 18000 }, // 40x60
+];
 
 async function generateImage() {
   console.log('Generating image with Gemini...');
@@ -21,7 +33,7 @@ async function generateImage() {
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({
         contents: [{
-          parts: [{ text: IMAGE_PROMPT + ' Generate as a high quality poster image.' }]
+          parts: [{ text: IMAGE_PROMPT + ' Generate as a high quality vertical portrait artwork, taller than wide, suitable for canvas wall art print.' }]
         }],
         generationConfig: { responseModalities: ['IMAGE', 'TEXT'] }
       })
@@ -31,7 +43,7 @@ async function generateImage() {
   const imagePart = data?.candidates?.[0]?.content?.parts?.find(p => p.inlineData);
   if (!imagePart) throw new Error('Image generation failed: ' + JSON.stringify(data));
   console.log('Image generated successfully');
-  return imagePart.inlineData.data; // base64 image data
+  return imagePart.inlineData.data;
 }
 
 async function uploadToPrintify(base64Data) {
@@ -43,7 +55,7 @@ async function uploadToPrintify(base64Data) {
       'Content-Type': 'application/json'
     },
     body: JSON.stringify({
-      file_name: 'poster_' + Date.now() + '.png',
+      file_name: 'canvas_' + Date.now() + '.png',
       contents: base64Data
     })
   });
@@ -55,6 +67,28 @@ async function uploadToPrintify(base64Data) {
 
 async function createProduct(imageId) {
   console.log('Creating Printify product...');
+
+  const variants = VERTICAL_VARIANTS.map(v => ({
+    id: v.id,
+    is_enabled: true
+  }));
+
+  const print_areas = VERTICAL_VARIANTS.map(v => ({
+    variant_ids: [v.id],
+    placeholders: [{
+      position: 'front',
+      images: [{
+        id: imageId,
+        x: 0.5,
+        y: 0.5,
+        scale: 1,
+        angle: 0,
+        print_area_width: v.w,
+        print_area_height: v.h
+      }]
+    }]
+  }));
+
   const res = await fetch(`https://api.printify.com/v1/shops/${SHOP_ID}/products.json`, {
     method: 'POST',
     headers: {
@@ -62,17 +96,11 @@ async function createProduct(imageId) {
       'Content-Type': 'application/json'
     },
     body: JSON.stringify({
-      title: LISTING_TITLE,
+      title: 'Matte Canvas Wall Art',
       blueprint_id: BLUEPRINT_ID,
       print_provider_id: PRINT_PROVIDER_ID,
-      variants: [{ id: 1, is_enabled: true }],
-      print_areas: [{
-        variant_ids: [1],
-        placeholders: [{
-          position: 'front',
-          images: [{ id: imageId, x: 0.5, y: 0.5, scale: 1, angle: 0 }]
-        }]
-      }]
+      variants,
+      print_areas
     })
   });
   const data = await res.json();
