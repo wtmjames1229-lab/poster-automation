@@ -9,20 +9,35 @@ const BLUEPRINT_ID = 1159;
 const PRINT_PROVIDER_ID = 99; // Printify Choice
 
 // SET YOUR IMAGE PROMPT HERE
-const IMAGE_PROMPT = 'snoopy wallpaper';
+const IMAGE_PROMPT = 'snoopy poster';
 
-// Vertical canvas variants with exact 50% margin prices (in cents)
+// Etsy fee rates
+const ETSY_TRANSACTION_FEE = 0.065;
+const ETSY_PAYMENT_FEE = 0.03;
+const ETSY_LISTING_FEE = 20; // cents
+
+// Vertical canvas variants with production costs (in cents)
 const VERTICAL_VARIANTS = [
-  { id: 101413, w: 2400,  h: 3000,  price: 2576  }, // 8x10
-  { id: 91641,  w: 3300,  h: 4200,  price: 3220  }, // 11x14
-  { id: 91644,  w: 3600,  h: 5400,  price: 4416  }, // 12x18
-  { id: 91647,  w: 4800,  h: 7200,  price: 5714  }, // 16x24
-  { id: 91649,  w: 6000,  h: 7200,  price: 7076  }, // 20x24
-  { id: 101411, w: 7200,  h: 9000,  price: 9198  }, // 24x30
-  { id: 91654,  w: 9000,  h: 12000, price: 12722 }, // 30x40
-  { id: 91655,  w: 9600,  h: 14400, price: 18628 }, // 32x48
-  { id: 112955, w: 12000, h: 18000, price: 25442 }, // 40x60
+  { id: 101413, w: 2400,  h: 3000,  cost: 1288  }, // 8x10
+  { id: 91641,  w: 3300,  h: 4200,  cost: 1610  }, // 11x14
+  { id: 91644,  w: 3600,  h: 5400,  cost: 2208  }, // 12x18
+  { id: 91647,  w: 4800,  h: 7200,  cost: 2857  }, // 16x24
+  { id: 91649,  w: 6000,  h: 7200,  cost: 3538  }, // 20x24
+  { id: 101411, w: 7200,  h: 9000,  cost: 4599  }, // 24x30
+  { id: 91654,  w: 9000,  h: 12000, cost: 6361  }, // 30x40
+  { id: 91655,  w: 9600,  h: 14400, cost: 9314  }, // 32x48
+  { id: 112955, w: 12000, h: 18000, cost: 12721 }, // 40x60
 ];
+
+// Calculate price for exactly 50% profit margin after all Etsy fees
+// profit_margin = (price - cost - etsy_fees) / price = 0.5
+// etsy_fees = price * (transaction + payment) + listing_fee
+// price - cost - price * 0.095 - 20 = 0.5 * price
+// price * (1 - 0.095 - 0.5) = cost + 20
+// price = (cost + 20) / 0.405
+function calculatePrice(cost) {
+  return Math.ceil((cost + ETSY_LISTING_FEE) / (1 - ETSY_TRANSACTION_FEE - ETSY_PAYMENT_FEE - 0.5));
+}
 
 async function generateListing() {
   console.log('Generating listing content with Gemini...');
@@ -34,11 +49,11 @@ async function generateListing() {
       body: JSON.stringify({
         contents: [{
           parts: [{ text: `Based on this art description: "${IMAGE_PROMPT}"
-          
-Generate an Etsy product listing in JSON format only, no markdown, no backticks, just raw JSON:
+
+Generate an Etsy product listing. Respond with raw JSON only, no markdown, no backticks:
 {
-  "title": "catchy Etsy title under 140 chars including wall art canvas keywords",
-  "description": "3 paragraph Etsy product description, engaging and SEO friendly, mention canvas print, wall art, home decor, available sizes",
+  "title": "catchy Etsy title under 140 chars with wall art canvas keywords",
+  "description": "3 paragraph Etsy product description, engaging and SEO friendly, mention canvas print, wall art, home decor, available in multiple sizes",
   "tags": ["tag1","tag2","tag3","tag4","tag5","tag6","tag7","tag8","tag9","tag10","tag11","tag12","tag13"]
 }` }]
         }],
@@ -50,7 +65,8 @@ Generate an Etsy product listing in JSON format only, no markdown, no backticks,
   const text = data?.candidates?.[0]?.content?.parts?.[0]?.text;
   if (!text) throw new Error('Listing generation failed: ' + JSON.stringify(data));
   try {
-    const listing = JSON.parse(text.trim());
+    const clean = text.replace(/```json|```/g, '').trim();
+    const listing = JSON.parse(clean);
     console.log('Listing generated:', listing.title);
     return listing;
   } catch (e) {
@@ -105,8 +121,16 @@ async function createProduct(imageId, listing) {
   const variants = VERTICAL_VARIANTS.map(v => ({
     id: v.id,
     is_enabled: true,
-    price: v.price
+    price: calculatePrice(v.cost)
   }));
+
+  // Log prices for verification
+  VERTICAL_VARIANTS.forEach(v => {
+    const price = calculatePrice(v.cost);
+    const profit = price - v.cost - Math.round(price * (ETSY_TRANSACTION_FEE + ETSY_PAYMENT_FEE)) - ETSY_LISTING_FEE;
+    const margin = Math.round((profit / price) * 100);
+    console.log(`Variant ${v.id}: cost=${v.cost} price=${price} margin=${margin}%`);
+  });
 
   const print_areas = VERTICAL_VARIANTS.map(v => ({
     variant_ids: [v.id],
@@ -165,7 +189,7 @@ async function enableEconomyShipping(productId) {
     }
   );
   const data = await res.json();
-  console.log('Shipping updated:', JSON.stringify(data));
+  console.log('Shipping response:', JSON.stringify(data));
 }
 
 async function publishToEtsy(productId) {
@@ -191,7 +215,7 @@ async function publishToEtsy(productId) {
     }
   );
   const data = await res.json();
-  console.log('Published to Etsy!', data);
+  console.log('Publish response:', JSON.stringify(data));
   return data;
 }
 
