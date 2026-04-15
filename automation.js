@@ -8,10 +8,6 @@ const SHOP_ID = '18634010';
 const BLUEPRINT_ID = 1159;
 const PRINT_PROVIDER_ID = 99; // Printify Choice
 
-function calculatePrice(cost) {
-  return Math.ceil(cost / 0.5);
-}
-
 const PROMPTS = [
   "Snoopy and Woodstock sitting together watching a sunset, warm golden sky",
   "Snoopy flying a kite with Woodstock sitting on top, blue sky and clouds",
@@ -114,16 +110,17 @@ const PROMPTS = [
   "Snoopy and Woodstock sitting on a cloud above a colorful world",
 ];
 
+// Flat rate prices in cents (hardcoded)
 const VERTICAL_VARIANTS = [
-  { id: 101413, w: 2400,  h: 3000,  cost: 1288  },
-  { id: 91641,  w: 3300,  h: 4200,  cost: 1610  },
-  { id: 91644,  w: 3600,  h: 5400,  cost: 2208  },
-  { id: 91647,  w: 4800,  h: 7200,  cost: 2857  },
-  { id: 91649,  w: 6000,  h: 7200,  cost: 3538  },
-  { id: 101411, w: 7200,  h: 9000,  cost: 4599  },
-  { id: 91654,  w: 9000,  h: 12000, cost: 6361  },
-  { id: 91655,  w: 9600,  h: 14400, cost: 9314  },
-  { id: 112955, w: 12000, h: 18000, cost: 12721 },
+  { id: 101413, w: 2400,  h: 3000,  price: 5142  }, // 8x10   $51.42
+  { id: 91641,  w: 3300,  h: 4200,  price: 6336  }, // 11x14  $63.36
+  { id: 91644,  w: 3600,  h: 5400,  price: 8420  }, // 12x18  $84.20
+  { id: 91647,  w: 4800,  h: 7200,  price: 10820 }, // 16x24  $108.20
+  { id: 91649,  w: 6000,  h: 7200,  price: 13200 }, // 20x24  $132.00
+  { id: 101411, w: 7200,  h: 9000,  price: 16966 }, // 24x30  $169.66
+  { id: 91654,  w: 9000,  h: 12000, price: 23762 }, // 30x40  $237.62
+  { id: 91655,  w: 9600,  h: 14400, price: 34684 }, // 32x48  $346.84
+  { id: 112955, w: 12000, h: 18000, price: 50026 }, // 40x60  $500.26
 ];
 
 function pickPrompts() {
@@ -237,7 +234,7 @@ async function uploadToPrintify(base64Data) {
 async function createProduct(imageId, listing) {
   console.log("Creating Printify product...");
   var variants = VERTICAL_VARIANTS.map(function(v) {
-    return { id: v.id, is_enabled: true, price: calculatePrice(v.cost) };
+    return { id: v.id, is_enabled: true, price: v.price };
   });
   var print_areas = VERTICAL_VARIANTS.map(function(v) {
     return {
@@ -268,7 +265,6 @@ async function publishToEtsy(productId) {
   console.log("Waiting 30s for product images to fully process...");
   await new Promise(function(r) { setTimeout(r, 30000); });
   console.log("Publishing to Etsy...");
-
   var body = JSON.stringify({
     title: true,
     description: true,
@@ -276,10 +272,8 @@ async function publishToEtsy(productId) {
     variants: true,
     tags: true,
     keyFeatures: true,
-    shipping_template: true,
-    offsite_ads: true
+    shipping_template: true
   });
-
   var res = await fetch(
     "https://api.printify.com/v1/shops/" + SHOP_ID + "/products/" + productId + "/publish.json",
     {
@@ -290,7 +284,6 @@ async function publishToEtsy(productId) {
   );
   var text = await res.text();
   console.log("Publish response:", text);
-
   if (text === "{}" || text === "" || text === "null") {
     console.log("Publish returned empty, retrying after 20s...");
     await new Promise(function(r) { setTimeout(r, 20000); });
