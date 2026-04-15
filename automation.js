@@ -8,7 +8,6 @@ const SHOP_ID = '18634010';
 const BLUEPRINT_ID = 1159;
 const PRINT_PROVIDER_ID = 99; // Printify Choice
 
-// Simple 50% gross margin before Etsy fees (cost / 0.5)
 function calculatePrice(cost) {
   return Math.ceil(cost / 0.5);
 }
@@ -116,15 +115,15 @@ const PROMPTS = [
 ];
 
 const VERTICAL_VARIANTS = [
-  { id: 101413, w: 2400,  h: 3000,  cost: 1288  }, // 8x10
-  { id: 91641,  w: 3300,  h: 4200,  cost: 1610  }, // 11x14
-  { id: 91644,  w: 3600,  h: 5400,  cost: 2208  }, // 12x18
-  { id: 91647,  w: 4800,  h: 7200,  cost: 2857  }, // 16x24
-  { id: 91649,  w: 6000,  h: 7200,  cost: 3538  }, // 20x24
-  { id: 101411, w: 7200,  h: 9000,  cost: 4599  }, // 24x30
-  { id: 91654,  w: 9000,  h: 12000, cost: 6361  }, // 30x40
-  { id: 91655,  w: 9600,  h: 14400, cost: 9314  }, // 32x48
-  { id: 112955, w: 12000, h: 18000, cost: 12721 }, // 40x60
+  { id: 101413, w: 2400,  h: 3000,  cost: 1288  },
+  { id: 91641,  w: 3300,  h: 4200,  cost: 1610  },
+  { id: 91644,  w: 3600,  h: 5400,  cost: 2208  },
+  { id: 91647,  w: 4800,  h: 7200,  cost: 2857  },
+  { id: 91649,  w: 6000,  h: 7200,  cost: 3538  },
+  { id: 101411, w: 7200,  h: 9000,  cost: 4599  },
+  { id: 91654,  w: 9000,  h: 12000, cost: 6361  },
+  { id: 91655,  w: 9600,  h: 14400, cost: 9314  },
+  { id: 112955, w: 12000, h: 18000, cost: 12721 },
 ];
 
 function pickPrompts() {
@@ -265,65 +264,42 @@ async function createProduct(imageId, listing) {
   return data.id;
 }
 
-async function updateProduct(productId) {
-  // Update product to enable economy shipping and offsite ads via product update endpoint
-  console.log("Waiting 10s for product images to process...");
-  await new Promise(function(r) { setTimeout(r, 10000); });
-  console.log("Updating product shipping and ads settings...");
-  var res = await fetch("https://api.printify.com/v1/shops/" + SHOP_ID + "/products/" + productId + ".json", {
-    method: "PUT",
-    headers: { "Authorization": "Bearer " + PRINTIFY_API_KEY, "Content-Type": "application/json" },
-    body: JSON.stringify({
-      shipping_template_id: null,
-      is_economy_shipping_enabled: true,
-      is_printify_express_shipping_enabled: false
-    })
-  });
-  var text = await res.text();
-  console.log("Product update response:", text);
-}
-
 async function publishToEtsy(productId) {
+  console.log("Waiting 30s for product images to fully process...");
+  await new Promise(function(r) { setTimeout(r, 30000); });
   console.log("Publishing to Etsy...");
-  await new Promise(function(r) { setTimeout(r, 5000); });
+
+  var body = JSON.stringify({
+    title: true,
+    description: true,
+    images: true,
+    variants: true,
+    tags: true,
+    keyFeatures: true,
+    shipping_template: true,
+    offsite_ads: true
+  });
+
   var res = await fetch(
     "https://api.printify.com/v1/shops/" + SHOP_ID + "/products/" + productId + "/publish.json",
     {
       method: "POST",
       headers: { "Authorization": "Bearer " + PRINTIFY_API_KEY, "Content-Type": "application/json" },
-      body: JSON.stringify({
-        title: true,
-        description: true,
-        images: true,
-        variants: true,
-        tags: true,
-        keyFeatures: true,
-        shipping_template: true,
-        offsite_ads: true
-      })
+      body: body
     }
   );
   var text = await res.text();
   console.log("Publish response:", text);
-  if (text === "{}" || text === "") {
-    // Retry publish once more after longer delay
-    console.log("Publish returned empty, retrying after 15s...");
-    await new Promise(function(r) { setTimeout(r, 15000); });
+
+  if (text === "{}" || text === "" || text === "null") {
+    console.log("Publish returned empty, retrying after 20s...");
+    await new Promise(function(r) { setTimeout(r, 20000); });
     var res2 = await fetch(
       "https://api.printify.com/v1/shops/" + SHOP_ID + "/products/" + productId + "/publish.json",
       {
         method: "POST",
         headers: { "Authorization": "Bearer " + PRINTIFY_API_KEY, "Content-Type": "application/json" },
-        body: JSON.stringify({
-          title: true,
-          description: true,
-          images: true,
-          variants: true,
-          tags: true,
-          keyFeatures: true,
-          shipping_template: true,
-          offsite_ads: true
-        })
+        body: body
       }
     );
     var text2 = await res2.text();
@@ -349,7 +325,6 @@ async function run() {
       var base64Image = await retry(function() { return generateImage(prompt); });
       var imageId = await uploadToPrintify(base64Image);
       var productId = await createProduct(imageId, listing);
-      await updateProduct(productId);
       await publishToEtsy(productId);
       console.log("Listing " + (i + 1) + " live on Etsy!");
       if (i < 4) await new Promise(function(r) { setTimeout(r, 10000); });
