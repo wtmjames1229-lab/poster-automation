@@ -8,10 +8,10 @@ const SHOP_ID = '18634010';
 const BLUEPRINT_ID = 1159;
 const PRINT_PROVIDER_ID = 99; // Printify Choice
 
-// Etsy fee rates
-const ETSY_TRANSACTION_FEE = 0.065;
-const ETSY_PAYMENT_FEE = 0.03;
-const ETSY_LISTING_FEE = 20; // cents
+// Simple 50% gross margin before Etsy fees (cost / 0.5)
+function calculatePrice(cost) {
+  return Math.ceil(cost / 0.5);
+}
 
 const PROMPTS = [
   "Snoopy and Woodstock sitting together watching a sunset, warm golden sky",
@@ -115,7 +115,6 @@ const PROMPTS = [
   "Snoopy and Woodstock sitting on a cloud above a colorful world",
 ];
 
-// Vertical canvas variants with production costs (in cents)
 const VERTICAL_VARIANTS = [
   { id: 101413, w: 2400,  h: 3000,  cost: 1288  }, // 8x10
   { id: 91641,  w: 3300,  h: 4200,  cost: 1610  }, // 11x14
@@ -128,12 +127,8 @@ const VERTICAL_VARIANTS = [
   { id: 112955, w: 12000, h: 18000, cost: 12721 }, // 40x60
 ];
 
-function calculatePrice(cost) {
-  return Math.ceil((cost + ETSY_LISTING_FEE) / (1 - ETSY_TRANSACTION_FEE - ETSY_PAYMENT_FEE - 0.5));
-}
-
 function pickPrompts() {
-  const shuffled = [...PROMPTS].sort(() => Math.random() - 0.5);
+  var shuffled = PROMPTS.slice().sort(function() { return Math.random() - 0.5; });
   return shuffled.slice(0, 5);
 }
 
@@ -155,111 +150,86 @@ async function retry(fn, retries, delay) {
   }
 }
 
-// Crop and resize base64 image to exact 2:3 vertical ratio using sharp
 async function cropToVertical(base64Data) {
-  const sharp = require("sharp");
-  const inputBuffer = Buffer.from(base64Data, "base64");
-  const metadata = await sharp(inputBuffer).metadata();
-  const width = metadata.width;
-  const height = metadata.height;
-
-  // Target 2:3 ratio (width:height)
-  const targetRatio = 2 / 3;
-  const currentRatio = width / height;
-
-  let cropWidth, cropHeight, left, top;
-
+  var sharp = require("sharp");
+  var inputBuffer = Buffer.from(base64Data, "base64");
+  var metadata = await sharp(inputBuffer).metadata();
+  var width = metadata.width;
+  var height = metadata.height;
+  var targetRatio = 2 / 3;
+  var currentRatio = width / height;
+  var cropWidth, cropHeight, left, top;
   if (currentRatio > targetRatio) {
-    // Image is too wide — crop width
     cropHeight = height;
     cropWidth = Math.floor(height * targetRatio);
     left = Math.floor((width - cropWidth) / 2);
     top = 0;
   } else {
-    // Image is too tall — crop height
     cropWidth = width;
     cropHeight = Math.floor(width / targetRatio);
     left = 0;
     top = Math.floor((height - cropHeight) / 2);
   }
-
-  const outputBuffer = await sharp(inputBuffer)
+  var outputBuffer = await sharp(inputBuffer)
     .extract({ left: left, top: top, width: cropWidth, height: cropHeight })
-    .resize(3000, 4500) // standardize to 3000x4500 (2:3)
+    .resize(3000, 4500)
     .png()
     .toBuffer();
-
-  console.log("Image cropped to 2:3 vertical ratio (" + width + "x" + height + " -> 3000x4500)");
+  console.log("Image cropped to 2:3 (" + width + "x" + height + " -> 3000x4500)");
   return outputBuffer.toString("base64");
 }
 
 async function generateListing(prompt) {
-  console.log("Generating listing content with Gemini...");
-  const res = await fetch(
+  console.log("Generating listing content...");
+  var res = await fetch(
     "https://generativelanguage.googleapis.com/v1beta/models/gemini-3.1-flash-image-preview:generateContent?key=" + NB_API_KEY,
     {
       method: "POST",
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify({
-        contents: [{
-          parts: [{ text: "Based on this art description: \"" + prompt + "\"\n\nGenerate an Etsy product listing. Respond with raw JSON only, no markdown, no backticks:\n{\n  \"title\": \"catchy Etsy title under 140 chars with wall art canvas keywords\",\n  \"description\": \"3 paragraph Etsy product description, engaging and SEO friendly, mention canvas print, wall art, home decor, available in multiple sizes\",\n  \"tags\": [\"tag1\",\"tag2\",\"tag3\",\"tag4\",\"tag5\",\"tag6\",\"tag7\",\"tag8\",\"tag9\",\"tag10\",\"tag11\",\"tag12\",\"tag13\"]\n}" }]
-        }],
+        contents: [{ parts: [{ text: "Based on this art description: \"" + prompt + "\"\n\nGenerate an Etsy product listing. Respond with raw JSON only, no markdown, no backticks:\n{\n  \"title\": \"catchy Etsy title under 140 chars with wall art canvas keywords\",\n  \"description\": \"3 paragraph Etsy product description, engaging and SEO friendly, mention canvas print, wall art, home decor, available in multiple sizes\",\n  \"tags\": [\"tag1\",\"tag2\",\"tag3\",\"tag4\",\"tag5\",\"tag6\",\"tag7\",\"tag8\",\"tag9\",\"tag10\",\"tag11\",\"tag12\",\"tag13\"]\n}" }] }],
         generationConfig: { responseModalities: ["TEXT"] }
       })
     }
   );
-  const data = await res.json();
-  const text = data && data.candidates && data.candidates[0] && data.candidates[0].content && data.candidates[0].content.parts && data.candidates[0].content.parts[0] && data.candidates[0].content.parts[0].text;
+  var data = await res.json();
+  var text = data && data.candidates && data.candidates[0] && data.candidates[0].content && data.candidates[0].content.parts && data.candidates[0].content.parts[0] && data.candidates[0].content.parts[0].text;
   if (!text) throw new Error("Listing generation failed: " + JSON.stringify(data));
-  const clean = text.replace(/```json|```/g, "").trim();
-  const listing = JSON.parse(clean);
+  var clean = text.replace(/```json|```/g, "").trim();
+  var listing = JSON.parse(clean);
   console.log("Listing generated:", listing.title);
   return listing;
 }
 
 async function generateImage(prompt) {
-  console.log("Generating image with Gemini...");
-  const res = await fetch(
+  console.log("Generating image...");
+  var res = await fetch(
     "https://generativelanguage.googleapis.com/v1beta/models/gemini-3.1-flash-image-preview:generateContent?key=" + NB_API_KEY,
     {
       method: "POST",
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify({
-        contents: [{
-          parts: [{ text: prompt + " Generate as a tall vertical portrait poster artwork in 2:3 aspect ratio, taller than wide, fill the entire frame edge to edge with no white borders, no margins, suitable for canvas wall art print, flat design, minimalist illustration style, no text, no words, no letters." }]
-        }],
-        generationConfig: {
-          responseModalities: ["IMAGE", "TEXT"],
-          imageConfig: { aspectRatio: "2:3" }
-        }
+        contents: [{ parts: [{ text: prompt + " Generate as a tall vertical portrait poster artwork in 2:3 aspect ratio, taller than wide, fill the entire frame edge to edge with no white borders, no margins, suitable for canvas wall art print, flat design, minimalist illustration style, no text, no words, no letters." }] }],
+        generationConfig: { responseModalities: ["IMAGE", "TEXT"] }
       })
     }
   );
-  const data = await res.json();
-  const parts = data && data.candidates && data.candidates[0] && data.candidates[0].content && data.candidates[0].content.parts;
-  const imagePart = parts && parts.find(function(p) { return p.inlineData; });
+  var data = await res.json();
+  var parts = data && data.candidates && data.candidates[0] && data.candidates[0].content && data.candidates[0].content.parts;
+  var imagePart = parts && parts.find(function(p) { return p.inlineData; });
   if (!imagePart) throw new Error("Image generation failed: " + JSON.stringify(data));
   console.log("Image generated successfully");
-
-  // Crop to exact 2:3 vertical ratio
-  const croppedBase64 = await cropToVertical(imagePart.inlineData.data);
-  return croppedBase64;
+  return await cropToVertical(imagePart.inlineData.data);
 }
 
 async function uploadToPrintify(base64Data) {
   console.log("Uploading image to Printify...");
-  const res = await fetch("https://api.printify.com/v1/uploads/images.json", {
+  var res = await fetch("https://api.printify.com/v1/uploads/images.json", {
     method: "POST",
-    headers: {
-      "Authorization": "Bearer " + PRINTIFY_API_KEY,
-      "Content-Type": "application/json"
-    },
-    body: JSON.stringify({
-      file_name: "canvas_" + Date.now() + ".png",
-      contents: base64Data
-    })
+    headers: { "Authorization": "Bearer " + PRINTIFY_API_KEY, "Content-Type": "application/json" },
+    body: JSON.stringify({ file_name: "canvas_" + Date.now() + ".png", contents: base64Data })
   });
-  const data = await res.json();
+  var data = await res.json();
   if (!data.id) throw new Error("Upload failed: " + JSON.stringify(data));
   console.log("Uploaded, image ID:", data.id);
   return data.id;
@@ -267,24 +237,18 @@ async function uploadToPrintify(base64Data) {
 
 async function createProduct(imageId, listing) {
   console.log("Creating Printify product...");
-  const variants = VERTICAL_VARIANTS.map(function(v) {
+  var variants = VERTICAL_VARIANTS.map(function(v) {
     return { id: v.id, is_enabled: true, price: calculatePrice(v.cost) };
   });
-  const print_areas = VERTICAL_VARIANTS.map(function(v) {
+  var print_areas = VERTICAL_VARIANTS.map(function(v) {
     return {
       variant_ids: [v.id],
-      placeholders: [{
-        position: "front",
-        images: [{ id: imageId, x: 0.5, y: 0.5, scale: 1, angle: 0, print_area_width: v.w, print_area_height: v.h }]
-      }]
+      placeholders: [{ position: "front", images: [{ id: imageId, x: 0.5, y: 0.5, scale: 1, angle: 0, print_area_width: v.w, print_area_height: v.h }] }]
     };
   });
-  const res = await fetch("https://api.printify.com/v1/shops/" + SHOP_ID + "/products.json", {
+  var res = await fetch("https://api.printify.com/v1/shops/" + SHOP_ID + "/products.json", {
     method: "POST",
-    headers: {
-      "Authorization": "Bearer " + PRINTIFY_API_KEY,
-      "Content-Type": "application/json"
-    },
+    headers: { "Authorization": "Bearer " + PRINTIFY_API_KEY, "Content-Type": "application/json" },
     body: JSON.stringify({
       title: listing.title,
       description: listing.description,
@@ -295,47 +259,38 @@ async function createProduct(imageId, listing) {
       print_areas: print_areas
     })
   });
-  const data = await res.json();
+  var data = await res.json();
   if (!data.id) throw new Error("Product creation failed: " + JSON.stringify(data));
   console.log("Product created, ID:", data.id);
   return data.id;
 }
 
-async function enableEconomyShipping(productId) {
-  console.log("Waiting for product to be ready...");
-  await new Promise(function(r) { setTimeout(r, 8000); });
-  console.log("Enabling economy shipping...");
-  const res = await fetch(
-    "https://api.printify.com/v2/shops/" + SHOP_ID + "/products/" + productId + "/shipping.json",
-    {
-      method: "PUT",
-      headers: {
-        "Authorization": "Bearer " + PRINTIFY_API_KEY,
-        "Content-Type": "application/json"
-      },
-      body: JSON.stringify({
-        shipping_handling: {
-          economy: { enabled: true },
-          standard: { enabled: true }
-        }
-      })
-    }
-  );
-  const text = await res.text();
-  console.log("Shipping response:", text);
+async function updateProduct(productId) {
+  // Update product to enable economy shipping and offsite ads via product update endpoint
+  console.log("Waiting 10s for product images to process...");
+  await new Promise(function(r) { setTimeout(r, 10000); });
+  console.log("Updating product shipping and ads settings...");
+  var res = await fetch("https://api.printify.com/v1/shops/" + SHOP_ID + "/products/" + productId + ".json", {
+    method: "PUT",
+    headers: { "Authorization": "Bearer " + PRINTIFY_API_KEY, "Content-Type": "application/json" },
+    body: JSON.stringify({
+      shipping_template_id: null,
+      is_economy_shipping_enabled: true,
+      is_printify_express_shipping_enabled: false
+    })
+  });
+  var text = await res.text();
+  console.log("Product update response:", text);
 }
 
 async function publishToEtsy(productId) {
   console.log("Publishing to Etsy...");
   await new Promise(function(r) { setTimeout(r, 5000); });
-  const res = await fetch(
+  var res = await fetch(
     "https://api.printify.com/v1/shops/" + SHOP_ID + "/products/" + productId + "/publish.json",
     {
       method: "POST",
-      headers: {
-        "Authorization": "Bearer " + PRINTIFY_API_KEY,
-        "Content-Type": "application/json"
-      },
+      headers: { "Authorization": "Bearer " + PRINTIFY_API_KEY, "Content-Type": "application/json" },
       body: JSON.stringify({
         title: true,
         description: true,
@@ -348,20 +303,41 @@ async function publishToEtsy(productId) {
       })
     }
   );
-  const text = await res.text();
+  var text = await res.text();
   console.log("Publish response:", text);
+  if (text === "{}" || text === "") {
+    // Retry publish once more after longer delay
+    console.log("Publish returned empty, retrying after 15s...");
+    await new Promise(function(r) { setTimeout(r, 15000); });
+    var res2 = await fetch(
+      "https://api.printify.com/v1/shops/" + SHOP_ID + "/products/" + productId + "/publish.json",
+      {
+        method: "POST",
+        headers: { "Authorization": "Bearer " + PRINTIFY_API_KEY, "Content-Type": "application/json" },
+        body: JSON.stringify({
+          title: true,
+          description: true,
+          images: true,
+          variants: true,
+          tags: true,
+          keyFeatures: true,
+          shipping_template: true,
+          offsite_ads: true
+        })
+      }
+    );
+    var text2 = await res2.text();
+    console.log("Publish retry response:", text2);
+  }
 }
 
 async function run() {
-  // Install sharp if not available
-  try {
-    require("sharp");
-  } catch (e) {
+  try { require("sharp"); } catch (e) {
     console.log("Installing sharp...");
     require("child_process").execSync("npm install sharp", { stdio: "inherit" });
   }
 
-  const prompts = pickPrompts();
+  var prompts = pickPrompts();
   console.log("Selected 5 unique prompts for this run");
 
   for (var i = 0; i < 5; i++) {
@@ -373,12 +349,12 @@ async function run() {
       var base64Image = await retry(function() { return generateImage(prompt); });
       var imageId = await uploadToPrintify(base64Image);
       var productId = await createProduct(imageId, listing);
-      await enableEconomyShipping(productId);
+      await updateProduct(productId);
       await publishToEtsy(productId);
       console.log("Listing " + (i + 1) + " live on Etsy!");
       if (i < 4) await new Promise(function(r) { setTimeout(r, 10000); });
     } catch (err) {
-      console.error("Listing " + (i + 1) + " failed after retries:", err.message);
+      console.error("Listing " + (i + 1) + " failed:", err.message);
     }
   }
   console.log("\nDone! All 5 listings processed.");
