@@ -730,6 +730,20 @@ async function createProduct(imageId, listing) {
   return data.id;
 }
 
+async function enableOffsiteAds(productId) {
+  console.log("Enabling offsite ads...");
+  var res = await fetch(
+    "https://api.printify.com/v1/shops/" + SHOP_ID + "/products/" + productId + ".json",
+    {
+      method: "PUT",
+      headers: { "Authorization": "Bearer " + PRINTIFY_API_KEY, "Content-Type": "application/json" },
+      body: JSON.stringify({ is_printify_express_eligible: false, sales_channel_properties: [{ channel: "etsy", offsite_ads_enabled: true }] })
+    }
+  );
+  var text = await res.text();
+  console.log("Offsite ads response:", text);
+}
+
 async function publishToEtsy(productId) {
   console.log("Waiting 30s for product images to fully process...");
   await new Promise(function(r) { setTimeout(r, 30000); });
@@ -787,6 +801,7 @@ async function run() {
       var base64Image = await retry(function() { return generateImage(prompt); });
       var imageId = await uploadToPrintify(base64Image);
       var productId = await createProduct(imageId, listing);
+      await enableOffsiteAds(productId);
       await publishToEtsy(productId);
       console.log("Listing " + (i + 1) + " live on Etsy!");
       if (i < 4) await new Promise(function(r) { setTimeout(r, 10000); });
