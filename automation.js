@@ -732,12 +732,22 @@ async function createProduct(imageId, listing) {
 
 async function enableOffsiteAds(productId) {
   console.log("Enabling offsite ads...");
-  var res = await fetch(
+  // First GET the product to find current state
+  var getRes = await fetch(
     "https://api.printify.com/v1/shops/" + SHOP_ID + "/products/" + productId + ".json",
+    { headers: { "Authorization": "Bearer " + PRINTIFY_API_KEY } }
+  );
+  var product = await getRes.json();
+  console.log("Product external_id:", product.external_id);
+
+  // Use the exact endpoint intercepted from browser: includes user_id in path
+  var USER_ID = "19310315";
+  var res = await fetch(
+    "https://printify.com/api/v1/users/" + USER_ID + "/shops/" + SHOP_ID + "/products/" + productId,
     {
       method: "PUT",
       headers: { "Authorization": "Bearer " + PRINTIFY_API_KEY, "Content-Type": "application/json" },
-      body: JSON.stringify({ is_printify_express_eligible: false, sales_channel_properties: [{ channel: "etsy", offsite_ads_enabled: true }] })
+      body: JSON.stringify({ sales_channel_properties: { etsy: { offsite_adds: 0.12 } } })
     }
   );
   var text = await res.text();
