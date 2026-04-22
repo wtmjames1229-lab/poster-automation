@@ -604,24 +604,55 @@ async function enableOffsiteAdsPuppeteer(productId) {
     await new Promise(function(r) { setTimeout(r, 4000); });
 
     console.log("Looking for offsite ads toggle...");
+    // Log all buttons and toggles found on page for debugging
+    var pageDebug = await page.evaluate(function() {
+      var buttons = document.querySelectorAll("button[role=switch]");
+      var info = "Switches found: " + buttons.length + " | ";
+      for (var i = 0; i < buttons.length; i++) {
+        info += "aria-checked=" + buttons[i].getAttribute("aria-checked") + " text=" + buttons[i].textContent.trim().substring(0, 30) + " | ";
+      }
+      var bodyText = document.body.innerText;
+      info += " | hasOffsiteText=" + (bodyText.indexOf("off-site") > -1 || bodyText.indexOf("offsite") > -1);
+      return info;
+    });
+    console.log("Page debug:", pageDebug);
+
     var toggled = await page.evaluate(function() {
-      var allElements = document.querySelectorAll("*");
-      for (var i = 0; i < allElements.length; i++) {
-        var el = allElements[i];
-        if (el.textContent && el.textContent.trim() === "Etsy off-site ads." && el.children.length === 0) {
-          var container = el.parentElement;
-          for (var j = 0; j < 5; j++) {
-            if (!container) break;
-            var toggle = container.querySelector("button[role=switch], input[type=checkbox]");
+      // Find all switch buttons
+      var switches = document.querySelectorAll("button[role=switch]");
+      for (var i = 0; i < switches.length; i++) {
+        var btn = switches[i];
+        // Check nearby text for "offsite" or "off-site"
+        var parent = btn.closest("div, section, label") || btn.parentElement;
+        var parentText = parent ? parent.innerText : "";
+        if (parentText.toLowerCase().indexOf("off-site") > -1 || parentText.toLowerCase().indexOf("offsite") > -1) {
+          var isOn = btn.getAttribute("aria-checked") === "true";
+          if (!isOn) {
+            btn.click();
+            return "clicked";
+          }
+          return "already-on";
+        }
+      }
+
+      // Try finding by searching all text nodes
+      var walker = document.createTreeWalker(document.body, NodeFilter.SHOW_TEXT);
+      var node;
+      while ((node = walker.nextNode())) {
+        if (node.nodeValue && (node.nodeValue.toLowerCase().indexOf("off-site ads") > -1 || node.nodeValue.toLowerCase().indexOf("offsite ads") > -1)) {
+          var parent = node.parentElement;
+          for (var j = 0; j < 8; j++) {
+            if (!parent) break;
+            var toggle = parent.querySelector("button[role=switch], input[type=checkbox]");
             if (toggle) {
               var isOn = toggle.getAttribute("aria-checked") === "true" || toggle.checked;
               if (!isOn) {
                 toggle.click();
-                return "clicked";
+                return "clicked-via-text";
               }
               return "already-on";
             }
-            container = container.parentElement;
+            parent = parent.parentElement;
           }
         }
       }
