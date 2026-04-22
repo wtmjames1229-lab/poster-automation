@@ -538,14 +538,27 @@ async function enableOffsiteAdsPuppeteer(productId) {
 
     console.log("Logging into Printify...");
     await page.goto("https://printify.com/app/login", { waitUntil: "domcontentloaded", timeout: 30000 });
-    await new Promise(function(r) { setTimeout(r, 5000); });
 
-    // Try multiple possible selectors for email field
+    // Wait for Angular to fully render the login form
+    console.log("Waiting for Angular app to render...");
+    await new Promise(function(r) { setTimeout(r, 8000); });
+
+    // Try to find email input with extended timeout
     var emailSelector = null;
-    var selectors = ["input[type=email]", "input[name=email]", "input[placeholder*=email i]", "input[id*=email i]", "#email", "input.email"];
+    var selectors = [
+      "input[type=email]",
+      "input[name=email]",
+      "input[formcontrolname=email]",
+      "input[placeholder*=email i]",
+      "input[id*=email i]",
+      "#email",
+      "pfa-login input[type=text]",
+      "form input:first-child"
+    ];
+
     for (var s = 0; s < selectors.length; s++) {
       try {
-        await page.waitForSelector(selectors[s], { timeout: 3000 });
+        await page.waitForSelector(selectors[s], { timeout: 5000 });
         emailSelector = selectors[s];
         console.log("Found email field:", emailSelector);
         break;
@@ -553,16 +566,23 @@ async function enableOffsiteAdsPuppeteer(productId) {
     }
 
     if (!emailSelector) {
-      // Log page content for debugging
-      var pageContent = await page.evaluate(function() { return document.body.innerHTML.substring(0, 500); });
-      console.log("Page content preview:", pageContent);
+      var pageContent = await page.evaluate(function() {
+        var inputs = document.querySelectorAll("input");
+        var info = "Inputs found: " + inputs.length + " | ";
+        for (var i = 0; i < inputs.length; i++) {
+          info += "type=" + inputs[i].type + " name=" + inputs[i].name + " id=" + inputs[i].id + " | ";
+        }
+        return info;
+      });
+      console.log("Input debug:", pageContent);
       throw new Error("Could not find email input on login page");
     }
 
-    await page.type(emailSelector, PRINTIFY_EMAIL, { delay: 50 });
+    await page.click(emailSelector);
+    await page.type(emailSelector, PRINTIFY_EMAIL, { delay: 80 });
 
     var passSelector = null;
-    var passSelectors = ["input[type=password]", "input[name=password]", "#password"];
+    var passSelectors = ["input[type=password]", "input[name=password]", "input[formcontrolname=password]", "#password"];
     for (var p = 0; p < passSelectors.length; p++) {
       try {
         await page.waitForSelector(passSelectors[p], { timeout: 3000 });
@@ -571,10 +591,12 @@ async function enableOffsiteAdsPuppeteer(productId) {
       } catch (e) {}
     }
     if (!passSelector) throw new Error("Could not find password input");
-    await page.type(passSelector, PRINTIFY_PASSWORD, { delay: 50 });
+    await page.click(passSelector);
+    await page.type(passSelector, PRINTIFY_PASSWORD, { delay: 80 });
 
     await page.keyboard.press("Enter");
-    await new Promise(function(r) { setTimeout(r, 8000); });
+    console.log("Submitted login, waiting for redirect...");
+    await new Promise(function(r) { setTimeout(r, 10000); });
     console.log("Logged in, navigating to product...");
 
     var productUrl = "https://printify.com/app/product-details/" + productId + "?fromProductsPage=1";
