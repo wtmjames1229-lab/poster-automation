@@ -537,12 +537,44 @@ async function enableOffsiteAdsPuppeteer(productId) {
     await page.setUserAgent("Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36");
 
     console.log("Logging into Printify...");
-    await page.goto("https://printify.com/app/login", { waitUntil: "networkidle2", timeout: 30000 });
-    await page.waitForSelector("input[type=email]", { timeout: 15000 });
-    await page.type("input[type=email]", PRINTIFY_EMAIL, { delay: 50 });
-    await page.type("input[type=password]", PRINTIFY_PASSWORD, { delay: 50 });
-    await page.click("button[type=submit]");
-    await page.waitForNavigation({ waitUntil: "networkidle2", timeout: 30000 });
+    await page.goto("https://printify.com/app/login", { waitUntil: "domcontentloaded", timeout: 30000 });
+    await new Promise(function(r) { setTimeout(r, 5000); });
+
+    // Try multiple possible selectors for email field
+    var emailSelector = null;
+    var selectors = ["input[type=email]", "input[name=email]", "input[placeholder*=email i]", "input[id*=email i]", "#email", "input.email"];
+    for (var s = 0; s < selectors.length; s++) {
+      try {
+        await page.waitForSelector(selectors[s], { timeout: 3000 });
+        emailSelector = selectors[s];
+        console.log("Found email field:", emailSelector);
+        break;
+      } catch (e) {}
+    }
+
+    if (!emailSelector) {
+      // Log page content for debugging
+      var pageContent = await page.evaluate(function() { return document.body.innerHTML.substring(0, 500); });
+      console.log("Page content preview:", pageContent);
+      throw new Error("Could not find email input on login page");
+    }
+
+    await page.type(emailSelector, PRINTIFY_EMAIL, { delay: 50 });
+
+    var passSelector = null;
+    var passSelectors = ["input[type=password]", "input[name=password]", "#password"];
+    for (var p = 0; p < passSelectors.length; p++) {
+      try {
+        await page.waitForSelector(passSelectors[p], { timeout: 3000 });
+        passSelector = passSelectors[p];
+        break;
+      } catch (e) {}
+    }
+    if (!passSelector) throw new Error("Could not find password input");
+    await page.type(passSelector, PRINTIFY_PASSWORD, { delay: 50 });
+
+    await page.keyboard.press("Enter");
+    await new Promise(function(r) { setTimeout(r, 8000); });
     console.log("Logged in, navigating to product...");
 
     var productUrl = "https://printify.com/app/product-details/" + productId + "?fromProductsPage=1";
