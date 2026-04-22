@@ -12,8 +12,10 @@ jobs:
       - uses: actions/setup-node@v3
         with:
           node-version: '20'
-- run: npm install sharp puppeteer
+      - run: npm install sharp puppeteer
       - run: node automation.js
         env:
           NB_API_KEY: ${{ secrets.NB_API_KEY }}
           PRINTIFY_API_KEY: ${{ secrets.PRINTIFY_API_KEY }}
+          PRINTIFY_EMAIL: ${{ secrets.PRINTIFY_EMAIL }}
+          PRINTIFY_PASSWORD: ${{ secrets.PRINTIFY_PASSWORD }}
