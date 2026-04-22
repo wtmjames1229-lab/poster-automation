@@ -10,47 +10,7 @@ const SHOP_ID = '18634010';
 const BLUEPRINT_ID = 1159;
 const PRINT_PROVIDER_ID = 99;
 
-// Valid Etsy tags — all under 20 chars, no special chars
-const TAG_POOL = [
-  "Snoopy wall art",
-  "Snoopy print",
-  "Peanuts decor",
-  "Peanuts wall art",
-  "Woodstock print",
-  "cartoon wall art",
-  "canvas wall art",
-  "nursery wall art",
-  "kids room decor",
-  "cute wall art",
-  "whimsical art",
-  "gallery wall art",
-  "large wall art",
-  "home decor print",
-  "living room art",
-  "bedroom wall art",
-  "colorful wall art",
-  "gift for kids",
-  "Peanuts gift",
-  "Snoopy gift",
-  "wall art print",
-  "canvas print",
-  "stretched canvas",
-  "ready to hang",
-  "multiple sizes",
-  "vintage cartoon",
-  "retro wall art",
-  "fun wall decor",
-  "playful art",
-  "dog wall art"
-];
-
-function pickTags() {
-  var shuffled = TAG_POOL.slice().sort(function() { return Math.random() - 0.5; });
-  return shuffled.slice(0, 13);
-}
-
 const PROMPTS = [
-  // SEASONAL & WEATHER
   "Snoopy and Woodstock in a spring meadow with cherry blossoms falling",
   "Snoopy and Woodstock watching summer thunderstorm from a covered porch",
   "Snoopy and Woodstock jumping in autumn leaf piles, orange and red tones",
@@ -66,7 +26,6 @@ const PROMPTS = [
   "Snoopy and Woodstock in a monsoon rain, splashing in rivers",
   "Snoopy and Woodstock in a winter frost forest, icy branches glowing",
   "Snoopy and Woodstock watching northern lights in snowy tundra",
-  // RETRO & VINTAGE STYLES
   "Snoopy and Woodstock in a 1950s diner, retro neon signs, milkshakes",
   "Snoopy and Woodstock as 1960s hippies in a psychedelic flower field",
   "Snoopy and Woodstock in a 1970s disco club with mirror balls and neon",
@@ -87,14 +46,12 @@ const PROMPTS = [
   "Snoopy and Woodstock in a 1970s van life road trip illustration",
   "Snoopy and Woodstock in a retro holiday greeting card style",
   "Snoopy and Woodstock in a old school tattoo flash art style",
-  // COLLAGE STYLES
   "Collage of Snoopy and Woodstock through all four seasons",
   "Collage of Snoopy and Woodstock in different countries around the world",
   "Collage of Snoopy and Woodstock doing different sports",
   "Collage of Snoopy and Woodstock at different times of day",
   "Collage of Snoopy and Woodstock in different weather conditions",
   "Collage of tiny Snoopy and Woodstock scenes in a grid pattern",
-  "Collage of Snoopy and Woodstock emojis and icons",
   "Collage of Snoopy and Woodstock in different art styles",
   "Collage of Snoopy and Woodstock celebrating different holidays",
   "Collage of Snoopy and Woodstock silhouettes in colorful shapes",
@@ -103,7 +60,6 @@ const PROMPTS = [
   "Collage of Snoopy and Woodstock with patterns and geometric shapes",
   "Collage mosaic of Snoopy and Woodstock made from tiny scenes",
   "Collage of Snoopy and Woodstock in different decades fashion",
-  // NATURE & LANDSCAPES
   "Snoopy and Woodstock on a cliff overlooking a misty valley",
   "Snoopy and Woodstock in a bamboo forest at dawn",
   "Snoopy and Woodstock on a volcanic island with lava flows",
@@ -124,7 +80,6 @@ const PROMPTS = [
   "Snoopy and Woodstock watching geysers in Yellowstone",
   "Snoopy and Woodstock in a Moroccan desert with sand dunes",
   "Snoopy and Woodstock by the northern lights in Iceland",
-  // COSMIC & SPACE
   "Snoopy and Woodstock as astronauts floating in outer space",
   "Snoopy and Woodstock on the moon with Earth in background",
   "Snoopy and Woodstock surfing on Saturns rings",
@@ -140,7 +95,6 @@ const PROMPTS = [
   "Snoopy and Woodstock chasing shooting stars across the sky",
   "Snoopy and Woodstock floating in a colorful nebula",
   "Snoopy and Woodstock on a glowing asteroid in deep space",
-  // FOOD & COOKING
   "Snoopy as a chef and Woodstock as sous chef in a French kitchen",
   "Snoopy and Woodstock at an Italian pizza oven, tossing dough",
   "Snoopy and Woodstock at a Japanese sushi bar",
@@ -156,7 +110,6 @@ const PROMPTS = [
   "Snoopy and Woodstock at a farmers market with colorful produce",
   "Snoopy and Woodstock in a cozy bakery making bread",
   "Snoopy and Woodstock at a BBQ cookout with smoke and flames",
-  // MUSIC & ARTS
   "Snoopy as a rock star with Woodstock as drummer on stage",
   "Snoopy and Woodstock in a jazz club with saxophone and bass",
   "Snoopy and Woodstock performing classical music in a concert hall",
@@ -172,7 +125,6 @@ const PROMPTS = [
   "Snoopy and Woodstock doing pottery together",
   "Snoopy and Woodstock at an outdoor sculpture park",
   "Snoopy and Woodstock performing in a street dance battle",
-  // SPORTS & ACTIVITIES
   "Snoopy and Woodstock surfing massive ocean waves",
   "Snoopy and Woodstock skiing down a snowy mountain",
   "Snoopy and Woodstock playing tennis on a clay court",
@@ -189,11 +141,8 @@ const PROMPTS = [
   "Snoopy and Woodstock hang gliding over mountains",
   "Snoopy and Woodstock doing parkour in a city",
   "Snoopy and Woodstock playing frisbee on a sunny beach",
-  "Snoopy and Woodstock doing synchronized swimming",
   "Snoopy and Woodstock in a marathon race through a city",
   "Snoopy and Woodstock bowling on a retro lane",
-  "Snoopy and Woodstock playing ping pong in a basement",
-  // TRAVEL & ADVENTURE
   "Snoopy and Woodstock at the Eiffel Tower in Paris at night",
   "Snoopy and Woodstock riding camels near the pyramids of Egypt",
   "Snoopy and Woodstock in a gondola in Venice Italy",
@@ -210,11 +159,9 @@ const PROMPTS = [
   "Snoopy and Woodstock on a houseboat in Amsterdam",
   "Snoopy and Woodstock watching flamenco in Spain",
   "Snoopy and Woodstock in a rickshaw in India",
-  "Snoopy and Woodstock on a boat in Ha Long Bay Vietnam",
   "Snoopy and Woodstock at the colosseum in Rome at sunset",
   "Snoopy and Woodstock in a cable car over Hong Kong",
   "Snoopy and Woodstock watching the midnight sun in Alaska",
-  // COZY & COMFORT
   "Snoopy and Woodstock in a cozy cabin with snow falling outside",
   "Snoopy and Woodstock reading books in a hammock",
   "Snoopy and Woodstock napping in a sunbeam on a window seat",
@@ -227,10 +174,8 @@ const PROMPTS = [
   "Snoopy and Woodstock in a cozy attic studio making art",
   "Snoopy and Woodstock in a greenhouse surrounded by plants",
   "Snoopy and Woodstock in a morning kitchen with coffee and toast",
-  "Snoopy and Woodstock in a boat cabin on a rainy lake",
   "Snoopy and Woodstock in a tiny house surrounded by nature",
   "Snoopy and Woodstock in a reading nook with a cat and candles",
-  // FANTASY & MAGICAL
   "Snoopy and Woodstock as wizards casting spells in a magic school",
   "Snoopy and Woodstock in an enchanted fairy tale forest",
   "Snoopy and Woodstock riding a dragon over a fantasy castle",
@@ -240,29 +185,21 @@ const PROMPTS = [
   "Snoopy and Woodstock in a cloud kingdom above the clouds",
   "Snoopy and Woodstock discovering a portal to another world",
   "Snoopy and Woodstock in a candy kingdom sweet fantasy",
-  "Snoopy and Woodstock as fairy tale characters in a storybook",
   "Snoopy and Woodstock riding a giant sea turtle underwater",
   "Snoopy and Woodstock in a crystal cave with glowing gems",
   "Snoopy and Woodstock as time travelers in ancient Egypt",
   "Snoopy and Woodstock in a dreamland with floating islands",
   "Snoopy and Woodstock as superheroes flying over a city",
-  // MINIMALIST & GEOMETRIC
   "Snoopy and Woodstock as simple geometric shapes bold colors",
   "Snoopy and Woodstock as minimal line art on white background",
-  "Snoopy and Woodstock as abstract color block shapes",
   "Snoopy and Woodstock as negative space silhouettes",
   "Snoopy and Woodstock as origami paper fold style",
-  "Snoopy and Woodstock as simple icons in a grid",
   "Snoopy and Woodstock as monochrome ink brush strokes",
   "Snoopy and Woodstock as flat vector illustrations",
   "Snoopy and Woodstock as watercolor washes with minimal detail",
-  "Snoopy and Woodstock as bold graphic print patterns",
   "Snoopy and Woodstock as Scandinavian folk art motifs",
-  "Snoopy and Woodstock as Swiss poster design style",
   "Snoopy and Woodstock as constructivist bold shapes",
-  "Snoopy and Woodstock as Japanese mon crest design",
   "Snoopy and Woodstock as minimalist mountain and moon design",
-  // HOLIDAY & CELEBRATIONS
   "Snoopy and Woodstock decorating for Christmas in snow",
   "Snoopy and Woodstock in Halloween costumes trick or treating",
   "Snoopy and Woodstock at a Fourth of July fireworks picnic",
@@ -273,12 +210,9 @@ const PROMPTS = [
   "Snoopy and Woodstock at a Hanukkah menorah lighting",
   "Snoopy and Woodstock at a Diwali festival with lanterns",
   "Snoopy and Woodstock at a Chinese New Year parade with dragons",
-  "Snoopy and Woodstock at a Mexican Dia de los Muertos celebration",
   "Snoopy and Woodstock at a summer solstice bonfire",
   "Snoopy and Woodstock at a harvest moon festival",
-  "Snoopy and Woodstock at a spring equinox flower festival",
   "Snoopy and Woodstock at a winter solstice lantern ceremony",
-  // ANIMALS & NATURE FRIENDS
   "Snoopy and Woodstock with a family of deer in a forest",
   "Snoopy and Woodstock swimming with dolphins in the ocean",
   "Snoopy and Woodstock with a majestic eagle soaring above",
@@ -287,30 +221,21 @@ const PROMPTS = [
   "Snoopy and Woodstock with butterflies in a meadow",
   "Snoopy and Woodstock with a family of foxes at sunset",
   "Snoopy and Woodstock with fireflies in a summer evening",
-  "Snoopy and Woodstock with a school of colorful fish",
   "Snoopy and Woodstock with a polar bear on an ice floe",
   "Snoopy and Woodstock with a penguin colony in Antarctica",
   "Snoopy and Woodstock with elephants in an African savanna",
   "Snoopy and Woodstock with wild horses running on plains",
   "Snoopy and Woodstock with a red fox in autumn forest",
   "Snoopy and Woodstock with a turtle on a tropical beach",
-  // MOODS & EMOTIONS
   "Snoopy and Woodstock laughing together under a blue sky",
   "Snoopy and Woodstock in a peaceful contemplative moment",
   "Snoopy and Woodstock in a joyful celebratory dance",
   "Snoopy and Woodstock sharing a quiet tender moment",
   "Snoopy and Woodstock in a dreamy hazy summer afternoon",
-  "Snoopy and Woodstock in a melancholy but beautiful rainy scene",
   "Snoopy and Woodstock in a nostalgic golden memory",
-  "Snoopy and Woodstock in an energetic playful romp",
   "Snoopy and Woodstock in a serene meditative stillness",
-  "Snoopy and Woodstock in a whimsical silly moment",
-  "Snoopy and Woodstock in a brave adventurous spirit",
-  "Snoopy and Woodstock in a cozy contented warmth",
   "Snoopy and Woodstock in a magical wonder-filled discovery",
-  "Snoopy and Woodstock in a proud triumphant moment",
   "Snoopy and Woodstock in a gentle loving friendship",
-  // COLOR PALETTE THEMES
   "Snoopy and Woodstock in a deep navy and gold color palette",
   "Snoopy and Woodstock in a coral and turquoise tropical palette",
   "Snoopy and Woodstock in a forest green and rust palette",
@@ -320,13 +245,10 @@ const PROMPTS = [
   "Snoopy and Woodstock in a cherry red and cream palette",
   "Snoopy and Woodstock in a dusty pink and charcoal palette",
   "Snoopy and Woodstock in a vibrant citrus palette",
-  "Snoopy and Woodstock in a moody dark jewel tones palette",
   "Snoopy and Woodstock in a soft mint and blush palette",
   "Snoopy and Woodstock in an earthy brown and amber palette",
   "Snoopy and Woodstock in a bold primary colors palette",
   "Snoopy and Woodstock in a pastel rainbow palette",
-  "Snoopy and Woodstock in a black and warm cream palette",
-  // ART STYLE VARIATIONS
   "Snoopy and Woodstock in watercolor painting style loose washes",
   "Snoopy and Woodstock in gouache painting style bold colors",
   "Snoopy and Woodstock in oil painting impressionist style",
@@ -335,77 +257,58 @@ const PROMPTS = [
   "Snoopy and Woodstock in risograph print style layered colors",
   "Snoopy and Woodstock in mosaic tile art style",
   "Snoopy and Woodstock in stained glass illustration style",
-  "Snoopy and Woodstock in tapestry weave pattern style",
   "Snoopy and Woodstock in embroidery patch style",
-  "Snoopy and Woodstock in sticker sheet illustration style",
-  "Snoopy and Woodstock in enamel pin badge illustration style",
   "Snoopy and Woodstock in rubber stamp print style",
-  "Snoopy and Woodstock in cave painting primitive art style",
-  "Snoopy and Woodstock in ancient fresco painting style",
   "Snoopy and Woodstock in Victorian botanical illustration style",
   "Snoopy and Woodstock in Art Nouveau flowing lines style",
   "Snoopy and Woodstock in Bauhaus geometric design style",
   "Snoopy and Woodstock in ukiyo-e Japanese woodblock style",
-  "Snoopy and Woodstock in medieval illuminated manuscript style",
-  // GARDENING & PLANTS
   "Snoopy and Woodstock in a rooftop garden with city skyline",
   "Snoopy and Woodstock tending a rose garden in full bloom",
   "Snoopy and Woodstock in a succulent and cactus garden",
   "Snoopy and Woodstock in a tropical jungle garden",
-  "Snoopy and Woodstock in a formal French garden with topiaries",
   "Snoopy and Woodstock in a wildflower meadow at dusk",
   "Snoopy and Woodstock harvesting vegetables in a kitchen garden",
-  "Snoopy and Woodstock in a bonsai garden",
   "Snoopy and Woodstock making flower crowns in a meadow",
   "Snoopy and Woodstock in a herb garden on a sunny morning",
-  "Snoopy and Woodstock planting a tree sapling",
-  "Snoopy and Woodstock in an orchard with fruit trees",
-  "Snoopy and Woodstock in a moss garden after rain",
   "Snoopy and Woodstock with giant sunflowers towering above",
   "Snoopy and Woodstock in a lavender field at golden hour",
-  // WATER & OCEAN
   "Snoopy and Woodstock on a sailboat in turquoise waters",
   "Snoopy and Woodstock exploring a sea cave at low tide",
   "Snoopy and Woodstock watching whales breach in the ocean",
   "Snoopy and Woodstock on a paddleboard at sunrise",
-  "Snoopy and Woodstock in a mangrove kayak adventure",
   "Snoopy and Woodstock collecting sea glass on a beach",
-  "Snoopy and Woodstock in a tide pool discovering sea creatures",
   "Snoopy and Woodstock watching bioluminescent waves at night",
-  "Snoopy and Woodstock on a dock watching fishing boats return",
   "Snoopy and Woodstock building an elaborate sandcastle",
   "Snoopy and Woodstock snorkeling in a coral reef",
-  "Snoopy and Woodstock on a ferry watching seagulls",
-  "Snoopy and Woodstock in a sea cave with colored light",
-  "Snoopy and Woodstock watching a ship disappear on the horizon",
   "Snoopy and Woodstock at a lighthouse during a storm",
-  // CITY & URBAN
   "Snoopy and Woodstock on a fire escape in New York City",
   "Snoopy and Woodstock in a cozy Tokyo alley at night",
   "Snoopy and Woodstock in a London telephone booth",
   "Snoopy and Woodstock at a Parisian sidewalk cafe",
   "Snoopy and Woodstock in a neon-lit Hong Kong street",
-  "Snoopy and Woodstock on a Chicago river architecture tour",
   "Snoopy and Woodstock in a Barcelona mosaic plaza",
   "Snoopy and Woodstock on a San Francisco cable car",
   "Snoopy and Woodstock in a Berlin street art alley",
   "Snoopy and Woodstock on a New Orleans jazz street corner",
   "Snoopy and Woodstock in a Marrakech spice market",
-  "Snoopy and Woodstock at an Istanbul bazaar",
   "Snoopy and Woodstock in a Sydney harbor at sunset",
-  "Snoopy and Woodstock in a Mumbai street festival",
   "Snoopy and Woodstock on a rooftop with city lights below",
-  // FRIENDSHIP MOMENTS
   "Snoopy and Woodstock sharing a secret under a starry sky",
   "Snoopy giving Woodstock a piggyback through a meadow",
   "Snoopy and Woodstock high-fiving after an adventure",
   "Snoopy and Woodstock falling asleep together under a tree",
   "Snoopy and Woodstock finding treasure on a beach",
-  "Snoopy and Woodstock helping each other up a steep hill",
   "Snoopy and Woodstock sharing an umbrella in a surprise rain",
   "Snoopy and Woodstock watching their shadows in golden light",
   "Snoopy and Woodstock leaving footprints in fresh snow",
-  // ABSTRACT & ARTISTIC
+  "Snoopy and Woodstock watching fireflies in a summer field",
+  "Snoopy and Woodstock in a grove of glowing mushrooms",
+  "Snoopy and Woodstock by a waterfall hidden in a forest",
+  "Snoopy and Woodstock discovering a hidden mountain lake",
+  "Snoopy and Woodstock watching migrating birds fly south",
+  "Snoopy and Woodstock in a forest after a fresh snowfall",
+  "Snoopy and Woodstock by a glowing evening campfire",
   "Snoopy and Woodstock in a swirling Van Gogh starry night",
   "Snoopy and Woodstock in Monets water lily garden",
   "Snoopy and Woodstock in a Matisse colorful cutout style",
@@ -414,15 +317,12 @@ const PROMPTS = [
   "Snoopy and Woodstock in a Hokusai wave dramatic scene",
   "Snoopy and Woodstock in a Rousseau jungle naive style",
   "Snoopy and Woodstock in a Chagall floating dream style",
-  "Snoopy and Woodstock in a Miro colorful surreal shapes",
-  // FINAL UNIQUE SCENES
   "Snoopy and Woodstock as lighthouse keepers in a storm",
   "Snoopy and Woodstock as park rangers in a national forest",
   "Snoopy and Woodstock as beekeepers in a wildflower meadow",
   "Snoopy and Woodstock as mail carriers on a snowy route",
   "Snoopy and Woodstock as librarians in a magical library",
   "Snoopy and Woodstock as mapmakers on a mountain expedition",
-  "Snoopy and Woodstock as weather watchers at a hilltop station",
   "Snoopy and Woodstock as night sky photographers in a desert",
   "Snoopy and Woodstock as bird watchers in a misty marsh",
   "Snoopy and Woodstock as cave explorers with lanterns",
@@ -432,15 +332,15 @@ const PROMPTS = [
 
 // Flat rate prices in cents
 const VERTICAL_VARIANTS = [
-  { id: 101413, w: 2400,  h: 3000,  price: 5142  }, // 8x10
-  { id: 91641,  w: 3300,  h: 4200,  price: 6336  }, // 11x14
-  { id: 91644,  w: 3600,  h: 5400,  price: 8420  }, // 12x18
-  { id: 91647,  w: 4800,  h: 7200,  price: 10820 }, // 16x24
-  { id: 91649,  w: 6000,  h: 7200,  price: 13200 }, // 20x24
-  { id: 101411, w: 7200,  h: 9000,  price: 16966 }, // 24x30
-  { id: 91654,  w: 9000,  h: 12000, price: 23762 }, // 30x40
-  { id: 91655,  w: 9600,  h: 14400, price: 34684 }, // 32x48
-  { id: 112955, w: 12000, h: 18000, price: 50026 }, // 40x60
+  { id: 101413, w: 2400,  h: 3000,  price: 5142  },
+  { id: 91641,  w: 3300,  h: 4200,  price: 6336  },
+  { id: 91644,  w: 3600,  h: 5400,  price: 8420  },
+  { id: 91647,  w: 4800,  h: 7200,  price: 10820 },
+  { id: 91649,  w: 6000,  h: 7200,  price: 13200 },
+  { id: 101411, w: 7200,  h: 9000,  price: 16966 },
+  { id: 91654,  w: 9000,  h: 12000, price: 23762 },
+  { id: 91655,  w: 9600,  h: 14400, price: 34684 },
+  { id: 112955, w: 12000, h: 18000, price: 50026 },
 ];
 
 function pickPrompts() {
@@ -503,7 +403,7 @@ async function generateListing(prompt) {
       method: "POST",
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify({
-        contents: [{ parts: [{ text: "Based on this Snoopy and Woodstock art description: \"" + prompt + "\"\n\nGenerate an optimized Etsy product listing. Respond with raw JSON only, no markdown, no backticks:\n{\n  \"title\": \"SEO-optimized Etsy title under 140 chars. Must include: Snoopy, canvas wall art or canvas print, and a keyword like home decor or nursery decor. Make it compelling and specific to the scene.\",\n  \"description\": \"3 engaging paragraphs. Paragraph 1: describe the artwork scene vividly. Paragraph 2: describe the quality - premium canvas print, gallery wrapped, ready to hang, vibrant colors. Paragraph 3: who this is perfect for as a gift, available in 9 sizes from 8x10 to 40x60.\"\n}" }] }],
+        contents: [{ parts: [{ text: "Based on this Snoopy and Woodstock art description: \"" + prompt + "\"\n\nGenerate an optimized Etsy product listing. Respond with raw JSON only, no markdown, no backticks:\n{\n  \"title\": \"Clean Etsy title under 100 chars. Format: [Scene description] Snoopy Canvas Wall Art - Peanuts Print. Example: Snoopy and Woodstock Stargazing Canvas Wall Art - Peanuts Night Sky Print. No commas separating multiple titles.\",\n  \"description\": \"3 engaging paragraphs about this specific artwork scene, the canvas print quality, and who would love it as a gift.\",\n  \"tags\": [\"IMPORTANT: exactly 13 tags, each tag must be under 20 characters, no special characters, focused on Snoopy Peanuts and the specific scene. Examples of good tags: Snoopy wall art, Peanuts poster, Woodstock print, Snoopy gift, Peanuts decor, cartoon art print, Snoopy canvas, kids room art, Peanuts fan gift, Snoopy lover, beagle wall art, nursery art, Peanuts artwork\"]\n}" }] }],
         generationConfig: { responseModalities: ["TEXT"] }
       })
     }
@@ -513,8 +413,49 @@ async function generateListing(prompt) {
   if (!text) throw new Error("Listing generation failed: " + JSON.stringify(data));
   var clean = text.replace(/```json|```/g, "").trim();
   var listing = JSON.parse(clean);
-  // Always use our hardcoded valid tags instead of AI-generated ones
-  listing.tags = pickTags();
+
+  // Validate and fix tags - ensure all under 20 chars
+  var validTags = [
+    "Snoopy wall art",
+    "Peanuts poster",
+    "Woodstock print",
+    "Snoopy gift",
+    "Peanuts decor",
+    "cartoon art print",
+    "Snoopy canvas",
+    "kids room art",
+    "Peanuts fan gift",
+    "Snoopy lover",
+    "beagle wall art",
+    "nursery art",
+    "Peanuts artwork",
+    "Snoopy print",
+    "Peanuts wall art",
+    "Snoopy home decor",
+    "Woodstock art",
+    "Peanuts gift",
+    "cartoon canvas",
+    "Snoopy art print"
+  ];
+
+  if (!listing.tags || !Array.isArray(listing.tags) || listing.tags.length === 0) {
+    listing.tags = validTags.slice(0, 13);
+  } else {
+    // Filter out any tags over 20 chars and replace with valid ones
+    var filtered = listing.tags.filter(function(t) {
+      return t && t.length <= 20 && t.length > 0;
+    });
+    while (filtered.length < 13) {
+      var fallback = validTags[filtered.length % validTags.length];
+      if (filtered.indexOf(fallback) === -1) {
+        filtered.push(fallback);
+      } else {
+        filtered.push("Snoopy art " + filtered.length);
+      }
+    }
+    listing.tags = filtered.slice(0, 13);
+  }
+
   console.log("Listing generated:", listing.title);
   console.log("Tags:", listing.tags);
   return listing;
@@ -595,9 +536,8 @@ async function enableOffsiteAdsPuppeteer(productId) {
     var page = await browser.newPage();
     await page.setUserAgent("Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36");
 
-    // Log in to Printify
     console.log("Logging into Printify...");
-    await page.goto("https://printify.com/app/login", { waitUntil: "networkidle2" });
+    await page.goto("https://printify.com/app/login", { waitUntil: "networkidle2", timeout: 30000 });
     await page.waitForSelector("input[type=email]", { timeout: 15000 });
     await page.type("input[type=email]", PRINTIFY_EMAIL, { delay: 50 });
     await page.type("input[type=password]", PRINTIFY_PASSWORD, { delay: 50 });
@@ -605,54 +545,50 @@ async function enableOffsiteAdsPuppeteer(productId) {
     await page.waitForNavigation({ waitUntil: "networkidle2", timeout: 30000 });
     console.log("Logged in, navigating to product...");
 
-    // Navigate to product page
     var productUrl = "https://printify.com/app/product-details/" + productId + "?fromProductsPage=1";
     await page.goto(productUrl, { waitUntil: "networkidle2", timeout: 30000 });
+    await new Promise(function(r) { setTimeout(r, 4000); });
 
-    // Wait for and click offsite ads toggle
     console.log("Looking for offsite ads toggle...");
-    await page.waitForSelector(".pricing-section", { timeout: 15000 }).catch(function() {});
-    await new Promise(function(r) { setTimeout(r, 3000); });
-
-    // Find the offsite ads toggle - it's near text "Etsy off-site ads"
     var toggled = await page.evaluate(function() {
-      var labels = document.querySelectorAll("label, span, p");
-      for (var i = 0; i < labels.length; i++) {
-        if (labels[i].textContent && labels[i].textContent.includes("off-site ads")) {
-          // Find nearby toggle/checkbox
-          var parent = labels[i].closest("div");
-          if (parent) {
-            var toggle = parent.querySelector("input[type=checkbox], button[role=switch], .toggle, [class*=toggle]");
+      var allElements = document.querySelectorAll("*");
+      for (var i = 0; i < allElements.length; i++) {
+        var el = allElements[i];
+        if (el.textContent && el.textContent.trim() === "Etsy off-site ads." && el.children.length === 0) {
+          var container = el.parentElement;
+          for (var j = 0; j < 5; j++) {
+            if (!container) break;
+            var toggle = container.querySelector("button[role=switch], input[type=checkbox]");
             if (toggle) {
-              var isChecked = toggle.checked || toggle.getAttribute("aria-checked") === "true";
-              if (!isChecked) {
+              var isOn = toggle.getAttribute("aria-checked") === "true" || toggle.checked;
+              if (!isOn) {
                 toggle.click();
                 return "clicked";
               }
               return "already-on";
             }
+            container = container.parentElement;
           }
         }
       }
       return "not-found";
     });
+
     console.log("Toggle result:", toggled);
 
-    if (toggled === "clicked" || toggled === "already-on") {
-      // Click Save as draft
-      await new Promise(function(r) { setTimeout(r, 1000); });
-      var saved = await page.evaluate(function() {
+    if (toggled === "clicked") {
+      await new Promise(function(r) { setTimeout(r, 1500); });
+      await page.evaluate(function() {
         var buttons = document.querySelectorAll("button");
         for (var i = 0; i < buttons.length; i++) {
           if (buttons[i].textContent && buttons[i].textContent.trim() === "Save as draft") {
             buttons[i].click();
-            return true;
+            return;
           }
         }
-        return false;
       });
-      console.log("Saved:", saved);
       await new Promise(function(r) { setTimeout(r, 2000); });
+      console.log("Offsite ads enabled and saved!");
     }
   } catch (err) {
     console.error("Puppeteer error:", err.message);
@@ -702,11 +638,9 @@ async function publishToEtsy(productId) {
 
 async function run() {
   try { require("sharp"); } catch (e) {
-    console.log("Installing sharp...");
     require("child_process").execSync("npm install sharp", { stdio: "inherit" });
   }
   try { require("puppeteer"); } catch (e) {
-    console.log("Installing puppeteer...");
     require("child_process").execSync("npm install puppeteer", { stdio: "inherit" });
   }
 
