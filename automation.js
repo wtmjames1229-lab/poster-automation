@@ -526,12 +526,136 @@ async function createProduct(imageId, listing) {
 }
 
 async function enableOffsiteAdsPuppeteer(productId) {
-  console.log("Launching browser to enable offsite ads...");
-  var puppeteer = require("puppeteer");
+  console.log("Launching stealth browser to enable offsite ads...");
+  var puppeteer = require("puppeteer-extra");
+  var StealthPlugin = require("puppeteer-extra-plugin-stealth");
+  puppeteer.use(StealthPlugin());
+
   var browser = await puppeteer.launch({
-    headless: "new",
-    args: ["--no-sandbox", "--disable-setuid-sandbox", "--disable-dev-shm-usage"]
+    headless: true,
+    args: ["--no-sandbox", "--disable-setuid-sandbox", "--disable-dev-shm-usage", "--window-size=1280,800"]
   });
+
+  try {
+    var page = await browser.newPage();
+    await page.setViewport({ width: 1280, height: 800 });
+    await page.setUserAgent("Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/122.0.0.0 Safari/537.36");
+
+    console.log("Navigating to Printify login...");
+    await page.goto("https://printify.com/app/login", { waitUntil: "domcontentloaded", timeout: 30000 });
+    await new Promise(function(r) { setTimeout(r, 10000); });
+
+    var inputDebug = await page.evaluate(function() {
+      var inputs = document.querySelectorAll("input");
+      var info = "Inputs: " + inputs.length + " | ";
+      for (var i = 0; i < inputs.length; i++) {
+        info += "[type=" + inputs[i].type + " name=" + inputs[i].name + "] ";
+      }
+      return info;
+    });
+    console.log(inputDebug);
+
+    // Type into username field
+    await page.evaluate(function(email) {
+      var inputs = document.querySelectorAll("input");
+      for (var i = 0; i < inputs.length; i++) {
+        if (inputs[i].type === "text" || inputs[i].name === "username" || inputs[i].type === "email") {
+          inputs[i].focus();
+          inputs[i].value = email;
+          inputs[i].dispatchEvent(new Event("input", { bubbles: true }));
+          inputs[i].dispatchEvent(new Event("change", { bubbles: true }));
+          break;
+        }
+      }
+    }, PRINTIFY_EMAIL);
+
+    await new Promise(function(r) { setTimeout(r, 500); });
+
+    // Type into password field
+    await page.evaluate(function(pass) {
+      var inputs = document.querySelectorAll("input");
+      for (var i = 0; i < inputs.length; i++) {
+        if (inputs[i].type === "password") {
+          inputs[i].focus();
+          inputs[i].value = pass;
+          inputs[i].dispatchEvent(new Event("input", { bubbles: true }));
+          inputs[i].dispatchEvent(new Event("change", { bubbles: true }));
+          break;
+        }
+      }
+    }, PRINTIFY_PASSWORD);
+
+    await new Promise(function(r) { setTimeout(r, 500); });
+
+    // Click submit
+    await page.evaluate(function() {
+      var buttons = document.querySelectorAll("button");
+      for (var i = 0; i < buttons.length; i++) {
+        if (buttons[i].type === "submit" || buttons[i].textContent.toLowerCase().includes("log in") || buttons[i].textContent.toLowerCase().includes("sign in")) {
+          buttons[i].click();
+          return;
+        }
+      }
+    });
+
+    console.log("Login submitted, waiting...");
+    await new Promise(function(r) { setTimeout(r, 12000); });
+
+    var currentUrl = page.url();
+    console.log("URL after login:", currentUrl);
+
+    if (currentUrl.includes("login") || currentUrl.includes("auth")) {
+      throw new Error("Login failed - Cloudflare may be blocking. URL: " + currentUrl);
+    }
+
+    console.log("Logged in! Navigating to product...");
+    await page.goto("https://printify.com/app/store/products/1", { waitUntil: "domcontentloaded", timeout: 30000 });
+    await new Promise(function(r) { setTimeout(r, 5000); });
+
+    await page.goto("https://printify.com/app/product-details/" + productId + "?fromProductsPage=1", { waitUntil: "domcontentloaded", timeout: 30000 });
+    await new Promise(function(r) { setTimeout(r, 8000); });
+
+    console.log("On product page:", page.url());
+
+    var toggled = await page.evaluate(function() {
+      var switches = document.querySelectorAll("button[role=switch]");
+      for (var i = 0; i < switches.length; i++) {
+        var btn = switches[i];
+        var parent = btn.parentElement;
+        for (var j = 0; j < 6; j++) {
+          if (!parent) break;
+          if (parent.innerText && (parent.innerText.toLowerCase().includes("off-site") || parent.innerText.toLowerCase().includes("offsite"))) {
+            var isOn = btn.getAttribute("aria-checked") === "true";
+            if (!isOn) { btn.click(); return "clicked"; }
+            return "already-on";
+          }
+          parent = parent.parentElement;
+        }
+      }
+      var info = "switches=" + switches.length + " bodyHasText=" + (document.body.innerText.toLowerCase().includes("off-site"));
+      return "not-found:" + info;
+    });
+
+    console.log("Toggle result:", toggled);
+
+    if (toggled === "clicked") {
+      await new Promise(function(r) { setTimeout(r, 1500); });
+      await page.evaluate(function() {
+        var buttons = document.querySelectorAll("button");
+        for (var i = 0; i < buttons.length; i++) {
+          if (buttons[i].textContent.trim() === "Save as draft") { buttons[i].click(); return; }
+        }
+      });
+      await new Promise(function(r) { setTimeout(r, 2000); });
+      console.log("Offsite ads enabled and saved!");
+    }
+
+  } catch (err) {
+    console.error("Puppeteer error:", err.message);
+  } finally {
+    await browser.close();
+  }
+}
   try {
     var page = await browser.newPage();
     await page.setUserAgent("Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36");
@@ -577,146 +701,7 @@ async function enableOffsiteAdsPuppeteer(productId) {
       }
     }
 
-    if (!emailFilled) {
-      // Last resort - click first input
-      await page.evaluate(function(email) {
-        var inputs = document.querySelectorAll("input");
-        if (inputs[0]) { inputs[0].value = email; inputs[0].dispatchEvent(new Event("input", { bubbles: true })); }
-      }, PRINTIFY_EMAIL);
-      console.log("Used fallback for email");
-    }
 
-    // Fill password
-    var passFilled = false;
-    for (var i = 0; i < inputs.length; i++) {
-      if (inputs[i].type === "password") {
-        var psel = inputs[i].id ? "#" + inputs[i].id : "input[type=password]";
-        await page.click(psel);
-        await page.type(psel, PRINTIFY_PASSWORD, { delay: 80 });
-        passFilled = true;
-        console.log("Typed password into:", psel);
-        break;
-      }
-    }
-
-    if (!passFilled) {
-      await page.evaluate(function(pass) {
-        var inputs = document.querySelectorAll("input");
-        for (var i = 0; i < inputs.length; i++) {
-          if (inputs[i].type === "password") { inputs[i].value = pass; inputs[i].dispatchEvent(new Event("input", { bubbles: true })); break; }
-        }
-      }, PRINTIFY_PASSWORD);
-      console.log("Used fallback for password");
-    }
-
-    await new Promise(function(r) { setTimeout(r, 1000); });
-
-    // Click submit button
-    await page.evaluate(function() {
-      var buttons = document.querySelectorAll("button[type=submit], button");
-      for (var i = 0; i < buttons.length; i++) {
-        var txt = buttons[i].textContent.toLowerCase();
-        if (txt.includes("log in") || txt.includes("login") || txt.includes("sign in") || buttons[i].type === "submit") {
-          buttons[i].click();
-          return;
-        }
-      }
-    });
-
-    console.log("Submitted login, waiting for redirect...");
-    await new Promise(function(r) { setTimeout(r, 12000); });
-
-    var loginUrl = page.url();
-    console.log("URL after login:", loginUrl);
-    if (loginUrl.includes("login") || loginUrl.includes("auth")) {
-      throw new Error("Login failed - still on login page: " + loginUrl);
-    }
-    console.log("Logged in, navigating to product...");
-    await page.goto("https://printify.com/app/store/products/1", { waitUntil: "domcontentloaded", timeout: 30000 });
-    await new Promise(function(r) { setTimeout(r, 5000); });
-    var productUrl = "https://printify.com/app/product-details/" + productId + "?fromProductsPage=1";
-    await page.goto(productUrl, { waitUntil: "domcontentloaded", timeout: 30000 });
-    await new Promise(function(r) { setTimeout(r, 8000); });
-    console.log("Current URL:", page.url());
-
-    console.log("Looking for offsite ads toggle...");
-    // Log all buttons and toggles found on page for debugging
-    var pageDebug = await page.evaluate(function() {
-      var buttons = document.querySelectorAll("button[role=switch]");
-      var info = "Switches found: " + buttons.length + " | ";
-      for (var i = 0; i < buttons.length; i++) {
-        info += "aria-checked=" + buttons[i].getAttribute("aria-checked") + " text=" + buttons[i].textContent.trim().substring(0, 30) + " | ";
-      }
-      var bodyText = document.body.innerText;
-      info += " | hasOffsiteText=" + (bodyText.indexOf("off-site") > -1 || bodyText.indexOf("offsite") > -1);
-      return info;
-    });
-    console.log("Page debug:", pageDebug);
-
-    var toggled = await page.evaluate(function() {
-      // Find all switch buttons
-      var switches = document.querySelectorAll("button[role=switch]");
-      for (var i = 0; i < switches.length; i++) {
-        var btn = switches[i];
-        // Check nearby text for "offsite" or "off-site"
-        var parent = btn.closest("div, section, label") || btn.parentElement;
-        var parentText = parent ? parent.innerText : "";
-        if (parentText.toLowerCase().indexOf("off-site") > -1 || parentText.toLowerCase().indexOf("offsite") > -1) {
-          var isOn = btn.getAttribute("aria-checked") === "true";
-          if (!isOn) {
-            btn.click();
-            return "clicked";
-          }
-          return "already-on";
-        }
-      }
-
-      // Try finding by searching all text nodes
-      var walker = document.createTreeWalker(document.body, NodeFilter.SHOW_TEXT);
-      var node;
-      while ((node = walker.nextNode())) {
-        if (node.nodeValue && (node.nodeValue.toLowerCase().indexOf("off-site ads") > -1 || node.nodeValue.toLowerCase().indexOf("offsite ads") > -1)) {
-          var parent = node.parentElement;
-          for (var j = 0; j < 8; j++) {
-            if (!parent) break;
-            var toggle = parent.querySelector("button[role=switch], input[type=checkbox]");
-            if (toggle) {
-              var isOn = toggle.getAttribute("aria-checked") === "true" || toggle.checked;
-              if (!isOn) {
-                toggle.click();
-                return "clicked-via-text";
-              }
-              return "already-on";
-            }
-            parent = parent.parentElement;
-          }
-        }
-      }
-      return "not-found";
-    });
-
-    console.log("Toggle result:", toggled);
-
-    if (toggled === "clicked") {
-      await new Promise(function(r) { setTimeout(r, 1500); });
-      await page.evaluate(function() {
-        var buttons = document.querySelectorAll("button");
-        for (var i = 0; i < buttons.length; i++) {
-          if (buttons[i].textContent && buttons[i].textContent.trim() === "Save as draft") {
-            buttons[i].click();
-            return;
-          }
-        }
-      });
-      await new Promise(function(r) { setTimeout(r, 2000); });
-      console.log("Offsite ads enabled and saved!");
-    }
-  } catch (err) {
-    console.error("Puppeteer error:", err.message);
-  } finally {
-    await browser.close();
-  }
-}
 
 async function publishToEtsy(productId) {
   console.log("Waiting 30s for product images to fully process...");
@@ -761,8 +746,8 @@ async function run() {
   try { require("sharp"); } catch (e) {
     require("child_process").execSync("npm install sharp", { stdio: "inherit" });
   }
-  try { require("puppeteer"); } catch (e) {
-    require("child_process").execSync("npm install puppeteer", { stdio: "inherit" });
+  try { require("puppeteer-extra"); } catch (e) {
+    require("child_process").execSync("npm install puppeteer-extra puppeteer-extra-plugin-stealth", { stdio: "inherit" });
   }
 
   var prompts = pickPrompts();
