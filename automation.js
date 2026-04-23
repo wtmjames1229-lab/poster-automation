@@ -659,9 +659,10 @@ async function enableOffsiteAdsPuppeteer(productId) {
 }
 
 async function publishToEtsy(productId) {
-  console.log("Waiting 30s for product images to fully process...");
-  await new Promise(function(r) { setTimeout(r, 30000); });
+  console.log("Waiting 45s for product images to fully process...");
+  await new Promise(function(r) { setTimeout(r, 45000); });
   console.log("Publishing to Etsy...");
+
   var body = JSON.stringify({
     title: true,
     description: true,
@@ -671,20 +672,11 @@ async function publishToEtsy(productId) {
     keyFeatures: true,
     shipping_template: true
   });
-  var res = await fetch(
-    "https://api.printify.com/v1/shops/" + SHOP_ID + "/products/" + productId + "/publish.json",
-    {
-      method: "POST",
-      headers: { "Authorization": "Bearer " + PRINTIFY_API_KEY, "Content-Type": "application/json" },
-      body: body
-    }
-  );
-  var text = await res.text();
-  console.log("Publish response:", text);
-  if (text === "{}" || text === "" || text === "null") {
-    console.log("Publish returned empty, retrying after 20s...");
-    await new Promise(function(r) { setTimeout(r, 20000); });
-    var res2 = await fetch(
+
+  // Try publishing up to 3 times
+  for (var attempt = 1; attempt <= 3; attempt++) {
+    console.log("Publish attempt " + attempt + "...");
+    var res = await fetch(
       "https://api.printify.com/v1/shops/" + SHOP_ID + "/products/" + productId + "/publish.json",
       {
         method: "POST",
@@ -692,9 +684,30 @@ async function publishToEtsy(productId) {
         body: body
       }
     );
-    var text2 = await res2.text();
-    console.log("Publish retry response:", text2);
+    var statusCode = res.status;
+    var text = await res.text();
+    console.log("Publish response (status " + statusCode + "):", text);
+
+    if (statusCode === 200 || statusCode === 204) {
+      console.log("Publish succeeded!");
+      break;
+    }
+
+    if (attempt < 3) {
+      console.log("Waiting 20s before retry...");
+      await new Promise(function(r) { setTimeout(r, 20000); });
+    }
   }
+
+  // Check actual product status
+  await new Promise(function(r) { setTimeout(r, 5000); });
+  var checkRes = await fetch(
+    "https://api.printify.com/v1/shops/" + SHOP_ID + "/products/" + productId + ".json",
+    { headers: { "Authorization": "Bearer " + PRINTIFY_API_KEY } }
+  );
+  var product = await checkRes.json();
+  console.log("Product publishing_status:", product.publishing_status);
+  console.log("Product status:", product.status);
 }
 
 async function run() {
