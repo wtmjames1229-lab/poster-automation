@@ -598,10 +598,12 @@ async function enableOffsiteAdsPuppeteer(productId) {
     console.log("Submitted login, waiting for redirect...");
     await new Promise(function(r) { setTimeout(r, 10000); });
     console.log("Logged in, navigating to product...");
-
+    await page.goto("https://printify.com/app/store/products/1", { waitUntil: "domcontentloaded", timeout: 30000 });
+    await new Promise(function(r) { setTimeout(r, 5000); });
     var productUrl = "https://printify.com/app/product-details/" + productId + "?fromProductsPage=1";
-    await page.goto(productUrl, { waitUntil: "networkidle2", timeout: 30000 });
-    await new Promise(function(r) { setTimeout(r, 4000); });
+    await page.goto(productUrl, { waitUntil: "domcontentloaded", timeout: 30000 });
+    await new Promise(function(r) { setTimeout(r, 8000); });
+    console.log("Current URL:", page.url());
 
     console.log("Looking for offsite ads toggle...");
     // Log all buttons and toggles found on page for debugging
