@@ -539,64 +539,98 @@ async function enableOffsiteAdsPuppeteer(productId) {
     console.log("Logging into Printify...");
     await page.goto("https://printify.com/app/login", { waitUntil: "domcontentloaded", timeout: 30000 });
 
-    // Wait for Angular to fully render the login form
+    // Wait for Angular to render
     console.log("Waiting for Angular app to render...");
-    await new Promise(function(r) { setTimeout(r, 8000); });
-
-    // Try to find email input with extended timeout
-    var emailSelector = null;
-    var selectors = [
-      "input[type=email]",
-      "input[name=email]",
-      "input[formcontrolname=email]",
-      "input[placeholder*=email i]",
-      "input[id*=email i]",
-      "#email",
-      "pfa-login input[type=text]",
-      "form input:first-child"
-    ];
-
-    for (var s = 0; s < selectors.length; s++) {
-      try {
-        await page.waitForSelector(selectors[s], { timeout: 5000 });
-        emailSelector = selectors[s];
-        console.log("Found email field:", emailSelector);
-        break;
-      } catch (e) {}
-    }
-
-    if (!emailSelector) {
-      var pageContent = await page.evaluate(function() {
-        var inputs = document.querySelectorAll("input");
-        var info = "Inputs found: " + inputs.length + " | ";
-        for (var i = 0; i < inputs.length; i++) {
-          info += "type=" + inputs[i].type + " name=" + inputs[i].name + " id=" + inputs[i].id + " | ";
-        }
-        return info;
-      });
-      console.log("Input debug:", pageContent);
-      throw new Error("Could not find email input on login page");
-    }
-
-    await page.click(emailSelector);
-    await page.type(emailSelector, PRINTIFY_EMAIL, { delay: 80 });
-
-    var passSelector = null;
-    var passSelectors = ["input[type=password]", "input[name=password]", "input[formcontrolname=password]", "#password"];
-    for (var p = 0; p < passSelectors.length; p++) {
-      try {
-        await page.waitForSelector(passSelectors[p], { timeout: 3000 });
-        passSelector = passSelectors[p];
-        break;
-      } catch (e) {}
-    }
-    if (!passSelector) throw new Error("Could not find password input");
-    await page.click(passSelector);
-    await page.type(passSelector, PRINTIFY_PASSWORD, { delay: 80 });
-
-    await page.keyboard.press("Enter");
-    console.log("Submitted login, waiting for redirect...");
     await new Promise(function(r) { setTimeout(r, 10000); });
+
+    // Log all inputs for debugging
+    var inputDebug = await page.evaluate(function() {
+      var inputs = document.querySelectorAll("input");
+      var info = "Total inputs: " + inputs.length + " | ";
+      for (var i = 0; i < inputs.length; i++) {
+        info += "[type=" + inputs[i].type + " name=" + inputs[i].name + " placeholder=" + inputs[i].placeholder + "] ";
+      }
+      return info;
+    });
+    console.log("Inputs on page:", inputDebug);
+
+    // Find email and password inputs
+    var inputs = await page.evaluate(function() {
+      var all = document.querySelectorAll("input");
+      var result = [];
+      for (var i = 0; i < all.length; i++) {
+        result.push({ type: all[i].type, name: all[i].name, placeholder: all[i].placeholder, id: all[i].id });
+      }
+      return result;
+    });
+
+    // Click and fill email - find by type=email or type=text
+    var emailFilled = false;
+    for (var i = 0; i < inputs.length; i++) {
+      if (inputs[i].type === "email" || (inputs[i].type === "text" && (inputs[i].name.toLowerCase().includes("email") || inputs[i].placeholder.toLowerCase().includes("email")))) {
+        var sel = inputs[i].id ? "#" + inputs[i].id : "input[type=" + inputs[i].type + "]";
+        await page.click(sel);
+        await page.type(sel, PRINTIFY_EMAIL, { delay: 80 });
+        emailFilled = true;
+        console.log("Typed email into:", sel);
+        break;
+      }
+    }
+
+    if (!emailFilled) {
+      // Last resort - click first input
+      await page.evaluate(function(email) {
+        var inputs = document.querySelectorAll("input");
+        if (inputs[0]) { inputs[0].value = email; inputs[0].dispatchEvent(new Event("input", { bubbles: true })); }
+      }, PRINTIFY_EMAIL);
+      console.log("Used fallback for email");
+    }
+
+    // Fill password
+    var passFilled = false;
+    for (var i = 0; i < inputs.length; i++) {
+      if (inputs[i].type === "password") {
+        var psel = inputs[i].id ? "#" + inputs[i].id : "input[type=password]";
+        await page.click(psel);
+        await page.type(psel, PRINTIFY_PASSWORD, { delay: 80 });
+        passFilled = true;
+        console.log("Typed password into:", psel);
+        break;
+      }
+    }
+
+    if (!passFilled) {
+      await page.evaluate(function(pass) {
+        var inputs = document.querySelectorAll("input");
+        for (var i = 0; i < inputs.length; i++) {
+          if (inputs[i].type === "password") { inputs[i].value = pass; inputs[i].dispatchEvent(new Event("input", { bubbles: true })); break; }
+        }
+      }, PRINTIFY_PASSWORD);
+      console.log("Used fallback for password");
+    }
+
+    await new Promise(function(r) { setTimeout(r, 1000); });
+
+    // Click submit button
+    await page.evaluate(function() {
+      var buttons = document.querySelectorAll("button[type=submit], button");
+      for (var i = 0; i < buttons.length; i++) {
+        var txt = buttons[i].textContent.toLowerCase();
+        if (txt.includes("log in") || txt.includes("login") || txt.includes("sign in") || buttons[i].type === "submit") {
+          buttons[i].click();
+          return;
+        }
+      }
+    });
+
+    console.log("Submitted login, waiting for redirect...");
+    await new Promise(function(r) { setTimeout(r, 12000); });
+
+    var loginUrl = page.url();
+    console.log("URL after login:", loginUrl);
+    if (loginUrl.includes("login") || loginUrl.includes("auth")) {
+      throw new Error("Login failed - still on login page: " + loginUrl);
+    }
     console.log("Logged in, navigating to product...");
     await page.goto("https://printify.com/app/store/products/1", { waitUntil: "domcontentloaded", timeout: 30000 });
     await new Promise(function(r) { setTimeout(r, 5000); });
