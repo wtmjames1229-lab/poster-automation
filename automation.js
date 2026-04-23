@@ -532,6 +532,7 @@ async function enableOffsiteAdsPuppeteer(productId) {
   puppeteer.use(StealthPlugin());
 
   var browser = await puppeteer.launch({
+    executablePath: require("puppeteer").executablePath(),
     headless: true,
     args: ["--no-sandbox", "--disable-setuid-sandbox", "--disable-dev-shm-usage", "--window-size=1280,800"]
   });
@@ -716,7 +717,7 @@ async function run() {
       var base64Image = await retry(function() { return generateImage(prompt); });
       var imageId = await uploadToPrintify(base64Image);
       var productId = await createProduct(imageId, listing);
-      await enableOffsiteAdsPuppeteer(productId);
+      try { await enableOffsiteAdsPuppeteer(productId); } catch(e) { console.log("Offsite ads skipped:", e.message); }
       await publishToEtsy(productId);
       console.log("Listing " + (i + 1) + " live on Etsy!");
       if (i < 4) await new Promise(function(r) { setTimeout(r, 10000); });
