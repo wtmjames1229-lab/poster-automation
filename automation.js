@@ -656,52 +656,6 @@ async function enableOffsiteAdsPuppeteer(productId) {
     await browser.close();
   }
 }
-  try {
-    var page = await browser.newPage();
-    await page.setUserAgent("Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36");
-
-    console.log("Logging into Printify...");
-    await page.goto("https://printify.com/app/login", { waitUntil: "domcontentloaded", timeout: 30000 });
-
-    // Wait for Angular to render
-    console.log("Waiting for Angular app to render...");
-    await new Promise(function(r) { setTimeout(r, 10000); });
-
-    // Log all inputs for debugging
-    var inputDebug = await page.evaluate(function() {
-      var inputs = document.querySelectorAll("input");
-      var info = "Total inputs: " + inputs.length + " | ";
-      for (var i = 0; i < inputs.length; i++) {
-        info += "[type=" + inputs[i].type + " name=" + inputs[i].name + " placeholder=" + inputs[i].placeholder + "] ";
-      }
-      return info;
-    });
-    console.log("Inputs on page:", inputDebug);
-
-    // Find email and password inputs
-    var inputs = await page.evaluate(function() {
-      var all = document.querySelectorAll("input");
-      var result = [];
-      for (var i = 0; i < all.length; i++) {
-        result.push({ type: all[i].type, name: all[i].name, placeholder: all[i].placeholder, id: all[i].id });
-      }
-      return result;
-    });
-
-    // Click and fill email - find by type=email or type=text
-    var emailFilled = false;
-    for (var i = 0; i < inputs.length; i++) {
-      if (inputs[i].type === "email" || (inputs[i].type === "text" && (inputs[i].name.toLowerCase().includes("email") || inputs[i].placeholder.toLowerCase().includes("email")))) {
-        var sel = inputs[i].id ? "#" + inputs[i].id : "input[type=" + inputs[i].type + "]";
-        await page.click(sel);
-        await page.type(sel, PRINTIFY_EMAIL, { delay: 80 });
-        emailFilled = true;
-        console.log("Typed email into:", sel);
-        break;
-      }
-    }
-
-
 
 async function publishToEtsy(productId) {
   console.log("Waiting 30s for product images to fully process...");
