@@ -7,6 +7,7 @@ const PRINTIFY_API_KEY = process.env.PRINTIFY_API_KEY;
 const PRINTIFY_EMAIL = process.env.PRINTIFY_EMAIL;
 const PRINTIFY_PASSWORD = process.env.PRINTIFY_PASSWORD;
 const SHOP_ID = '18634010';
+const EBAY_SHOP_ID = '27315339';
 const BLUEPRINT_ID = 1159;
 const PRINT_PROVIDER_ID = 99;
 
@@ -403,7 +404,7 @@ async function generateListing(prompt) {
       method: "POST",
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify({
-        contents: [{ parts: [{ text: "Based on this Snoopy and Woodstock art description: \"" + prompt + "\"\n\nGenerate an optimized Etsy product listing. Respond with raw JSON only, no markdown, no backticks:\n{\n  \"title\": \"Etsy-optimized title under 80 chars. Format: [Characters] [Scene] Canvas Print – Peanuts [Art Type] Wall Decor. Examples: Snoopy Woodstock Stargazing Canvas Print – Peanuts Night Sky Wall Decor. Snoopy Woodstock Beach Canvas Print – Peanuts Summer Art Wall Decor. NO the word Wall Art twice, NO commas, use a dash separator, keep it clean and specific.\",\n  \"description\": \"3 engaging paragraphs about this specific artwork scene, the canvas print quality, and who would love it as a gift.\",\n  \"tags\": [\"IMPORTANT: exactly 13 tags, each tag must be under 20 characters, no special characters, focused on Snoopy Peanuts and the specific scene. Examples of good tags: Snoopy wall art, Peanuts poster, Woodstock print, Snoopy gift, Peanuts decor, cartoon art print, Snoopy canvas, kids room art, Peanuts fan gift, Snoopy lover, beagle wall art, nursery art, Peanuts artwork\"]\n}" }] }],
+        contents: [{ parts: [{ text: "Based on this Snoopy and Woodstock art description: \"" + prompt + "\"\n\nGenerate an optimized Etsy product listing. Respond with raw JSON only, no markdown, no backticks:\n{\n  \"title\": \"Etsy optimized title under 80 chars. Format: Snoopy Woodstock [Scene] Canvas Print Peanuts [Theme] Wall Decor. Examples: Snoopy Woodstock Stargazing Canvas Print Peanuts Night Sky Wall Decor. Snoopy Woodstock Beach Canvas Print Peanuts Summer Art Wall Decor. NO dashes, NO hyphens, NO special characters, NO the word Wall Art twice, keep it clean and specific.\",\n  \"description\": \"3 engaging paragraphs about this specific artwork scene, the canvas print quality, and who would love it as a gift.\",\n  \"tags\": [\"IMPORTANT: exactly 13 tags, each tag must be under 20 characters, no special characters, focused on Snoopy Peanuts and the specific scene. Examples of good tags: Snoopy wall art, Peanuts poster, Woodstock print, Snoopy gift, Peanuts decor, cartoon art print, Snoopy canvas, kids room art, Peanuts fan gift, Snoopy lover, beagle wall art, nursery art, Peanuts artwork\"]\n}" }] }],
         generationConfig: { responseModalities: ["TEXT"] }
       })
     }
@@ -526,16 +527,33 @@ async function createProduct(imageId, listing) {
 }
 
 async function enableOffsiteAdsPuppeteer(productId) {
-  console.log("Launching stealth browser to enable offsite ads...");
-  var puppeteer = require("puppeteer-extra");
-  var StealthPlugin = require("puppeteer-extra-plugin-stealth");
-  puppeteer.use(StealthPlugin());
-
-  var browser = await puppeteer.launch({
-    executablePath: require("puppeteer").executablePath(),
-    headless: true,
-    args: ["--no-sandbox", "--disable-setuid-sandbox", "--disable-dev-shm-usage", "--window-size=1280,800"]
-  });
+  var PRINTIFY_BEARER = process.env.PRINTIFY_BEARER;
+  if (!PRINTIFY_BEARER) {
+    console.log("No PRINTIFY_BEARER token set, skipping offsite ads");
+    return;
+  }
+  console.log("Enabling offsite ads via bearer token...");
+  try {
+    var USER_ID = "19310315";
+    var res = await fetch(
+      "https://printify.com/api/v1/users/" + USER_ID + "/shops/" + SHOP_ID + "/products/" + productId,
+      {
+        method: "PUT",
+        headers: {
+          "Authorization": "Bearer " + PRINTIFY_BEARER,
+          "Content-Type": "application/json",
+          "Origin": "https://printify.com",
+          "Referer": "https://printify.com/app/store/products/1"
+        },
+        body: JSON.stringify({ sales_channel_properties: { etsy: { offsite_adds: 0.12 } } })
+      }
+    );
+    var text = await res.text();
+    console.log("Offsite ads response (status " + res.status + "):", text.substring(0, 200));
+  } catch (err) {
+    console.log("Offsite ads error:", err.message);
+  }
+}
 
   try {
     var page = await browser.newPage();
@@ -599,63 +617,48 @@ async function enableOffsiteAdsPuppeteer(productId) {
       }
     });
 
-    console.log("Login submitted, waiting...");
-    await new Promise(function(r) { setTimeout(r, 12000); });
 
-    var currentUrl = page.url();
-    console.log("URL after login:", currentUrl);
 
-    if (currentUrl.includes("login") || currentUrl.includes("auth")) {
-      throw new Error("Login failed - Cloudflare may be blocking. URL: " + currentUrl);
+async function createAndPublishEbay(imageId, listing) {
+  console.log("Creating eBay product...");
+  var variants = VERTICAL_VARIANTS.map(function(v) {
+    return { id: v.id, is_enabled: true, price: v.price };
+  });
+  var print_areas = VERTICAL_VARIANTS.map(function(v) {
+    return {
+      variant_ids: [v.id],
+      placeholders: [{ position: "front", images: [{ id: imageId, x: 0.5, y: 0.5, scale: 1, angle: 0, print_area_width: v.w, print_area_height: v.h }] }]
+    };
+  });
+  var res = await fetch("https://api.printify.com/v1/shops/" + EBAY_SHOP_ID + "/products.json", {
+    method: "POST",
+    headers: { "Authorization": "Bearer " + PRINTIFY_API_KEY, "Content-Type": "application/json" },
+    body: JSON.stringify({
+      title: listing.title,
+      description: listing.description,
+      tags: listing.tags,
+      blueprint_id: BLUEPRINT_ID,
+      print_provider_id: PRINT_PROVIDER_ID,
+      variants: variants,
+      print_areas: print_areas
+    })
+  });
+  var data = await res.json();
+  if (!data.id) { console.log("eBay product creation failed:", JSON.stringify(data)); return; }
+  console.log("eBay product created, ID:", data.id);
+
+  // Publish to eBay
+  await new Promise(function(r) { setTimeout(r, 45000); });
+  console.log("Publishing to eBay...");
+  var pubRes = await fetch(
+    "https://api.printify.com/v1/shops/" + EBAY_SHOP_ID + "/products/" + data.id + "/publish.json",
+    {
+      method: "POST",
+      headers: { "Authorization": "Bearer " + PRINTIFY_API_KEY, "Content-Type": "application/json" },
+      body: JSON.stringify({ title: true, description: true, images: true, variants: true, tags: true, keyFeatures: true, shipping_template: true })
     }
-
-    console.log("Logged in! Navigating to product...");
-    await page.goto("https://printify.com/app/store/products/1", { waitUntil: "domcontentloaded", timeout: 30000 });
-    await new Promise(function(r) { setTimeout(r, 5000); });
-
-    await page.goto("https://printify.com/app/product-details/" + productId + "?fromProductsPage=1", { waitUntil: "domcontentloaded", timeout: 30000 });
-    await new Promise(function(r) { setTimeout(r, 8000); });
-
-    console.log("On product page:", page.url());
-
-    var toggled = await page.evaluate(function() {
-      var switches = document.querySelectorAll("button[role=switch]");
-      for (var i = 0; i < switches.length; i++) {
-        var btn = switches[i];
-        var parent = btn.parentElement;
-        for (var j = 0; j < 6; j++) {
-          if (!parent) break;
-          if (parent.innerText && (parent.innerText.toLowerCase().includes("off-site") || parent.innerText.toLowerCase().includes("offsite"))) {
-            var isOn = btn.getAttribute("aria-checked") === "true";
-            if (!isOn) { btn.click(); return "clicked"; }
-            return "already-on";
-          }
-          parent = parent.parentElement;
-        }
-      }
-      var info = "switches=" + switches.length + " bodyHasText=" + (document.body.innerText.toLowerCase().includes("off-site"));
-      return "not-found:" + info;
-    });
-
-    console.log("Toggle result:", toggled);
-
-    if (toggled === "clicked") {
-      await new Promise(function(r) { setTimeout(r, 1500); });
-      await page.evaluate(function() {
-        var buttons = document.querySelectorAll("button");
-        for (var i = 0; i < buttons.length; i++) {
-          if (buttons[i].textContent.trim() === "Save as draft") { buttons[i].click(); return; }
-        }
-      });
-      await new Promise(function(r) { setTimeout(r, 2000); });
-      console.log("Offsite ads enabled and saved!");
-    }
-
-  } catch (err) {
-    console.error("Puppeteer error:", err.message);
-  } finally {
-    await browser.close();
-  }
+  );
+  console.log("eBay publish response (status " + pubRes.status + "):", await pubRes.text());
 }
 
 async function publishToEtsy(productId) {
@@ -714,9 +717,6 @@ async function run() {
   try { require("sharp"); } catch (e) {
     require("child_process").execSync("npm install sharp", { stdio: "inherit" });
   }
-  try { require("puppeteer-extra"); } catch (e) {
-    require("child_process").execSync("npm install puppeteer-extra puppeteer-extra-plugin-stealth", { stdio: "inherit" });
-  }
 
   var prompts = pickPrompts();
   console.log("Selected 5 unique prompts for this run");
@@ -732,6 +732,7 @@ async function run() {
       var productId = await createProduct(imageId, listing);
       try { await enableOffsiteAdsPuppeteer(productId); } catch(e) { console.log("Offsite ads skipped:", e.message); }
       await publishToEtsy(productId);
+      await createAndPublishEbay(imageId, listing);
       console.log("Listing " + (i + 1) + " live on Etsy!");
       if (i < 4) await new Promise(function(r) { setTimeout(r, 10000); });
     } catch (err) {
