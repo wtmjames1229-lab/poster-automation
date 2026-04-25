@@ -577,11 +577,12 @@ async function createAndPublishEbay(imageId, listing) {
       blueprint_id: BLUEPRINT_ID,
       print_provider_id: PRINT_PROVIDER_ID,
       variants: variants,
-      print_areas: print_areas
+      print_areas: print_areas,
+      sales_channel_properties: { ebay: { category_id: "184" } }
     })
   });
   var data = await res.json();
-  if (!data.id) { console.log("eBay product creation failed:", JSON.stringify(data)); return; }
+  if (!data.id) { console.log("eBay product creation failed (status " + res.status + "):", JSON.stringify(data)); return; }
   console.log("eBay product created, ID:", data.id);
 
   // Publish to eBay
