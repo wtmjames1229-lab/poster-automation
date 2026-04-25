@@ -556,35 +556,23 @@ async function enableOffsiteAdsPuppeteer(productId) {
 }
 
 
-async function createAndPublishEbay(imageId, listing) {
-  console.log("Creating eBay product...");
-  var variants = VERTICAL_VARIANTS.map(function(v) {
-    return { id: v.id, is_enabled: true, price: v.price };
-  });
-  var print_areas = VERTICAL_VARIANTS.map(function(v) {
-    return {
-      variant_ids: [v.id],
-      placeholders: [{ position: "front", images: [{ id: imageId, x: 0.5, y: 0.5, scale: 1, angle: 0, print_area_width: v.w, print_area_height: v.h }] }]
-    };
-  });
-  var res = await fetch("https://api.printify.com/v1/shops/" + EBAY_SHOP_ID + "/products.json", {
-    method: "POST",
-    headers: { "Authorization": "Bearer " + PRINTIFY_API_KEY, "Content-Type": "application/json" },
-    body: JSON.stringify({
-      title: listing.title,
-      description: listing.description,
-      blueprint_id: BLUEPRINT_ID,
-      print_provider_id: PRINT_PROVIDER_ID,
-      variants: variants,
-      print_areas: print_areas
-    })
-  });
+async function createAndPublishEbay(etsyProductId) {
+  console.log("Copying product to eBay store...");
+  var res = await fetch(
+    "https://api.printify.com/v1/shops/" + SHOP_ID + "/products/" + etsyProductId + "/duplicate.json",
+    {
+      method: "POST",
+      headers: { "Authorization": "Bearer " + PRINTIFY_API_KEY, "Content-Type": "application/json" },
+      body: JSON.stringify({ shop_id: parseInt(EBAY_SHOP_ID) })
+    }
+  );
   var data = await res.json();
-  if (!data.id) { console.log("eBay product creation failed (status " + res.status + "):", JSON.stringify(data)); return; }
-  console.log("eBay product created, ID:", data.id);
+  console.log("Copy response (status " + res.status + "):", JSON.stringify(data).substring(0, 200));
+  if (!data.id) { console.log("eBay copy failed"); return; }
+  console.log("eBay product copied, ID:", data.id);
 
   // Publish to eBay
-  await new Promise(function(r) { setTimeout(r, 45000); });
+  await new Promise(function(r) { setTimeout(r, 15000); });
   console.log("Publishing to eBay...");
   var pubRes = await fetch(
     "https://api.printify.com/v1/shops/" + EBAY_SHOP_ID + "/products/" + data.id + "/publish.json",
@@ -668,7 +656,7 @@ async function run() {
       var productId = await createProduct(imageId, listing);
       try { await enableOffsiteAdsPuppeteer(productId); } catch(e) { console.log("Offsite ads skipped:", e.message); }
       await publishToEtsy(productId);
-      await createAndPublishEbay(imageId, listing);
+      await createAndPublishEbay(productId);
       console.log("Listing " + (i + 1) + " live on Etsy!");
       if (i < 4) await new Promise(function(r) { setTimeout(r, 10000); });
     } catch (err) {
