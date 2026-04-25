@@ -604,20 +604,6 @@ async function enableOffsiteAdsPuppeteer(productId) {
       }
     }, PRINTIFY_PASSWORD);
 
-    await new Promise(function(r) { setTimeout(r, 500); });
-
-    // Click submit
-    await page.evaluate(function() {
-      var buttons = document.querySelectorAll("button");
-      for (var i = 0; i < buttons.length; i++) {
-        if (buttons[i].type === "submit" || buttons[i].textContent.toLowerCase().includes("log in") || buttons[i].textContent.toLowerCase().includes("sign in")) {
-          buttons[i].click();
-          return;
-        }
-      }
-    });
-
-
 
 async function createAndPublishEbay(imageId, listing) {
   console.log("Creating eBay product...");
