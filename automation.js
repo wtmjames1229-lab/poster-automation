@@ -555,55 +555,6 @@ async function enableOffsiteAdsPuppeteer(productId) {
   }
 }
 
-  try {
-    var page = await browser.newPage();
-    await page.setViewport({ width: 1280, height: 800 });
-    await page.setUserAgent("Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/122.0.0.0 Safari/537.36");
-
-    console.log("Navigating to Printify login...");
-    await page.goto("https://printify.com/app/login", { waitUntil: "domcontentloaded", timeout: 30000 });
-    await new Promise(function(r) { setTimeout(r, 10000); });
-
-    var inputDebug = await page.evaluate(function() {
-      var inputs = document.querySelectorAll("input");
-      var info = "Inputs: " + inputs.length + " | ";
-      for (var i = 0; i < inputs.length; i++) {
-        info += "[type=" + inputs[i].type + " name=" + inputs[i].name + "] ";
-      }
-      return info;
-    });
-    console.log(inputDebug);
-
-    // Type into username field
-    await page.evaluate(function(email) {
-      var inputs = document.querySelectorAll("input");
-      for (var i = 0; i < inputs.length; i++) {
-        if (inputs[i].type === "text" || inputs[i].name === "username" || inputs[i].type === "email") {
-          inputs[i].focus();
-          inputs[i].value = email;
-          inputs[i].dispatchEvent(new Event("input", { bubbles: true }));
-          inputs[i].dispatchEvent(new Event("change", { bubbles: true }));
-          break;
-        }
-      }
-    }, PRINTIFY_EMAIL);
-
-    await new Promise(function(r) { setTimeout(r, 500); });
-
-    // Type into password field
-    await page.evaluate(function(pass) {
-      var inputs = document.querySelectorAll("input");
-      for (var i = 0; i < inputs.length; i++) {
-        if (inputs[i].type === "password") {
-          inputs[i].focus();
-          inputs[i].value = pass;
-          inputs[i].dispatchEvent(new Event("input", { bubbles: true }));
-          inputs[i].dispatchEvent(new Event("change", { bubbles: true }));
-          break;
-        }
-      }
-    }, PRINTIFY_PASSWORD);
-
 
 async function createAndPublishEbay(imageId, listing) {
   console.log("Creating eBay product...");
