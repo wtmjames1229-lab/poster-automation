@@ -12,7 +12,7 @@ jobs:
       - uses: actions/setup-node@v3
         with:
           node-version: '20'
-      - run: npm install sharp puppeteer puppeteer-extra puppeteer-extra-plugin-stealth
+      - run: npm install sharp
       - run: node automation.js
         env:
           NB_API_KEY: ${{ secrets.NB_API_KEY }}
