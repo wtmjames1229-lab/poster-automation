@@ -573,12 +573,10 @@ async function createAndPublishEbay(imageId, listing) {
     body: JSON.stringify({
       title: listing.title,
       description: listing.description,
-      tags: listing.tags,
       blueprint_id: BLUEPRINT_ID,
       print_provider_id: PRINT_PROVIDER_ID,
       variants: variants,
-      print_areas: print_areas,
-      sales_channel_properties: { ebay: { category_id: "184" } }
+      print_areas: print_areas
     })
   });
   var data = await res.json();
