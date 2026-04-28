@@ -217,6 +217,7 @@ async function generateListing(prompt) {
     listing.tags = filtered.slice(0, 13);
   }
 
+  listing.title = "Large Framed Anime Canvas | Japanese Manga Art";
   console.log("Listing generated:", listing.title);
   console.log("Tags:", listing.tags);
   return listing;
