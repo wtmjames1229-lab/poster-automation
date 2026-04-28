@@ -186,23 +186,6 @@ const PROMPTS = [
   "Pikachu and Eevee watching the sun rise over the mountains",
   "Pikachu and Snorlax napping together in a sunny meadow",
 ];
-  "Pikachu and Eevee playing in a field of flowers",
-  "Pikachu stargazing on a hilltop at night with stars glowing",
-  "Pikachu napping under a tree on a sunny afternoon",
-  "Pikachu and Snorlax sleeping together in a cozy meadow",
-  "Pikachu surfing on a wave at the beach",
-  "Pikachu in a hot air balloon over a colorful landscape",
-  "Pikachu ice skating on a frozen pond in winter",
-  "Pikachu and Eevee sharing an umbrella in the rain",
-  "Pikachu watching fireworks light up the night sky",
-  "Pikachu sledding down a snowy hill in winter",
-  "Pikachu picking apples in an orchard in autumn",
-  "Pikachu and Eevee having a picnic on a sunny day",
-  "Pikachu sitting on a crescent moon in the night sky",
-  "Pikachu exploring a colorful garden in spring",
-  "Pikachu and Bulbasaur in a field of sunflowers",
-  "Pikachu fishing by a calm lake at sunset",
-];
 
 const VERTICAL_VARIANTS = [
   { id: 101413, w: 2400,  h: 3000,  price: 5142  },
