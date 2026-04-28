@@ -375,8 +375,8 @@ async function createProduct(imageId, listing) {
 }
 
 async function publishToEtsy(productId) {
-  console.log("Waiting 45s for product images to fully process...");
-  await new Promise(function(r) { setTimeout(r, 45000); });
+  console.log("Waiting 90s for product images to fully process...")
+  await new Promise(function(r) { setTimeout(r, 90000); });
   console.log("Publishing to Etsy...");
   var body = JSON.stringify({
     title: true,
