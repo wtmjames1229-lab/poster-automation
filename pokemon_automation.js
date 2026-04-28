@@ -518,9 +518,6 @@ async function run() {
       var productId = await createProduct(imageId, listing);
       try { await enableOffsiteAdsPuppeteer(productId); } catch(e) { console.log("Offsite ads skipped:", e.message); }
       await publishToEtsy(productId);
-      var etsyId = await getEtsyListingId(productId);
-      if (etsyId) saveListing(productId, etsyId);
-      await createAndPublishEbay(productId);
       console.log("Listing " + (i + 1) + " live on Etsy!");
       if (i < 4) await new Promise(function(r) { setTimeout(r, 10000); });
     } catch (err) {
