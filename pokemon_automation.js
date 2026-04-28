@@ -1,16 +1,19 @@
-// Pokemon POD Automation Pipeline
+// POD Automation Pipeline
 // Gemini → Printify → Etsy
-// Run with: node pokemon_automation.js
+// Run with: node automation.js
 
 const NB_API_KEY = process.env.NB_API_KEY;
 const PRINTIFY_API_KEY = process.env.PRINTIFY_API_KEY;
+const PRINTIFY_EMAIL = process.env.PRINTIFY_EMAIL;
+const PRINTIFY_PASSWORD = process.env.PRINTIFY_PASSWORD;
 const SHOP_ID = '27354436';
+const EBAY_SHOP_ID = '27315339';
 const BLUEPRINT_ID = 1159;
 const PRINT_PROVIDER_ID = 99;
 
 const PROMPTS = [
   // PIKACHU
-  "Pikachu sitting on a hill watching a sunset, warm golden sky",
+  "Pikachu sitting on a hill watching a sunset warm golden sky",
   "Pikachu and Eevee playing in a field of flowers",
   "Pikachu stargazing on a hilltop at night with stars glowing",
   "Pikachu napping under a tree on a sunny afternoon",
@@ -28,7 +31,7 @@ const PROMPTS = [
   "Pikachu in a field of sunflowers at golden hour",
   "Pikachu wrapped in blankets watching the sunset",
   "Pikachu in a cozy reading nook with warm candles",
-  "Pikachu jumping in autumn leaves, orange and red tones",
+  "Pikachu jumping in autumn leaves orange and red tones",
   "Pikachu and Eevee sharing an umbrella in the rain",
   // CHARIZARD
   "Charizard flying over mountains at golden hour sunset",
@@ -38,29 +41,28 @@ const PROMPTS = [
   "Charizard flying over a colorful autumn forest",
   "Charizard sitting by a campfire watching the stars",
   "Charizard soaring over the ocean at sunrise",
-  "Charizard in a retro space age style with rocket ships and stars",
+  "Charizard in retro space age style with rocket ships and stars",
   "Charizard flying through a cosmic dreamscape of stars and planets",
   "Charizard in watercolor painting style with loose washes",
   // EEVEE AND EVOLUTIONS
   "Eevee and Flareon sitting by a cozy fireplace in winter",
-  "Eevee running through autumn leaves, orange and red tones",
+  "Eevee running through autumn leaves orange and red tones",
   "Eevee and Vaporeon swimming in turquoise ocean waters",
   "Eevee in a spring meadow with cherry blossoms falling",
   "Eevee napping in a sunbeam on a cozy window seat",
   "Eevee and Espeon stargazing together on a hilltop",
   "Eevee and Umbreon watching the northern lights at night",
   "Eevee in a field of lavender at golden hour dusk",
-  "Eevee and Glaceon in a winter frost forest glowing branches",
+  "Eevee and Glaceon in a winter frost forest with glowing branches",
   "Eevee and Leafeon in a bamboo forest at dawn",
   "Sylveon in a lavender and cream color palette",
   "Espeon sitting on a rooftop watching city lights at night",
   "Umbreon and Espeon silhouetted against a blazing sunset",
   "Vaporeon swimming in a coral reef underwater scene",
   "Jolteon in a vibrant lightning storm over the ocean",
-  // MEWTWO & LEGENDARY
+  // MEWTWO AND LEGENDARIES
   "Mewtwo floating in a cosmic dreamscape of stars and planets",
   "Mewtwo in a crystal cave with glowing gems",
-  "Mewtwo in a retro Japanese woodblock print style",
   "Mewtwo silhouetted against a blazing purple sunset",
   "Lugia flying over the ocean at sunset majestic and peaceful",
   "Ho-Oh soaring over a rainbow after spring rain",
@@ -76,53 +78,13 @@ const PROMPTS = [
   "Kyogre swimming in a deep glowing ocean at night",
   "Groudon watching a volcano erupt at golden hour",
   "Dialga and Palkia in a cosmic starry night sky",
-  "Giratina in a dreamland with floating islands",
   "Arceus in a golden cloud kingdom above the clouds",
-  "Reshiram soaring through a snowy tundra landscape",
-  "Zekrom flying through a lightning storm at night",
-  "Xerneas in an enchanted fairy tale forest glowing",
-  "Yveltal soaring over a dark dramatic stormy sky",
   "Lunala soaring through a starry night sky",
   "Solgaleo watching a solar eclipse over mountains",
-  "Necrozma floating in a colorful nebula in outer space",
-  // BULBASAUR AND IVYSAUR
-  "Bulbasaur in a flower garden with butterflies at spring",
-  "Bulbasaur in a tropical jungle garden at golden hour",
-  "Bulbasaur in a Japanese zen garden at golden hour",
-  "Venusaur in an ancient redwood forest at dawn",
-  "Ivysaur in a field of wildflowers on a windy day",
-  // SQUIRTLE AND BLASTOISE
-  "Squirtle and Wartortle playing in ocean waves at sunset",
-  "Squirtle on a sailboat in turquoise waters",
-  "Blastoise on a rocky coastline with waves crashing",
-  "Squirtle building an elaborate sandcastle at the beach",
-  "Squirtle watching bioluminescent waves at night on the beach",
-  // GENGAR AND HAUNTER
-  "Gengar and Mimikyu in a cozy haunted library with candles",
-  "Gengar in Halloween style trick or treating at night",
-  "Gengar floating in a starry night sky over a city",
-  "Haunter floating in a foggy morning forest",
-  "Gengar in a 1920s art deco cityscape at night",
-  // SNORLAX
-  "Snorlax sleeping in a cozy meadow on a sunny afternoon",
-  "Snorlax napping under a giant cherry blossom tree",
-  "Snorlax sleeping by a campfire watching the stars",
-  "Snorlax wrapped in blankets in a cozy cabin in winter",
-  "Snorlax sleeping in autumn leaves, orange and red tones",
-  // MEOWTH AND PERSIAN
-  "Meowth in a 1950s diner with retro neon signs and milkshakes",
-  "Meowth sitting on a rooftop watching city lights at night",
-  "Persian curled up in a cozy reading nook with candles",
-  // PSYDUCK AND SLOWPOKE
-  "Psyduck sitting by a calm lake watching the sunset",
-  "Slowpoke sitting on a dock watching the water at sunset",
-  "Psyduck in a cozy bathtub surrounded by bubbles and candles",
-  // JIGGLYPUFF
-  "Jigglypuff singing under a starry night sky",
-  "Jigglypuff celebrating New Year with confetti and fireworks",
-  "Jigglypuff in a cozy attic studio making art at night",
-  // STARTER COLLECTIONS
+  // STARTERS
   "Charmander sitting by a campfire watching the stars at night",
+  "Squirtle and Wartortle playing in ocean waves at sunset",
+  "Bulbasaur in a flower garden with butterflies in spring",
   "Chikorita in a field of clover and bees on a sunny day",
   "Cyndaquil watching fireflies in a summer field at night",
   "Totodile splashing in river rapids on an adventure",
@@ -140,23 +102,39 @@ const PROMPTS = [
   "Rowlet in a treehouse with string lights at night",
   "Litten curled up in a cozy cabin with snow falling outside",
   "Popplio performing in a magical underwater kingdom",
+  // POPULAR POKEMON
+  "Gengar floating in a starry night sky over a city",
+  "Gengar and Mimikyu in a cozy haunted library with candles",
+  "Snorlax sleeping in a cozy meadow on a sunny afternoon",
+  "Snorlax napping under a giant cherry blossom tree",
+  "Snorlax sleeping by a campfire watching the stars",
+  "Meowth sitting on a rooftop watching city lights at night",
+  "Psyduck sitting by a calm lake watching the sunset",
+  "Slowpoke sitting on a dock watching the water at sunset",
+  "Jigglypuff singing under a starry night sky",
+  "Jigglypuff celebrating New Year with confetti and fireworks",
+  "Bulbasaur in a tropical jungle garden at golden hour",
+  "Venusaur in an ancient redwood forest at dawn",
+  "Squirtle on a sailboat in turquoise waters",
+  "Blastoise on a rocky coastline with waves crashing",
+  "Dragonite flying over the Scottish highlands landscape",
+  "Lapras floating on a calm misty mountain lake",
+  "Ninetales running through a field of poppies at sunset",
+  "Vulpix in a winter frost forest with glowing branches",
   // ART STYLES
   "Pikachu in watercolor painting style with loose washes",
   "Eevee in gouache painting style with bold colors",
   "Charizard in oil painting impressionist style",
   "Mewtwo in mosaic tile art style",
   "Pikachu in stained glass illustration style",
-  "Gengar in risograph print style with layered colors",
   "Pikachu in ukiyo-e Japanese woodblock style",
   "Eevee in Art Nouveau flowing lines style",
   "Charizard in Bauhaus geometric design style",
   "Pikachu in screen print style with limited colors",
-  "Mewtwo in Victorian botanical illustration style",
   "Pikachu as minimal line art on clean background",
   "Charizard as negative space silhouette art",
-  "Eevee as origami paper fold style illustration",
-  "Pikachu as flat vector illustration minimal style",
-  // COLOR PALETTE THEMES
+  "Eevee as flat vector illustration minimal style",
+  // COLOR PALETTES
   "Pikachu and Eevee in a deep navy and gold color palette",
   "Vaporeon in a coral and turquoise tropical palette",
   "Leafeon in a forest green and rust autumn palette",
@@ -172,11 +150,9 @@ const PROMPTS = [
   "Charizard watching summer thunderstorm from above",
   "Snorlax jumping in autumn leaf piles orange and red tones",
   "Pikachu and Eevee building an igloo in a blizzard",
-  "Gengar watching lightning over a stormy ocean at night",
   "Articuno in a winter frost forest with icy glowing branches",
-  "Jolteon in a monsoon rain splashing in rivers",
   "Suicune watching the northern lights in snowy tundra",
-  // FRIENDSHIP MOMENTS
+  // FRIENDSHIP
   "Pikachu and Eevee high-fiving after a big adventure",
   "Squirtle and Charmander falling asleep together under a tree",
   "Bulbasaur and Oddish finding treasure on a beach",
@@ -187,6 +163,7 @@ const PROMPTS = [
   "Pikachu and Snorlax napping together in a sunny meadow",
 ];
 
+// Flat rate prices in cents
 const VERTICAL_VARIANTS = [
   { id: 101413, w: 2400,  h: 3000,  price: 5142  },
   { id: 91641,  w: 3300,  h: 4200,  price: 6336  },
@@ -259,7 +236,7 @@ async function generateListing(prompt) {
       method: "POST",
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify({
-        contents: [{ parts: [{ text: "Based on this Pokemon art description: \"" + prompt + "\"\n\nGenerate an optimized Etsy product listing. Respond with raw JSON only, no markdown, no backticks:\n{\n  \"title\": \"Etsy optimized title under 80 chars. You MUST include the exact Pokemon character name from the description. Format: [Pokemon Name] Canvas Print Pokemon Wall Decor. Example: Pikachu Sunset Canvas Print Pokemon Wall Decor. NO dashes, NO hyphens, NO special characters.\",\n  \"description\": \"3 engaging paragraphs about this specific artwork scene, the canvas print quality, and who would love it as a gift.\",\n  \"tags\": [\"exactly 13 tags each under 20 characters no special characters. Mix Pokemon and kawaii terms: kawaii wall art, anime wall art, kids room art, nursery art, kawaii canvas, cute wall art, anime poster, kawaii decor, fantasy art, cute kids decor, kawaii gift, anime art gift, cute room decor\"]\n}" }] }],
+        contents: [{ parts: [{ text: "Based on this Pokemon art description: \"" + prompt + "\"\n\nGenerate an optimized Etsy product listing. Respond with raw JSON only, no markdown, no backticks:\n{\n  \"title\": \"Etsy optimized title under 80 chars. Format: [Pokemon Name] Canvas Print Pokemon [Scene] Wall Decor. Examples: Pikachu Stargazing Canvas Print Pokemon Night Sky Wall Decor. Charizard Sunset Canvas Print Pokemon Fire Wall Decor. MUST include the Pokemon character name and the word Pokemon. NO dashes, NO hyphens, NO special characters.\",\n  \"description\": \"3 engaging paragraphs about this specific artwork scene, the canvas print quality, and who would love it as a gift.\",\n  \"tags\": [\"IMPORTANT: exactly 13 tags, each tag must be under 20 characters, no special characters. Examples: kawaii wall art, anime wall art, kids room art, nursery art, kawaii canvas, cute wall art, anime poster, kawaii decor, fantasy art, cute kids decor, kawaii gift, anime art gift, cute room decor\"]\n}" }] }],
         generationConfig: { responseModalities: ["TEXT"] }
       })
     }
@@ -270,37 +247,44 @@ async function generateListing(prompt) {
   var clean = text.replace(/```json|```/g, "").trim();
   var listing = JSON.parse(clean);
 
+  // Validate and fix tags - ensure all under 20 chars
   var validTags = [
     "kawaii wall art",
     "anime wall art",
-    "cute creature art",
-    "fantasy art print",
     "kids room art",
     "nursery art",
     "kawaii canvas",
-    "anime canvas",
     "cute wall art",
-    "kawaii decor",
     "anime poster",
+    "kawaii decor",
+    "fantasy art",
+    "cute kids decor",
+    "kawaii gift",
+    "anime art gift",
+    "cute room decor",
+    "anime canvas",
     "kawaii nursery",
-    "fantasy canvas",
     "cute anime art",
     "kawaii print",
     "anime wall decor",
     "cute fantasy art",
-    "kawaii gift",
-    "anime art gift",
-    "cute kids decor"
+    "kawaii home decor"
   ];
 
   if (!listing.tags || !Array.isArray(listing.tags) || listing.tags.length === 0) {
     listing.tags = validTags.slice(0, 13);
   } else {
-    var filtered = listing.tags.filter(function(t) { return t && t.length <= 20 && t.length > 0; });
+    // Filter out any tags over 20 chars and replace with valid ones
+    var filtered = listing.tags.filter(function(t) {
+      return t && t.length <= 20 && t.length > 0;
+    });
     while (filtered.length < 13) {
       var fallback = validTags[filtered.length % validTags.length];
-      if (filtered.indexOf(fallback) === -1) filtered.push(fallback);
-      else filtered.push("Pokemon art " + filtered.length);
+      if (filtered.indexOf(fallback) === -1) {
+        filtered.push(fallback);
+      } else {
+        filtered.push("kawaii art " + filtered.length);
+      }
     }
     listing.tags = filtered.slice(0, 13);
   }
@@ -374,10 +358,100 @@ async function createProduct(imageId, listing) {
   return data.id;
 }
 
+async function enableOffsiteAdsPuppeteer(productId) {
+  var PRINTIFY_BEARER = process.env.PRINTIFY_BEARER;
+  if (!PRINTIFY_BEARER) {
+    console.log("No PRINTIFY_BEARER token set, skipping offsite ads");
+    return;
+  }
+  console.log("Enabling offsite ads via bearer token...");
+  try {
+    var USER_ID = "19310315";
+    var res = await fetch(
+      "https://printify.com/api/v1/users/" + USER_ID + "/shops/" + SHOP_ID + "/products/" + productId,
+      {
+        method: "PUT",
+        headers: {
+          "Authorization": "Bearer " + PRINTIFY_BEARER,
+          "Content-Type": "application/json",
+          "Origin": "https://printify.com",
+          "Referer": "https://printify.com/app/store/products/1"
+        },
+        body: JSON.stringify({ sales_channel_properties: { etsy: { offsite_adds: 0.12 } } })
+      }
+    );
+    var text = await res.text();
+    console.log("Offsite ads response (status " + res.status + "):", text.substring(0, 200));
+  } catch (err) {
+    console.log("Offsite ads error:", err.message);
+  }
+}
+
+
+async function createAndPublishEbay(etsyProductId) {
+  console.log("Copying product to eBay store...");
+  var res = await fetch(
+    "https://api.printify.com/v1/shops/" + SHOP_ID + "/products/" + etsyProductId + "/duplicate.json",
+    {
+      method: "POST",
+      headers: { "Authorization": "Bearer " + PRINTIFY_API_KEY, "Content-Type": "application/json" },
+      body: JSON.stringify({ shop_id: parseInt(EBAY_SHOP_ID) })
+    }
+  );
+  var data = await res.json();
+  console.log("Copy response (status " + res.status + "):", JSON.stringify(data).substring(0, 200));
+  if (!data.id) { console.log("eBay copy failed"); return; }
+  console.log("eBay product copied, ID:", data.id);
+
+  // Publish to eBay
+  await new Promise(function(r) { setTimeout(r, 15000); });
+  console.log("Publishing to eBay...");
+  var pubRes = await fetch(
+    "https://api.printify.com/v1/shops/" + EBAY_SHOP_ID + "/products/" + data.id + "/publish.json",
+    {
+      method: "POST",
+      headers: { "Authorization": "Bearer " + PRINTIFY_API_KEY, "Content-Type": "application/json" },
+      body: JSON.stringify({ title: true, description: true, images: true, variants: true, tags: true, keyFeatures: true, shipping_template: true })
+    }
+  );
+  console.log("eBay publish response (status " + pubRes.status + "):", await pubRes.text());
+}
+
+function saveListing(printifyId, etsyListingId) {
+  var fs = require('fs');
+  var file = './listings.json';
+  var listings = {};
+  try {
+    if (fs.existsSync(file)) listings = JSON.parse(fs.readFileSync(file, 'utf8'));
+  } catch (e) {}
+  listings[etsyListingId] = {
+    printify_id: printifyId,
+    created_at: new Date().toISOString(),
+    auto_renew: false
+  };
+  fs.writeFileSync(file, JSON.stringify(listings, null, 2));
+  console.log("Saved listing to tracker:", etsyListingId);
+}
+
+async function getEtsyListingId(printifyProductId) {
+  await new Promise(function(r) { setTimeout(r, 5000); });
+  var res = await fetch(
+    "https://api.printify.com/v1/shops/" + SHOP_ID + "/products/" + printifyProductId + ".json",
+    { headers: { "Authorization": "Bearer " + PRINTIFY_API_KEY } }
+  );
+  var data = await res.json();
+  if (data.external && data.external.id) {
+    console.log("Etsy listing ID:", data.external.id);
+    return data.external.id;
+  }
+  return null;
+}
+
 async function publishToEtsy(productId) {
-  console.log("Waiting 90s for product images to fully process...")
-  await new Promise(function(r) { setTimeout(r, 90000); });
+  console.log("Waiting 45s for product images to fully process...");
+  await new Promise(function(r) { setTimeout(r, 45000); });
   console.log("Publishing to Etsy...");
+
   var body = JSON.stringify({
     title: true,
     description: true,
@@ -387,6 +461,8 @@ async function publishToEtsy(productId) {
     keyFeatures: true,
     shipping_template: true
   });
+
+  // Try publishing up to 3 times
   for (var attempt = 1; attempt <= 3; attempt++) {
     console.log("Publish attempt " + attempt + "...");
     var res = await fetch(
@@ -400,12 +476,27 @@ async function publishToEtsy(productId) {
     var statusCode = res.status;
     var text = await res.text();
     console.log("Publish response (status " + statusCode + "):", text);
-    if (statusCode === 200 || statusCode === 204) { console.log("Publish succeeded!"); break; }
+
+    if (statusCode === 200 || statusCode === 204) {
+      console.log("Publish succeeded!");
+      break;
+    }
+
     if (attempt < 3) {
       console.log("Waiting 20s before retry...");
       await new Promise(function(r) { setTimeout(r, 20000); });
     }
   }
+
+  // Check actual product status
+  await new Promise(function(r) { setTimeout(r, 5000); });
+  var checkRes = await fetch(
+    "https://api.printify.com/v1/shops/" + SHOP_ID + "/products/" + productId + ".json",
+    { headers: { "Authorization": "Bearer " + PRINTIFY_API_KEY } }
+  );
+  var product = await checkRes.json();
+  console.log("Product publishing_status:", product.publishing_status);
+  console.log("Product status:", product.status);
 }
 
 async function run() {
@@ -425,14 +516,18 @@ async function run() {
       var base64Image = await retry(function() { return generateImage(prompt); });
       var imageId = await uploadToPrintify(base64Image);
       var productId = await createProduct(imageId, listing);
+      try { await enableOffsiteAdsPuppeteer(productId); } catch(e) { console.log("Offsite ads skipped:", e.message); }
       await publishToEtsy(productId);
+      var etsyId = await getEtsyListingId(productId);
+      if (etsyId) saveListing(productId, etsyId);
+      await createAndPublishEbay(productId);
       console.log("Listing " + (i + 1) + " live on Etsy!");
       if (i < 4) await new Promise(function(r) { setTimeout(r, 10000); });
     } catch (err) {
       console.error("Listing " + (i + 1) + " failed:", err.message);
     }
   }
-  console.log("\nDone! All 5 Pokemon listings processed.");
+  console.log("\nDone! All 5 listings processed.");
 }
 
 run();
