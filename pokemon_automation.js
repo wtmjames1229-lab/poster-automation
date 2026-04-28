@@ -353,6 +353,7 @@ async function createProduct(imageId, listing) {
     })
   });
   var data = await res.json();
+  console.log("Product creation response (status " + res.status + "):", JSON.stringify(data).substring(0, 300));
   if (!data.id) throw new Error("Product creation failed: " + JSON.stringify(data));
   console.log("Product created, ID:", data.id);
   return data.id;
