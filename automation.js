@@ -11,8 +11,64 @@ const EBAY_SHOP_ID = '27315339';
 const BLUEPRINT_ID = 1159;
 const PRINT_PROVIDER_ID = 99;
 
-// Shared retro pulp comic style suffix appended to every image generation
-const STYLE_SUFFIX = " in vintage 1960s pulp comic book cover style, aged distressed paper texture, halftone dot shading, bold black ink outlines, limited retro color palette of teal cream mustard yellow and brick red, slight registration offset like old print, weathered edges, dynamic action composition, bold colorful flat illustration. Render the title text and ribbon banner text exactly as quoted in the prompt, clearly legible and prominently displayed at the top.";
+// Procedural retro color system - randomly picks one color from each pool per image.
+// 55 x 31 x 35 x 20 = ~1.2 million unique palette combinations. Effectively unlimited variety.
+// Each image gets a fresh background/title/accent/highlight combo picked at random.
+
+const BACKGROUND_COLORS = [
+  "teal", "deep navy blue", "burnt orange", "cream", "hot pink", "lime green",
+  "magenta", "aqua blue", "coral pink", "olive green", "rust orange",
+  "avocado green", "harvest gold", "deep purple", "midnight blue",
+  "charcoal grey", "pale mint green", "dusty pink", "periwinkle blue",
+  "crimson red", "forest green", "mustard yellow", "brick red", "sage green",
+  "lavender", "salmon", "ochre", "terracotta", "maroon", "powder blue",
+  "buttercream yellow", "khaki", "warm beige", "burgundy", "plum purple",
+  "robin egg blue", "mint green", "peach", "butter yellow", "soft coral",
+  "chocolate brown", "muted gold", "olive drab", "deep teal", "dusty rose",
+  "slate blue", "sand tan", "moss green", "cherry red", "tangerine orange",
+  "denim blue", "cocoa brown", "watermelon pink", "honey gold", "deep emerald"
+];
+
+const TITLE_COLORS = [
+  "mustard yellow", "golden yellow", "cream", "white", "hot pink", "turquoise",
+  "lime green", "hot orange", "sage green", "salmon pink", "peach",
+  "butter yellow", "crimson red", "black", "off-white", "lavender",
+  "harvest gold", "brick red", "neon yellow", "coral", "rich gold",
+  "ivory", "pale yellow", "fire-engine red", "electric blue", "magenta",
+  "powder pink", "burnt sienna", "lemon yellow", "deep red", "tangerine"
+];
+
+const ACCENT_COLORS = [
+  "brick red", "crimson red", "navy blue", "dark brown", "lemon yellow",
+  "electric blue", "golden yellow", "deep brown", "olive", "warm brown",
+  "mint green", "red", "mustard", "deep red", "white", "gold", "cream",
+  "burnt orange", "forest green", "ochre", "rust", "burgundy", "indigo",
+  "magenta", "lime", "aqua", "salmon", "peach", "lavender", "charcoal",
+  "ivory", "wine red", "copper", "khaki", "teal"
+];
+
+const HIGHLIGHT_COLORS = [
+  "cream", "off-white", "white", "pale yellow", "peach", "buttercream",
+  "ivory", "soft mint", "powder pink", "light grey", "pearl white",
+  "warm cream", "vanilla", "dusty white", "soft beige", "champagne",
+  "pale gold", "linen", "eggshell", "dove grey"
+];
+
+function pickRandom(arr) {
+  return arr[Math.floor(Math.random() * arr.length)];
+}
+
+function pickPalette() {
+  var bg = pickRandom(BACKGROUND_COLORS);
+  var title = pickRandom(TITLE_COLORS);
+  var accent = pickRandom(ACCENT_COLORS);
+  var highlight = pickRandom(HIGHLIGHT_COLORS);
+  return bg + " background with " + title + " title, " + accent + " accents, and " + highlight + " highlights";
+}
+
+function buildStyleSuffix(palette) {
+  return " in vintage 1960s pulp comic book cover style, aged paper texture, halftone dot shading, bold black ink outlines, color scheme: " + palette + ", slight registration offset like old print, weathered edges, dynamic action composition, bold colorful flat illustration. Render the title text and ribbon banner text exactly as quoted in the prompt, clearly legible and prominently displayed at the top.";
+}
 
 const PROMPTS = [
   // FLYING ACE / AVIATION
@@ -263,17 +319,12 @@ const PROMPTS = [
   '"DINER DAYS" arched block-letter title at top in mustard yellow with thick red outline and drop shadow, "MILKSHAKES AND MEMORIES" yellow ribbon banner subtitle, Snoopy on a stool at a 1950s diner counter, Woodstock sipping a shake',
 ];
 
-// Flat rate prices in cents
+// Flat rate prices in cents - only 2:3 ratio variants for perfect framing
 const VERTICAL_VARIANTS = [
-  { id: 101413, w: 2400,  h: 3000,  price: 5142  },
-  { id: 91641,  w: 3300,  h: 4200,  price: 6336  },
-  { id: 91644,  w: 3600,  h: 5400,  price: 8420  },
-  { id: 91647,  w: 4800,  h: 7200,  price: 10820 },
-  { id: 91649,  w: 6000,  h: 7200,  price: 13200 },
-  { id: 101411, w: 7200,  h: 9000,  price: 16966 },
-  { id: 91654,  w: 9000,  h: 12000, price: 23762 },
-  { id: 91655,  w: 9600,  h: 14400, price: 34684 },
-  { id: 112955, w: 12000, h: 18000, price: 50026 },
+  { id: 91644,  w: 3600,  h: 5400,  price: 8420  }, // 12 x 18
+  { id: 91647,  w: 4800,  h: 7200,  price: 10820 }, // 16 x 24
+  { id: 91655,  w: 9600,  h: 14400, price: 34684 }, // 32 x 48
+  { id: 112955, w: 12000, h: 18000, price: 50026 }, // 40 x 60
 ];
 
 function pickPrompts() {
@@ -396,7 +447,9 @@ async function generateListing(prompt) {
 
 async function generateImage(prompt) {
   console.log("Generating image...");
-  var fullPrompt = prompt + STYLE_SUFFIX + " Generate as a tall vertical portrait poster artwork in 2:3 aspect ratio, taller than wide, fill the entire frame edge to edge with no white borders, no margins, suitable for canvas wall art print.";
+  var palette = pickPalette();
+  console.log("Using palette:", palette);
+  var fullPrompt = prompt + buildStyleSuffix(palette) + " Generate as a tall vertical portrait poster artwork in 2:3 aspect ratio, taller than wide, fill the entire frame edge to edge with no white borders, no margins, suitable for canvas wall art print.";
   var res = await fetch(
     "https://generativelanguage.googleapis.com/v1beta/models/gemini-3.1-flash-image-preview:generateContent?key=" + NB_API_KEY,
     {
@@ -434,10 +487,21 @@ async function createProduct(imageId, listing) {
   var variants = VERTICAL_VARIANTS.map(function(v) {
     return { id: v.id, is_enabled: true, price: v.price };
   });
+  // Image is generated at 2:3 ratio (3000x4500). For each variant:
+  // - scale: cover-fill the print area regardless of aspect ratio
+  // - y position: anchor the top edge of the image to the top edge of the print
+  //   area so the title is never cropped. Bottom (clouds/decoration) gets cropped
+  //   instead. Math: y = scale/2 places image-top exactly at print-area-top.
+  //   For 2:3 variants (scale 1.0) this gives y=0.5 (centered, no crop).
+  var IMAGE_RATIO = 3000 / 4500; // 0.667
   var print_areas = VERTICAL_VARIANTS.map(function(v) {
+    var variantRatio = v.w / v.h;
+    var scale = Math.max(variantRatio, IMAGE_RATIO) / Math.min(variantRatio, IMAGE_RATIO);
+    var yPos = scale / 2;
+    console.log("Variant " + v.id + " (" + v.w + "x" + v.h + ") -> scale " + scale.toFixed(3) + ", y " + yPos.toFixed(3));
     return {
       variant_ids: [v.id],
-      placeholders: [{ position: "front", images: [{ id: imageId, x: 0.5, y: 0.5, scale: 1, angle: 0, print_area_width: v.w, print_area_height: v.h }] }]
+      placeholders: [{ position: "front", images: [{ id: imageId, x: 0.5, y: yPos, scale: scale, angle: 0, print_area_width: v.w, print_area_height: v.h }] }]
     };
   });
   var res = await fetch("https://api.printify.com/v1/shops/" + SHOP_ID + "/products.json", {
