@@ -327,6 +327,16 @@ const VERTICAL_VARIANTS = [
   { id: 112955, w: 12000, h: 18000, price: 50026 }, // 40 x 60
 ];
 
+// Sizes we DO NOT want enabled (Printify auto-includes them otherwise).
+// We explicitly send these with is_enabled: false to force them off.
+const DISABLED_VARIANT_IDS = [
+  101413, // 8 x 10
+  91641,  // 11 x 14
+  91649,  // 20 x 24
+  101411, // 24 x 30
+  91654,  // 30 x 40
+];
+
 function pickPrompts() {
   var shuffled = PROMPTS.slice().sort(function() { return Math.random() - 0.5; });
   return shuffled.slice(0, 5);
@@ -484,9 +494,15 @@ async function uploadToPrintify(base64Data) {
 
 async function createProduct(imageId, listing) {
   console.log("Creating Printify product...");
+  // Build the variants array: enabled ones at our prices, disabled ones explicitly
+  // marked is_enabled: false. We need to send the disabled ones too because Printify
+  // defaults to enabling all blueprint variants if they're not in the request.
   var variants = VERTICAL_VARIANTS.map(function(v) {
     return { id: v.id, is_enabled: true, price: v.price };
-  });
+  }).concat(DISABLED_VARIANT_IDS.map(function(id) {
+    return { id: id, is_enabled: false, price: 999 };
+  }));
+  console.log("Variants: " + VERTICAL_VARIANTS.length + " enabled, " + DISABLED_VARIANT_IDS.length + " disabled");
   // Image is generated at 2:3 ratio (3000x4500). For each variant:
   // - scale: cover-fill the print area regardless of aspect ratio
   // - y position: anchor the top edge of the image to the top edge of the print
