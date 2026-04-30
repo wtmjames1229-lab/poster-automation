@@ -614,6 +614,7 @@ async function publishToEtsy(productId) {
   });
 
   // Try publishing up to 3 times
+  var publishAccepted = false;
   for (var attempt = 1; attempt <= 3; attempt++) {
     console.log("Publish attempt " + attempt + "...");
     var res = await fetch(
@@ -629,7 +630,8 @@ async function publishToEtsy(productId) {
     console.log("Publish response (status " + statusCode + "):", text);
 
     if (statusCode === 200 || statusCode === 204) {
-      console.log("Publish succeeded!");
+      console.log("Publish request accepted by Printify, now waiting for Etsy to process...");
+      publishAccepted = true;
       break;
     }
 
@@ -639,15 +641,54 @@ async function publishToEtsy(productId) {
     }
   }
 
-  // Check actual product status
-  await new Promise(function(r) { setTimeout(r, 5000); });
-  var checkRes = await fetch(
-    "https://api.printify.com/v1/shops/" + SHOP_ID + "/products/" + productId + ".json",
-    { headers: { "Authorization": "Bearer " + PRINTIFY_API_KEY } }
-  );
-  var product = await checkRes.json();
-  console.log("Product publishing_status:", product.publishing_status);
-  console.log("Product status:", product.status);
+  if (!publishAccepted) {
+    console.log("❌ Publish request never accepted by Printify");
+    return;
+  }
+
+  // Etsy publishing happens asynchronously after Printify accepts. Poll to find
+  // out what actually happened. Check every 30s for up to 3 minutes.
+  console.log("Polling for actual Etsy publish result (up to 3 min)...");
+  var finalProduct = null;
+  for (var pollAttempt = 1; pollAttempt <= 6; pollAttempt++) {
+    await new Promise(function(r) { setTimeout(r, 30000); });
+    var checkRes = await fetch(
+      "https://api.printify.com/v1/shops/" + SHOP_ID + "/products/" + productId + ".json",
+      { headers: { "Authorization": "Bearer " + PRINTIFY_API_KEY } }
+    );
+    finalProduct = await checkRes.json();
+    var locked = finalProduct.is_locked;
+    var external = finalProduct.external;
+    var hasHandle = external && external.handle;
+    console.log("Poll " + pollAttempt + ": is_locked=" + locked + ", has_external_handle=" + !!hasHandle);
+
+    // Success: product unlocked AND has external handle (Etsy listing URL)
+    if (!locked && hasHandle) {
+      console.log("✅ Successfully published to Etsy!");
+      console.log("   Etsy listing: " + external.handle);
+      return;
+    }
+
+    // Failure: product unlocked but NO external handle = Etsy rejected
+    if (!locked && !hasHandle) {
+      console.log("❌ Etsy REJECTED the listing.");
+      console.log("   Most common causes:");
+      console.log("   1. Trademark/IP filter on 'Snoopy' or 'Peanuts' in title/tags");
+      console.log("   2. Shipping template not configured for this product type");
+      console.log("   3. Image dimensions/quality issue");
+      console.log("   Check Printify > Products > this product for the exact error.");
+      console.log("   Full product state:", JSON.stringify({
+        is_locked: finalProduct.is_locked,
+        visible: finalProduct.visible,
+        external: finalProduct.external
+      }));
+      return;
+    }
+    // Still locked = still processing, keep polling
+  }
+
+  console.log("⚠️  Timed out waiting for Etsy. Still locked after 3 minutes.");
+  console.log("   Listing may still publish later or may be stuck. Check Printify dashboard.");
 }
 
 async function run() {
@@ -669,8 +710,7 @@ async function run() {
       var productId = await createProduct(imageId, listing);
       try { await enableOffsiteAdsPuppeteer(productId); } catch(e) { console.log("Offsite ads skipped:", e.message); }
       await publishToEtsy(productId);
-      await createAndPublishEbay(productId);
-      console.log("Listing " + (i + 1) + " live on Etsy!");
+      console.log("Listing " + (i + 1) + " complete!");
       if (i < 4) await new Promise(function(r) { setTimeout(r, 10000); });
     } catch (err) {
       console.error("Listing " + (i + 1) + " failed:", err.message);
