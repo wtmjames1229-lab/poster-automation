@@ -1,4 +1,5 @@
-// POD Automation Pipeline
+// POD Automation Pipeline - Hybrid (Old Style + Retro Comic)
+// Each run: 3 old-style listings (all 9 sizes, no text) + 2 retro comic listings (4 sizes, with text)
 // Gemini → Printify → Etsy
 // Run with: node automation.js
 
@@ -11,9 +12,346 @@ const EBAY_SHOP_ID = '27315339';
 const BLUEPRINT_ID = 1159;
 const PRINT_PROVIDER_ID = 99;
 
-// Procedural retro color system - randomly picks one color from each pool per image.
-// 55 x 31 x 35 x 20 = ~1.2 million unique palette combinations. Effectively unlimited variety.
-// Each image gets a fresh background/title/accent/highlight combo picked at random.
+// =============================================================================
+// OLD STYLE - clean illustrations, no text, all 9 canvas sizes
+// =============================================================================
+
+const OLD_PROMPTS = [
+  "Snoopy and Woodstock in a spring meadow with cherry blossoms falling",
+  "Snoopy and Woodstock watching summer thunderstorm from a covered porch",
+  "Snoopy and Woodstock jumping in autumn leaf piles, orange and red tones",
+  "Snoopy and Woodstock building an igloo in a blizzard",
+  "Snoopy and Woodstock under a rainbow after a spring shower",
+  "Snoopy and Woodstock catching snowflakes on their tongues",
+  "Snoopy and Woodstock in a field of wildflowers on a windy day",
+  "Snoopy and Woodstock watching lightning over a stormy ocean",
+  "Snoopy and Woodstock sitting on a fence during golden hour",
+  "Snoopy and Woodstock in a foggy morning forest",
+  "Snoopy and Woodstock chasing tumbleweeds in a desert",
+  "Snoopy and Woodstock watching a tornado from a safe distance",
+  "Snoopy and Woodstock in a monsoon rain, splashing in rivers",
+  "Snoopy and Woodstock in a winter frost forest, icy branches glowing",
+  "Snoopy and Woodstock watching northern lights in snowy tundra",
+  "Snoopy and Woodstock in a 1950s diner, retro neon signs, milkshakes",
+  "Snoopy and Woodstock as 1960s hippies in a psychedelic flower field",
+  "Snoopy and Woodstock in a 1970s disco club with mirror balls and neon",
+  "Snoopy and Woodstock in 1980s arcade, pixel games glowing",
+  "Snoopy and Woodstock on a vintage 1950s drive-in movie date",
+  "Snoopy and Woodstock in retro space age style, rocket ships, stars",
+  "Snoopy and Woodstock as vintage travel poster tourists",
+  "Snoopy and Woodstock in a sepia-toned old west scene, saloon",
+  "Snoopy and Woodstock in a vintage circus poster style",
+  "Snoopy and Woodstock in a 1920s art deco cityscape at night",
+  "Snoopy and Woodstock as 1940s jazz musicians in a smoky club",
+  "Snoopy and Woodstock on vintage postcard from Paris",
+  "Snoopy and Woodstock in a retro Japanese woodblock print style",
+  "Snoopy and Woodstock on a vintage tin toy illustration",
+  "Snoopy and Woodstock in a classic pulp magazine cover style",
+  "Snoopy and Woodstock in a 1960s pop art style, bold colors",
+  "Snoopy and Woodstock as vintage sailors on a tall ship",
+  "Snoopy and Woodstock in a 1970s van life road trip illustration",
+  "Snoopy and Woodstock in a retro holiday greeting card style",
+  "Snoopy and Woodstock in a old school tattoo flash art style",
+  "Collage of Snoopy and Woodstock through all four seasons",
+  "Collage of Snoopy and Woodstock in different countries around the world",
+  "Collage of Snoopy and Woodstock doing different sports",
+  "Collage of Snoopy and Woodstock at different times of day",
+  "Collage of Snoopy and Woodstock in different weather conditions",
+  "Collage of tiny Snoopy and Woodstock scenes in a grid pattern",
+  "Collage of Snoopy and Woodstock in different art styles",
+  "Collage of Snoopy and Woodstock celebrating different holidays",
+  "Collage of Snoopy and Woodstock silhouettes in colorful shapes",
+  "Collage of Snoopy and Woodstock in vintage stamp style",
+  "Collage of Snoopy and Woodstock as botanical illustrations",
+  "Collage of Snoopy and Woodstock with patterns and geometric shapes",
+  "Collage mosaic of Snoopy and Woodstock made from tiny scenes",
+  "Collage of Snoopy and Woodstock in different decades fashion",
+  "Snoopy and Woodstock on a cliff overlooking a misty valley",
+  "Snoopy and Woodstock in a bamboo forest at dawn",
+  "Snoopy and Woodstock on a volcanic island with lava flows",
+  "Snoopy and Woodstock in a coral reef underwater scene",
+  "Snoopy and Woodstock in an ancient redwood forest",
+  "Snoopy and Woodstock in a tulip field in the Netherlands",
+  "Snoopy and Woodstock in a Scottish highlands landscape",
+  "Snoopy and Woodstock at the Grand Canyon watching sunrise",
+  "Snoopy and Woodstock in a Japanese zen garden",
+  "Snoopy and Woodstock in an African savanna at golden hour",
+  "Snoopy and Woodstock in an Amazonian rainforest",
+  "Snoopy and Woodstock on a rocky coastline with waves crashing",
+  "Snoopy and Woodstock in a Nevada desert with giant cacti",
+  "Snoopy and Woodstock in an alpine meadow with wildflowers",
+  "Snoopy and Woodstock in a mangrove swamp at sunset",
+  "Snoopy and Woodstock by a frozen waterfall in winter",
+  "Snoopy and Woodstock in a field of poppies in Tuscany",
+  "Snoopy and Woodstock watching geysers in Yellowstone",
+  "Snoopy and Woodstock in a Moroccan desert with sand dunes",
+  "Snoopy and Woodstock by the northern lights in Iceland",
+  "Snoopy and Woodstock as astronauts floating in outer space",
+  "Snoopy and Woodstock on the moon with Earth in background",
+  "Snoopy and Woodstock surfing on Saturns rings",
+  "Snoopy and Woodstock in a spaceship cockpit approaching a nebula",
+  "Snoopy and Woodstock discovering a new planet",
+  "Snoopy and Woodstock watching a meteor shower from a hilltop",
+  "Snoopy and Woodstock floating beside a comet",
+  "Snoopy and Woodstock as retro space explorers on Mars",
+  "Snoopy and Woodstock in a galaxy swirling with stars",
+  "Snoopy and Woodstock watching a solar eclipse",
+  "Snoopy and Woodstock on a space station looking at Earth",
+  "Snoopy and Woodstock in a cosmic dreamscape of stars and planets",
+  "Snoopy and Woodstock chasing shooting stars across the sky",
+  "Snoopy and Woodstock floating in a colorful nebula",
+  "Snoopy and Woodstock on a glowing asteroid in deep space",
+  "Snoopy as a chef and Woodstock as sous chef in a French kitchen",
+  "Snoopy and Woodstock at an Italian pizza oven, tossing dough",
+  "Snoopy and Woodstock at a Japanese sushi bar",
+  "Snoopy and Woodstock at a Mexican street food stand",
+  "Snoopy and Woodstock making a giant birthday cake",
+  "Snoopy and Woodstock at a Parisian patisserie with croissants",
+  "Snoopy and Woodstock in a candy factory Willy Wonka style",
+  "Snoopy and Woodstock at an ice cream parlor with giant sundaes",
+  "Snoopy and Woodstock making smores at a campfire",
+  "Snoopy and Woodstock picking strawberries in a farm field",
+  "Snoopy and Woodstock at a lemonade stand on a hot day",
+  "Snoopy and Woodstock making pancakes on a Sunday morning",
+  "Snoopy and Woodstock at a farmers market with colorful produce",
+  "Snoopy and Woodstock in a cozy bakery making bread",
+  "Snoopy and Woodstock at a BBQ cookout with smoke and flames",
+  "Snoopy as a rock star with Woodstock as drummer on stage",
+  "Snoopy and Woodstock in a jazz club with saxophone and bass",
+  "Snoopy and Woodstock performing classical music in a concert hall",
+  "Snoopy as DJ and Woodstock dancing at a music festival",
+  "Snoopy and Woodstock playing folk music around a campfire",
+  "Snoopy as a street musician with Woodstock in guitar case",
+  "Snoopy and Woodstock at a vinyl record shop",
+  "Snoopy and Woodstock playing reggae on a beach in Jamaica",
+  "Snoopy and Woodstock in a recording studio making an album",
+  "Snoopy painting a mural with Woodstock helping",
+  "Snoopy and Woodstock at an art gallery opening night",
+  "Snoopy as a graffiti artist with Woodstock holding spray paint",
+  "Snoopy and Woodstock doing pottery together",
+  "Snoopy and Woodstock at an outdoor sculpture park",
+  "Snoopy and Woodstock performing in a street dance battle",
+  "Snoopy and Woodstock surfing massive ocean waves",
+  "Snoopy and Woodstock skiing down a snowy mountain",
+  "Snoopy and Woodstock playing tennis on a clay court",
+  "Snoopy and Woodstock rock climbing a granite cliff",
+  "Snoopy and Woodstock doing yoga at sunrise on a beach",
+  "Snoopy and Woodstock cycling through a mountain pass",
+  "Snoopy and Woodstock kayaking through river rapids",
+  "Snoopy and Woodstock playing basketball on a city court",
+  "Snoopy and Woodstock doing martial arts in a dojo",
+  "Snoopy and Woodstock skateboarding at a colorful skate park",
+  "Snoopy and Woodstock playing soccer on a rainy field",
+  "Snoopy and Woodstock doing archery in a forest",
+  "Snoopy and Woodstock bungee jumping off a bridge",
+  "Snoopy and Woodstock hang gliding over mountains",
+  "Snoopy and Woodstock doing parkour in a city",
+  "Snoopy and Woodstock playing frisbee on a sunny beach",
+  "Snoopy and Woodstock in a marathon race through a city",
+  "Snoopy and Woodstock bowling on a retro lane",
+  "Snoopy and Woodstock at the Eiffel Tower in Paris at night",
+  "Snoopy and Woodstock riding camels near the pyramids of Egypt",
+  "Snoopy and Woodstock in a gondola in Venice Italy",
+  "Snoopy and Woodstock at the Great Wall of China",
+  "Snoopy and Woodstock watching the Northern Lights in Norway",
+  "Snoopy and Woodstock on safari in Kenya",
+  "Snoopy and Woodstock at the cherry blossom festival in Tokyo",
+  "Snoopy and Woodstock in a tuk-tuk in Bangkok",
+  "Snoopy and Woodstock at Machu Picchu in Peru",
+  "Snoopy and Woodstock on a double-decker bus in London",
+  "Snoopy and Woodstock exploring ancient ruins in Greece",
+  "Snoopy and Woodstock at a night market in Taiwan",
+  "Snoopy and Woodstock hiking in Patagonia",
+  "Snoopy and Woodstock on a houseboat in Amsterdam",
+  "Snoopy and Woodstock watching flamenco in Spain",
+  "Snoopy and Woodstock in a rickshaw in India",
+  "Snoopy and Woodstock at the colosseum in Rome at sunset",
+  "Snoopy and Woodstock in a cable car over Hong Kong",
+  "Snoopy and Woodstock watching the midnight sun in Alaska",
+  "Snoopy and Woodstock in a cozy cabin with snow falling outside",
+  "Snoopy and Woodstock reading books in a hammock",
+  "Snoopy and Woodstock napping in a sunbeam on a window seat",
+  "Snoopy and Woodstock in a treehouse with string lights at night",
+  "Snoopy and Woodstock in a cozy library with towering bookshelves",
+  "Snoopy and Woodstock in a hot tub watching stars",
+  "Snoopy and Woodstock in a tent on a rainy camping night",
+  "Snoopy and Woodstock wrapped in blankets watching the sunset",
+  "Snoopy and Woodstock in a cottage garden drinking tea",
+  "Snoopy and Woodstock in a cozy attic studio making art",
+  "Snoopy and Woodstock in a greenhouse surrounded by plants",
+  "Snoopy and Woodstock in a morning kitchen with coffee and toast",
+  "Snoopy and Woodstock in a tiny house surrounded by nature",
+  "Snoopy and Woodstock in a reading nook with a cat and candles",
+  "Snoopy and Woodstock as wizards casting spells in a magic school",
+  "Snoopy and Woodstock in an enchanted fairy tale forest",
+  "Snoopy and Woodstock riding a dragon over a fantasy castle",
+  "Snoopy and Woodstock as knights in shining armor",
+  "Snoopy and Woodstock in a magical underwater kingdom",
+  "Snoopy and Woodstock as forest spirits in a glowing grove",
+  "Snoopy and Woodstock in a cloud kingdom above the clouds",
+  "Snoopy and Woodstock discovering a portal to another world",
+  "Snoopy and Woodstock in a candy kingdom sweet fantasy",
+  "Snoopy and Woodstock riding a giant sea turtle underwater",
+  "Snoopy and Woodstock in a crystal cave with glowing gems",
+  "Snoopy and Woodstock as time travelers in ancient Egypt",
+  "Snoopy and Woodstock in a dreamland with floating islands",
+  "Snoopy and Woodstock as superheroes flying over a city",
+  "Snoopy and Woodstock as simple geometric shapes bold colors",
+  "Snoopy and Woodstock as minimal line art on white background",
+  "Snoopy and Woodstock as negative space silhouettes",
+  "Snoopy and Woodstock as origami paper fold style",
+  "Snoopy and Woodstock as monochrome ink brush strokes",
+  "Snoopy and Woodstock as flat vector illustrations",
+  "Snoopy and Woodstock as watercolor washes with minimal detail",
+  "Snoopy and Woodstock as Scandinavian folk art motifs",
+  "Snoopy and Woodstock as constructivist bold shapes",
+  "Snoopy and Woodstock as minimalist mountain and moon design",
+  "Snoopy and Woodstock decorating for Christmas in snow",
+  "Snoopy and Woodstock in Halloween costumes trick or treating",
+  "Snoopy and Woodstock at a Fourth of July fireworks picnic",
+  "Snoopy and Woodstock celebrating New Year with confetti",
+  "Snoopy and Woodstock at an Easter egg hunt in spring garden",
+  "Snoopy and Woodstock at a Valentines Day picnic with hearts",
+  "Snoopy and Woodstock celebrating Thanksgiving with a feast",
+  "Snoopy and Woodstock at a Hanukkah menorah lighting",
+  "Snoopy and Woodstock at a Diwali festival with lanterns",
+  "Snoopy and Woodstock at a Chinese New Year parade with dragons",
+  "Snoopy and Woodstock at a summer solstice bonfire",
+  "Snoopy and Woodstock at a harvest moon festival",
+  "Snoopy and Woodstock at a winter solstice lantern ceremony",
+  "Snoopy and Woodstock with a family of deer in a forest",
+  "Snoopy and Woodstock swimming with dolphins in the ocean",
+  "Snoopy and Woodstock with a majestic eagle soaring above",
+  "Snoopy and Woodstock with baby ducks following in a line",
+  "Snoopy and Woodstock with a wise old owl in a moonlit tree",
+  "Snoopy and Woodstock with butterflies in a meadow",
+  "Snoopy and Woodstock with a family of foxes at sunset",
+  "Snoopy and Woodstock with fireflies in a summer evening",
+  "Snoopy and Woodstock with a polar bear on an ice floe",
+  "Snoopy and Woodstock with a penguin colony in Antarctica",
+  "Snoopy and Woodstock with elephants in an African savanna",
+  "Snoopy and Woodstock with wild horses running on plains",
+  "Snoopy and Woodstock with a red fox in autumn forest",
+  "Snoopy and Woodstock with a turtle on a tropical beach",
+  "Snoopy and Woodstock laughing together under a blue sky",
+  "Snoopy and Woodstock in a peaceful contemplative moment",
+  "Snoopy and Woodstock in a joyful celebratory dance",
+  "Snoopy and Woodstock sharing a quiet tender moment",
+  "Snoopy and Woodstock in a dreamy hazy summer afternoon",
+  "Snoopy and Woodstock in a nostalgic golden memory",
+  "Snoopy and Woodstock in a serene meditative stillness",
+  "Snoopy and Woodstock in a magical wonder-filled discovery",
+  "Snoopy and Woodstock in a gentle loving friendship",
+  "Snoopy and Woodstock in a deep navy and gold color palette",
+  "Snoopy and Woodstock in a coral and turquoise tropical palette",
+  "Snoopy and Woodstock in a forest green and rust palette",
+  "Snoopy and Woodstock in a lavender and cream palette",
+  "Snoopy and Woodstock in a midnight blue and silver palette",
+  "Snoopy and Woodstock in a warm terracotta and sage palette",
+  "Snoopy and Woodstock in a cherry red and cream palette",
+  "Snoopy and Woodstock in a dusty pink and charcoal palette",
+  "Snoopy and Woodstock in a vibrant citrus palette",
+  "Snoopy and Woodstock in a soft mint and blush palette",
+  "Snoopy and Woodstock in an earthy brown and amber palette",
+  "Snoopy and Woodstock in a bold primary colors palette",
+  "Snoopy and Woodstock in a pastel rainbow palette",
+  "Snoopy and Woodstock in watercolor painting style loose washes",
+  "Snoopy and Woodstock in gouache painting style bold colors",
+  "Snoopy and Woodstock in oil painting impressionist style",
+  "Snoopy and Woodstock in linocut print style bold graphic",
+  "Snoopy and Woodstock in screen print style limited colors",
+  "Snoopy and Woodstock in risograph print style layered colors",
+  "Snoopy and Woodstock in mosaic tile art style",
+  "Snoopy and Woodstock in stained glass illustration style",
+  "Snoopy and Woodstock in embroidery patch style",
+  "Snoopy and Woodstock in rubber stamp print style",
+  "Snoopy and Woodstock in Victorian botanical illustration style",
+  "Snoopy and Woodstock in Art Nouveau flowing lines style",
+  "Snoopy and Woodstock in Bauhaus geometric design style",
+  "Snoopy and Woodstock in ukiyo-e Japanese woodblock style",
+  "Snoopy and Woodstock in a rooftop garden with city skyline",
+  "Snoopy and Woodstock tending a rose garden in full bloom",
+  "Snoopy and Woodstock in a succulent and cactus garden",
+  "Snoopy and Woodstock in a tropical jungle garden",
+  "Snoopy and Woodstock in a wildflower meadow at dusk",
+  "Snoopy and Woodstock harvesting vegetables in a kitchen garden",
+  "Snoopy and Woodstock making flower crowns in a meadow",
+  "Snoopy and Woodstock in a herb garden on a sunny morning",
+  "Snoopy and Woodstock with giant sunflowers towering above",
+  "Snoopy and Woodstock in a lavender field at golden hour",
+  "Snoopy and Woodstock on a sailboat in turquoise waters",
+  "Snoopy and Woodstock exploring a sea cave at low tide",
+  "Snoopy and Woodstock watching whales breach in the ocean",
+  "Snoopy and Woodstock on a paddleboard at sunrise",
+  "Snoopy and Woodstock collecting sea glass on a beach",
+  "Snoopy and Woodstock watching bioluminescent waves at night",
+  "Snoopy and Woodstock building an elaborate sandcastle",
+  "Snoopy and Woodstock snorkeling in a coral reef",
+  "Snoopy and Woodstock at a lighthouse during a storm",
+  "Snoopy and Woodstock on a fire escape in New York City",
+  "Snoopy and Woodstock in a cozy Tokyo alley at night",
+  "Snoopy and Woodstock in a London telephone booth",
+  "Snoopy and Woodstock at a Parisian sidewalk cafe",
+  "Snoopy and Woodstock in a neon-lit Hong Kong street",
+  "Snoopy and Woodstock in a Barcelona mosaic plaza",
+  "Snoopy and Woodstock on a San Francisco cable car",
+  "Snoopy and Woodstock in a Berlin street art alley",
+  "Snoopy and Woodstock on a New Orleans jazz street corner",
+  "Snoopy and Woodstock in a Marrakech spice market",
+  "Snoopy and Woodstock in a Sydney harbor at sunset",
+  "Snoopy and Woodstock on a rooftop with city lights below",
+  "Snoopy and Woodstock sharing a secret under a starry sky",
+  "Snoopy giving Woodstock a piggyback through a meadow",
+  "Snoopy and Woodstock high-fiving after an adventure",
+  "Snoopy and Woodstock falling asleep together under a tree",
+  "Snoopy and Woodstock finding treasure on a beach",
+  "Snoopy and Woodstock sharing an umbrella in a surprise rain",
+  "Snoopy and Woodstock watching their shadows in golden light",
+  "Snoopy and Woodstock leaving footprints in fresh snow",
+  "Snoopy and Woodstock watching fireflies in a summer field",
+  "Snoopy and Woodstock in a grove of glowing mushrooms",
+  "Snoopy and Woodstock by a waterfall hidden in a forest",
+  "Snoopy and Woodstock discovering a hidden mountain lake",
+  "Snoopy and Woodstock watching migrating birds fly south",
+  "Snoopy and Woodstock in a forest after a fresh snowfall",
+  "Snoopy and Woodstock by a glowing evening campfire",
+  "Snoopy and Woodstock in a swirling Van Gogh starry night",
+  "Snoopy and Woodstock in Monets water lily garden",
+  "Snoopy and Woodstock in a Matisse colorful cutout style",
+  "Snoopy and Woodstock in a Keith Haring bold line style",
+  "Snoopy and Woodstock in a Klimt gold leaf decorative style",
+  "Snoopy and Woodstock in a Hokusai wave dramatic scene",
+  "Snoopy and Woodstock in a Rousseau jungle naive style",
+  "Snoopy and Woodstock in a Chagall floating dream style",
+  "Snoopy and Woodstock as lighthouse keepers in a storm",
+  "Snoopy and Woodstock as park rangers in a national forest",
+  "Snoopy and Woodstock as beekeepers in a wildflower meadow",
+  "Snoopy and Woodstock as mail carriers on a snowy route",
+  "Snoopy and Woodstock as librarians in a magical library",
+  "Snoopy and Woodstock as mapmakers on a mountain expedition",
+  "Snoopy and Woodstock as night sky photographers in a desert",
+  "Snoopy and Woodstock as bird watchers in a misty marsh",
+  "Snoopy and Woodstock as cave explorers with lanterns",
+  "Snoopy and Woodstock as river guides on a canyon expedition",
+  "Snoopy and Woodstock as cloud watchers on a grassy hill",
+];
+
+// Old style: all 9 sizes
+const OLD_VARIANTS = [
+  { id: 101413, w: 2400,  h: 3000,  price: 5142  },
+  { id: 91641,  w: 3300,  h: 4200,  price: 6336  },
+  { id: 91644,  w: 3600,  h: 5400,  price: 8420  },
+  { id: 91647,  w: 4800,  h: 7200,  price: 10820 },
+  { id: 91649,  w: 6000,  h: 7200,  price: 13200 },
+  { id: 101411, w: 7200,  h: 9000,  price: 16966 },
+  { id: 91654,  w: 9000,  h: 12000, price: 23762 },
+  { id: 91655,  w: 9600,  h: 14400, price: 34684 },
+  { id: 112955, w: 12000, h: 18000, price: 50026 },
+];
+
+// =============================================================================
+// RETRO COMIC STYLE - vintage pulp covers with title text, only 4 perfect sizes
+// =============================================================================
 
 const BACKGROUND_COLORS = [
   "teal", "deep navy blue", "burnt orange", "cream", "hot pink", "lime green",
@@ -66,270 +404,103 @@ function pickPalette() {
   return bg + " background with " + title + " title, " + accent + " accents, and " + highlight + " highlights";
 }
 
-function buildStyleSuffix(palette) {
+function buildRetroStyleSuffix(palette) {
   return " in vintage 1960s pulp comic book cover style, aged paper texture, halftone dot shading, bold black ink outlines, color scheme: " + palette + ", slight registration offset like old print, weathered edges, dynamic action composition, bold colorful flat illustration. Render the title text and ribbon banner text exactly as quoted in the prompt, clearly legible and prominently displayed at the top.";
 }
 
-const PROMPTS = [
+const RETRO_PROMPTS = [
   // FLYING ACE / AVIATION
-  '"SNOOPY: FLYING ACE" arched block-letter title at top in mustard yellow with thick red outline and drop shadow, "SCOURGE OF THE SKIES" yellow ribbon banner subtitle, Snoopy in goggles and red scarf piloting his red doghouse through clouds, biplanes and Woodstock wingmen circling around him',
-  '"THE RED BARON RETURNS" arched block-letter title at top in mustard yellow with thick red outline and drop shadow, "DOGFIGHT AT DAWN" yellow ribbon banner subtitle, Snoopy as Flying Ace shaking his fist at the sky, smoke trails and propellers swirling around him',
-  '"BEAGLE SQUADRON" arched block-letter title at top in mustard yellow with thick red outline and drop shadow, "NO MISSION TOO SMALL" yellow ribbon banner subtitle, Snoopy saluting in pilot gear, Woodstock co-pilot beside him, vintage airplane silhouettes in formation',
-  '"CHAOS IN THE CLOUDS" arched block-letter title at top in mustard yellow with thick red outline and drop shadow, "WORLDS OKAYEST ADVENTURERS" yellow ribbon banner subtitle, Snoopy with parachute and Woodstock falling through clouds, birds circling around them',
-  '"DAWN PATROL" arched block-letter title at top in mustard yellow with thick red outline and drop shadow, "EYES IN THE SKY" yellow ribbon banner subtitle, Snoopy in pilot gear scanning the horizon from the cockpit at sunrise',
-  '"WINGS OF GLORY" arched block-letter title at top in mustard yellow with thick red outline and drop shadow, "MEDAL OF HONOR" yellow ribbon banner subtitle, Snoopy in pilot uniform receiving a medal, Woodstock saluting beside him',
-  '"ESCAPE FROM ENEMY LINES" arched block-letter title at top in mustard yellow with thick red outline and drop shadow, "NO BEAGLE LEFT BEHIND" yellow ribbon banner subtitle, Snoopy and Woodstock crawling under barbed wire, searchlights overhead',
-  '"MIDNIGHT MISSION" arched block-letter title at top in mustard yellow with thick red outline and drop shadow, "STEALTH AND COURAGE" yellow ribbon banner subtitle, Snoopy in pilot gear sneaking past spotlights at night',
-  '"PARACHUTE PANIC" arched block-letter title at top in mustard yellow with thick red outline and drop shadow, "BAILOUT" yellow ribbon banner subtitle, Snoopy clutching parachute strings, Woodstock dangling beside him, tangled lines',
-  '"BIPLANE BANDIT" arched block-letter title at top in mustard yellow with thick red outline and drop shadow, "RIDER OF THE WIND" yellow ribbon banner subtitle, Snoopy doing a barrel roll on his doghouse plane, Woodstock holding on for dear life',
-  '"FLIGHT 1969" arched block-letter title at top in mustard yellow with thick red outline and drop shadow, "DESTINATION UNKNOWN" yellow ribbon banner subtitle, Snoopy as airline captain at the controls, Woodstock as flight attendant in retro uniform',
-  '"ACE OF THE SKIES" arched block-letter title at top in mustard yellow with thick red outline and drop shadow, "TOP OF HIS GAME" yellow ribbon banner subtitle, Snoopy in flight goggles giving a thumbs up, vintage planes behind him',
-  '"TURBULENCE" arched block-letter title at top in mustard yellow with thick red outline and drop shadow, "HOLD ON TIGHT" yellow ribbon banner subtitle, Snoopy gripping his doghouse plane as it shakes through stormy clouds, Woodstock flapping wildly',
-  '"CLOUDS OF DESTINY" arched block-letter title at top in mustard yellow with thick red outline and drop shadow, "ABOVE IT ALL" yellow ribbon banner subtitle, Snoopy soaring proudly through pillowy clouds with Woodstock by his side',
-  '"AERIAL ARCHIVE" arched block-letter title at top in mustard yellow with thick red outline and drop shadow, "UNTOLD STORIES" yellow ribbon banner subtitle, Snoopy holding aviator goggles and a scrapbook of his adventures',
+  '"SNOOPY: FLYING ACE" arched block-letter title at top, "SCOURGE OF THE SKIES" yellow ribbon banner subtitle, Snoopy in goggles and red scarf piloting his red doghouse through clouds, biplanes and Woodstock wingmen circling around him',
+  '"THE RED BARON RETURNS" arched block-letter title at top, "DOGFIGHT AT DAWN" yellow ribbon banner subtitle, Snoopy as Flying Ace shaking his fist at the sky, smoke trails and propellers swirling around him',
+  '"BEAGLE SQUADRON" arched block-letter title at top, "NO MISSION TOO SMALL" yellow ribbon banner subtitle, Snoopy saluting in pilot gear, Woodstock co-pilot beside him, vintage airplane silhouettes in formation',
+  '"CHAOS IN THE CLOUDS" arched block-letter title at top, "WORLDS OKAYEST ADVENTURERS" yellow ribbon banner subtitle, Snoopy with parachute and Woodstock falling through clouds, birds circling around them',
+  '"DAWN PATROL" arched block-letter title at top, "EYES IN THE SKY" yellow ribbon banner subtitle, Snoopy in pilot gear scanning the horizon from the cockpit at sunrise',
+  '"WINGS OF GLORY" arched block-letter title at top, "MEDAL OF HONOR" yellow ribbon banner subtitle, Snoopy in pilot uniform receiving a medal, Woodstock saluting beside him',
+  '"ESCAPE FROM ENEMY LINES" arched block-letter title at top, "NO BEAGLE LEFT BEHIND" yellow ribbon banner subtitle, Snoopy and Woodstock crawling under barbed wire, searchlights overhead',
+  '"MIDNIGHT MISSION" arched block-letter title at top, "STEALTH AND COURAGE" yellow ribbon banner subtitle, Snoopy in pilot gear sneaking past spotlights at night',
+  '"PARACHUTE PANIC" arched block-letter title at top, "BAILOUT" yellow ribbon banner subtitle, Snoopy clutching parachute strings, Woodstock dangling beside him, tangled lines',
+  '"BIPLANE BANDIT" arched block-letter title at top, "RIDER OF THE WIND" yellow ribbon banner subtitle, Snoopy doing a barrel roll on his doghouse plane, Woodstock holding on for dear life',
+  '"FLIGHT 1969" arched block-letter title at top, "DESTINATION UNKNOWN" yellow ribbon banner subtitle, Snoopy as airline captain at the controls, Woodstock as flight attendant in retro uniform',
+  '"ACE OF THE SKIES" arched block-letter title at top, "TOP OF HIS GAME" yellow ribbon banner subtitle, Snoopy in flight goggles giving a thumbs up, vintage planes behind him',
 
-  // WESTERN / OUTLAW
-  '"WANTED" arched block-letter title at top in mustard yellow with thick red outline and drop shadow, "DEAD OR ALIVE" yellow ribbon banner subtitle, Snoopy in cowboy hat and bandana, Woodstock as outlaw sidekick, desert cacti and wanted posters around them',
-  '"THE GOOD THE BAD AND THE BEAGLE" arched block-letter title at top in mustard yellow with thick red outline and drop shadow, "HIGH NOON" yellow ribbon banner subtitle, Snoopy as cowboy at a showdown, tumbleweeds and a setting sun behind him',
-  '"OUTLAW BEAGLE" arched block-letter title at top in mustard yellow with thick red outline and drop shadow, "LAST STAND" yellow ribbon banner subtitle, Snoopy with two pistols drawn, bandana over his snout, Woodstock with a tiny lasso',
-  '"GUNSLINGER" arched block-letter title at top in mustard yellow with thick red outline and drop shadow, "QUICK PAW" yellow ribbon banner subtitle, Snoopy in poncho squinting under his hat, dusty western town behind him',
-  '"DESERT JUSTICE" arched block-letter title at top in mustard yellow with thick red outline and drop shadow, "WHEN THE SUN SETS" yellow ribbon banner subtitle, Snoopy riding a horse across red rock canyons at sunset',
-  '"STAGECOACH HEIST" arched block-letter title at top in mustard yellow with thick red outline and drop shadow, "THE BEAGLE STRIKES" yellow ribbon banner subtitle, Snoopy in mask leaping onto a runaway stagecoach, Woodstock at the reins',
-  '"SHERIFF SNOOPY" arched block-letter title at top in mustard yellow with thick red outline and drop shadow, "TOWN AINT BIG ENOUGH" yellow ribbon banner subtitle, Snoopy with a tin star badge standing in front of a saloon',
-  '"RIDE OR DIE" arched block-letter title at top in mustard yellow with thick red outline and drop shadow, "TUMBLEWEED TRAIL" yellow ribbon banner subtitle, Snoopy galloping on a wild horse through the open prairie, Woodstock hanging on',
-  '"WILD WEST WONDERS" arched block-letter title at top in mustard yellow with thick red outline and drop shadow, "FRONTIER LEGENDS" yellow ribbon banner subtitle, Snoopy and Woodstock as cowboys around a campfire, harmonica in hand',
-  '"BOOT HILL BEAGLE" arched block-letter title at top in mustard yellow with thick red outline and drop shadow, "LEGEND OF THE WEST" yellow ribbon banner subtitle, Snoopy tipping his hat against a glowing desert horizon',
+  // WESTERN
+  '"WANTED" arched block-letter title at top, "DEAD OR ALIVE" yellow ribbon banner subtitle, Snoopy in cowboy hat and bandana, Woodstock as outlaw sidekick, desert cacti and wanted posters around them',
+  '"THE GOOD THE BAD AND THE BEAGLE" arched block-letter title at top, "HIGH NOON" yellow ribbon banner subtitle, Snoopy as cowboy at a showdown, tumbleweeds and a setting sun behind him',
+  '"OUTLAW BEAGLE" arched block-letter title at top, "LAST STAND" yellow ribbon banner subtitle, Snoopy with two pistols drawn, bandana over his snout, Woodstock with a tiny lasso',
+  '"GUNSLINGER" arched block-letter title at top, "QUICK PAW" yellow ribbon banner subtitle, Snoopy in poncho squinting under his hat, dusty western town behind him',
+  '"DESERT JUSTICE" arched block-letter title at top, "WHEN THE SUN SETS" yellow ribbon banner subtitle, Snoopy riding a horse across red rock canyons at sunset',
+  '"SHERIFF SNOOPY" arched block-letter title at top, "TOWN AINT BIG ENOUGH" yellow ribbon banner subtitle, Snoopy with a tin star badge standing in front of a saloon',
 
   // SPACE / SCI-FI
-  '"MOON MISSION" arched block-letter title at top in mustard yellow with thick red outline and drop shadow, "ONE SMALL PAW" yellow ribbon banner subtitle, Snoopy in astronaut helmet floating among planets, Woodstock in a tiny spacesuit beside him',
-  '"COSMIC BEAGLE" arched block-letter title at top in mustard yellow with thick red outline and drop shadow, "LOST IN THE STARS" yellow ribbon banner subtitle, Snoopy in retro spacesuit pointing at a comet, rockets and ringed planets surrounding him',
-  '"SPACE INVADERS" arched block-letter title at top in mustard yellow with thick red outline and drop shadow, "DEFEND THE GALAXY" yellow ribbon banner subtitle, Snoopy with a ray gun shooting at retro flying saucers, Woodstock in a bubble helmet',
-  '"STARFLEET BEAGLE" arched block-letter title at top in mustard yellow with thick red outline and drop shadow, "TO BOLDLY GO" yellow ribbon banner subtitle, Snoopy as a starship captain in a vintage uniform, Woodstock at the helm',
-  '"ROCKET RIDERS" arched block-letter title at top in mustard yellow with thick red outline and drop shadow, "BLAST OFF" yellow ribbon banner subtitle, Snoopy and Woodstock launching in a vintage red rocket trailing flame',
-  '"MARS OR BUST" arched block-letter title at top in mustard yellow with thick red outline and drop shadow, "RED PLANET ADVENTURE" yellow ribbon banner subtitle, Snoopy planting a flag on Mars, retro rover and Woodstock astronaut behind him',
-  '"ALIEN ENCOUNTER" arched block-letter title at top in mustard yellow with thick red outline and drop shadow, "WE COME IN PEACE" yellow ribbon banner subtitle, Snoopy shaking hands with a friendly green alien, Woodstock peeking from a UFO',
-  '"GALACTIC GUARDIANS" arched block-letter title at top in mustard yellow with thick red outline and drop shadow, "PROTECT THE COSMOS" yellow ribbon banner subtitle, Snoopy and Woodstock floating heroically among nebulae and starbursts',
-  '"INTERSTELLAR" arched block-letter title at top in mustard yellow with thick red outline and drop shadow, "INTO THE UNKNOWN" yellow ribbon banner subtitle, Snoopy gazing through the porthole of a retro spaceship at distant galaxies',
-  '"ZERO GRAVITY" arched block-letter title at top in mustard yellow with thick red outline and drop shadow, "FLOATING FREE" yellow ribbon banner subtitle, Snoopy and Woodstock weightless inside a spacecraft, food drifting around them',
-  '"ROBOT REBELLION" arched block-letter title at top in mustard yellow with thick red outline and drop shadow, "BEAGLE VS MACHINE" yellow ribbon banner subtitle, Snoopy battling a retro tin-foil robot with sparks flying',
-  '"TIME WARP" arched block-letter title at top in mustard yellow with thick red outline and drop shadow, "STUCK IN THE 60S" yellow ribbon banner subtitle, Snoopy and Woodstock spinning through a swirling vortex of clocks and stars',
-  '"ASTEROID ALERT" arched block-letter title at top in mustard yellow with thick red outline and drop shadow, "DODGE EVERYTHING" yellow ribbon banner subtitle, Snoopy steering his rocket through a field of jagged asteroids',
-  '"NEBULA NIGHTS" arched block-letter title at top in mustard yellow with thick red outline and drop shadow, "STARLIGHT JOURNEY" yellow ribbon banner subtitle, Snoopy and Woodstock drifting through a glowing pink and purple nebula',
-  '"FROM THE STARS" arched block-letter title at top in mustard yellow with thick red outline and drop shadow, "THEY CAME IN PEACE" yellow ribbon banner subtitle, Snoopy emerging from a flying saucer with Woodstock as alien mascot',
+  '"MOON MISSION" arched block-letter title at top, "ONE SMALL PAW" yellow ribbon banner subtitle, Snoopy in astronaut helmet floating among planets, Woodstock in a tiny spacesuit beside him',
+  '"COSMIC BEAGLE" arched block-letter title at top, "LOST IN THE STARS" yellow ribbon banner subtitle, Snoopy in retro spacesuit pointing at a comet, rockets and ringed planets surrounding him',
+  '"SPACE INVADERS" arched block-letter title at top, "DEFEND THE GALAXY" yellow ribbon banner subtitle, Snoopy with a ray gun shooting at retro flying saucers, Woodstock in a bubble helmet',
+  '"STARFLEET BEAGLE" arched block-letter title at top, "TO BOLDLY GO" yellow ribbon banner subtitle, Snoopy as a starship captain in a vintage uniform, Woodstock at the helm',
+  '"ROCKET RIDERS" arched block-letter title at top, "BLAST OFF" yellow ribbon banner subtitle, Snoopy and Woodstock launching in a vintage red rocket trailing flame',
+  '"MARS OR BUST" arched block-letter title at top, "RED PLANET ADVENTURE" yellow ribbon banner subtitle, Snoopy planting a flag on Mars, retro rover and Woodstock astronaut behind him',
+  '"ALIEN ENCOUNTER" arched block-letter title at top, "WE COME IN PEACE" yellow ribbon banner subtitle, Snoopy shaking hands with a friendly green alien, Woodstock peeking from a UFO',
 
   // SUPERHERO
-  '"SUPER SNOOPY" arched block-letter title at top in mustard yellow with thick red outline and drop shadow, "DEFENDER OF THE DOGHOUSE" yellow ribbon banner subtitle, Snoopy in flowing red cape arms outstretched flying through clouds, comic action lines radiating outward',
-  '"MASKED MARVEL" arched block-letter title at top in mustard yellow with thick red outline and drop shadow, "BEWARE THE BEAGLE" yellow ribbon banner subtitle, Snoopy in a domino mask and cape striking a hero pose, Woodstock as sidekick at his feet',
-  '"CAPTAIN BEAGLE" arched block-letter title at top in mustard yellow with thick red outline and drop shadow, "WORLDS GREATEST" yellow ribbon banner subtitle, Snoopy in a star-spangled costume holding a shield, action burst behind him',
-  '"BEAGLE-MAN" arched block-letter title at top in mustard yellow with thick red outline and drop shadow, "WITH GREAT POWER" yellow ribbon banner subtitle, Snoopy swinging from a web between skyscrapers, Woodstock clinging to his back',
-  '"WONDER BEAGLE" arched block-letter title at top in mustard yellow with thick red outline and drop shadow, "AMAZON OF THE BACKYARD" yellow ribbon banner subtitle, Snoopy with a golden lasso and tiara striking a heroic stance',
-  '"NIGHT HOUND" arched block-letter title at top in mustard yellow with thick red outline and drop shadow, "PROTECTOR OF THE DARK" yellow ribbon banner subtitle, Snoopy in a black cowl perched on a gargoyle over a city skyline',
-  '"INCREDIBLE BEAGLE" arched block-letter title at top in mustard yellow with thick red outline and drop shadow, "DONT MAKE HIM HUNGRY" yellow ribbon banner subtitle, Snoopy ripping off a sweater vest, Woodstock cheering nearby',
-  '"FANTASTIC FOUR PAWS" arched block-letter title at top in mustard yellow with thick red outline and drop shadow, "TEAM OF HEROES" yellow ribbon banner subtitle, Snoopy leading a squad of caped beagles in a heroic pose',
-  '"SECRET IDENTITY" arched block-letter title at top in mustard yellow with thick red outline and drop shadow, "WHO IS HE REALLY" yellow ribbon banner subtitle, Snoopy in glasses and tie pulling open his shirt to reveal a cape and S logo',
-  '"ORIGIN STORY" arched block-letter title at top in mustard yellow with thick red outline and drop shadow, "HOW IT ALL BEGAN" yellow ribbon banner subtitle, Snoopy struck by a glowing meteor, Woodstock watching in shock',
+  '"SUPER SNOOPY" arched block-letter title at top, "DEFENDER OF THE DOGHOUSE" yellow ribbon banner subtitle, Snoopy in flowing red cape arms outstretched flying through clouds, comic action lines radiating outward',
+  '"MASKED MARVEL" arched block-letter title at top, "BEWARE THE BEAGLE" yellow ribbon banner subtitle, Snoopy in a domino mask and cape striking a hero pose, Woodstock as sidekick at his feet',
+  '"CAPTAIN BEAGLE" arched block-letter title at top, "WORLDS GREATEST" yellow ribbon banner subtitle, Snoopy in a star-spangled costume holding a shield, action burst behind him',
 
   // SPY / DETECTIVE
-  '"SECRET AGENT SNOOPY" arched block-letter title at top in mustard yellow with thick red outline and drop shadow, "LICENSE TO SNIFF" yellow ribbon banner subtitle, Snoopy in trench coat and fedora holding a magnifying glass, silhouettes of suspects in shadow behind him',
-  '"THE BEAGLE FILES" arched block-letter title at top in mustard yellow with thick red outline and drop shadow, "CLASSIFIED" yellow ribbon banner subtitle, Snoopy as detective with a pipe, Woodstock in a tiny trench coat, foggy noir alley background',
-  '"CODE NAME BEAGLE" arched block-letter title at top in mustard yellow with thick red outline and drop shadow, "TOP SECRET" yellow ribbon banner subtitle, Snoopy in a tuxedo holding a martini glass, vintage spy gadgets around him',
-  '"DETECTIVE BEAGLE" arched block-letter title at top in mustard yellow with thick red outline and drop shadow, "CASE CLOSED" yellow ribbon banner subtitle, Snoopy examining a clue with a magnifying glass, Woodstock taking notes',
-  '"MIDNIGHT SPY" arched block-letter title at top in mustard yellow with thick red outline and drop shadow, "SHADOWS AND SECRETS" yellow ribbon banner subtitle, Snoopy in dark trench coat lurking under a streetlamp at night',
-  '"INSPECTOR SNOOPY" arched block-letter title at top in mustard yellow with thick red outline and drop shadow, "ON THE CASE" yellow ribbon banner subtitle, Snoopy in deerstalker hat and pipe, Woodstock as sidekick with a notepad',
-  '"PRIVATE EYE" arched block-letter title at top in mustard yellow with thick red outline and drop shadow, "WHO DUNNIT" yellow ribbon banner subtitle, Snoopy in a noir office leaning back in a chair, suspect silhouettes on the wall',
-  '"INTERNATIONAL INTRIGUE" arched block-letter title at top in mustard yellow with thick red outline and drop shadow, "GLOBAL MISSION" yellow ribbon banner subtitle, Snoopy with a globe and passport, Woodstock with travel stamps swirling around',
-  '"MISSION IMPAWSIBLE" arched block-letter title at top in mustard yellow with thick red outline and drop shadow, "WE ACCEPT" yellow ribbon banner subtitle, Snoopy descending from a ceiling on a wire to grab a glowing briefcase',
-  '"SPY VS SPY" arched block-letter title at top in mustard yellow with thick red outline and drop shadow, "BATTLE OF WITS" yellow ribbon banner subtitle, Snoopy and Woodstock in matching trench coats facing off across a chessboard',
+  '"SECRET AGENT SNOOPY" arched block-letter title at top, "LICENSE TO SNIFF" yellow ribbon banner subtitle, Snoopy in trench coat and fedora holding a magnifying glass, silhouettes of suspects in shadow behind him',
+  '"THE BEAGLE FILES" arched block-letter title at top, "CLASSIFIED" yellow ribbon banner subtitle, Snoopy as detective with a pipe, Woodstock in a tiny trench coat, foggy noir alley background',
+  '"CODE NAME BEAGLE" arched block-letter title at top, "TOP SECRET" yellow ribbon banner subtitle, Snoopy in a tuxedo holding a martini glass, vintage spy gadgets around him',
 
-  // HORROR / MONSTER PARODY
-  '"BEAGLE VS THE CAT NEXT DOOR" arched block-letter title at top in mustard yellow with thick red outline and drop shadow, "EPIC SHOWDOWN" yellow ribbon banner subtitle, Snoopy in fighting stance, giant menacing cat shadow looming, fence and full moon background',
-  '"NIGHT OF THE BEAGLE" arched block-letter title at top in mustard yellow with thick red outline and drop shadow, "TERROR ON THE ROOF" yellow ribbon banner subtitle, Snoopy as the Vulture lurking on his doghouse, full moon and bats around him',
-  '"DRACULA BEAGLE" arched block-letter title at top in mustard yellow with thick red outline and drop shadow, "THE BITE OF NIGHT" yellow ribbon banner subtitle, Snoopy in a black cape with vampire fangs, castle and bats in the background',
-  '"WEREWOLF WOODSTOCK" arched block-letter title at top in mustard yellow with thick red outline and drop shadow, "FULL MOON FRENZY" yellow ribbon banner subtitle, Woodstock transforming into a fluffy werewolf, Snoopy stepping back in horror',
-  '"ZOMBIE INVASION" arched block-letter title at top in mustard yellow with thick red outline and drop shadow, "THE UNDEAD WALK" yellow ribbon banner subtitle, Snoopy and Woodstock running from a horde of cartoon zombies in a graveyard',
-  '"GHOST IN THE DOGHOUSE" arched block-letter title at top in mustard yellow with thick red outline and drop shadow, "WHO YA GONNA CALL" yellow ribbon banner subtitle, Snoopy with a proton pack chasing a friendly ghost out of his red doghouse',
-  '"FRANKENBEAGLE" arched block-letter title at top in mustard yellow with thick red outline and drop shadow, "ITS ALIVE" yellow ribbon banner subtitle, Snoopy with bolts in his neck on a lab table, Woodstock as mad scientist pulling a lever',
-  '"MUMMY MENACE" arched block-letter title at top in mustard yellow with thick red outline and drop shadow, "ANCIENT CURSE" yellow ribbon banner subtitle, Snoopy wrapped in bandages stumbling out of a sarcophagus, Woodstock screaming',
-  '"CREATURE FROM THE LAGOON" arched block-letter title at top in mustard yellow with thick red outline and drop shadow, "BEAGLE BEWARE" yellow ribbon banner subtitle, Snoopy peeking nervously into a swamp, scaly hand reaching from the water',
-  '"HAUNTED HOUSE" arched block-letter title at top in mustard yellow with thick red outline and drop shadow, "ENTER IF YOU DARE" yellow ribbon banner subtitle, Snoopy and Woodstock standing at the gates of a creepy mansion, lightning flashing',
+  // HORROR / MONSTER
+  '"DRACULA BEAGLE" arched block-letter title at top, "THE BITE OF NIGHT" yellow ribbon banner subtitle, Snoopy in a black cape with vampire fangs, castle and bats in the background',
+  '"MUMMY MENACE" arched block-letter title at top, "ANCIENT CURSE" yellow ribbon banner subtitle, Snoopy wrapped in bandages stumbling out of a sarcophagus, Woodstock screaming',
+  '"GHOST IN THE DOGHOUSE" arched block-letter title at top, "WHO YA GONNA CALL" yellow ribbon banner subtitle, Snoopy with a proton pack chasing a friendly ghost out of his red doghouse',
 
-  // PIRATE / NAUTICAL
-  '"CAPTAIN SNOOPY" arched block-letter title at top in mustard yellow with thick red outline and drop shadow, "TERROR OF THE SEAS" yellow ribbon banner subtitle, Snoopy in pirate hat with eye patch holding a sword, Woodstock as parrot on his shoulder, ship and waves behind',
-  '"TREASURE OF THE BEAGLE" arched block-letter title at top in mustard yellow with thick red outline and drop shadow, "X MARKS THE SPOT" yellow ribbon banner subtitle, Snoopy with a treasure map and shovel, palm trees and a treasure chest behind him',
-  '"BUCCANEER BEAGLE" arched block-letter title at top in mustard yellow with thick red outline and drop shadow, "RAISE THE FLAG" yellow ribbon banner subtitle, Snoopy hoisting a Jolly Roger on a pirate ship, Woodstock climbing the rigging',
-  '"JOLLY ROGER" arched block-letter title at top in mustard yellow with thick red outline and drop shadow, "PIRATES PROWL" yellow ribbon banner subtitle, Snoopy with a cutlass swinging from a rope across the deck of a galleon',
-  '"MUTINY ON THE BEAGLE" arched block-letter title at top in mustard yellow with thick red outline and drop shadow, "ALL HANDS ON DECK" yellow ribbon banner subtitle, Snoopy facing down a crew of mutinous Woodstock pirates on a stormy ship',
-  '"DAVY JONES LOCKER" arched block-letter title at top in mustard yellow with thick red outline and drop shadow, "DEEP SEA DANGER" yellow ribbon banner subtitle, Snoopy in a diving helmet exploring an underwater shipwreck',
-  '"CARIBBEAN CHAOS" arched block-letter title at top in mustard yellow with thick red outline and drop shadow, "PARROT ON THE SHOULDER" yellow ribbon banner subtitle, Snoopy as pirate captain steering through a tropical storm',
-  '"TREASURE ISLAND" arched block-letter title at top in mustard yellow with thick red outline and drop shadow, "MAP TO MYSTERY" yellow ribbon banner subtitle, Snoopy with a spyglass spotting an island, Woodstock holding a treasure map',
+  // PIRATE
+  '"CAPTAIN SNOOPY" arched block-letter title at top, "TERROR OF THE SEAS" yellow ribbon banner subtitle, Snoopy in pirate hat with eye patch holding a sword, Woodstock as parrot on his shoulder, ship and waves behind',
+  '"TREASURE OF THE BEAGLE" arched block-letter title at top, "X MARKS THE SPOT" yellow ribbon banner subtitle, Snoopy with a treasure map and shovel, palm trees and a treasure chest behind him',
 
-  // JUNGLE / EXPLORATION
-  '"SNOOPY OF THE JUNGLE" arched block-letter title at top in mustard yellow with thick red outline and drop shadow, "KING OF THE VINES" yellow ribbon banner subtitle, Snoopy swinging on a vine in a loincloth, Woodstock flying alongside, jungle leaves and parrots framing them',
-  '"INDIANA SNOOPY" arched block-letter title at top in mustard yellow with thick red outline and drop shadow, "RAIDER OF THE LOST BONE" yellow ribbon banner subtitle, Snoopy in fedora and whip running from a giant boulder, ancient temple background',
-  '"TARZAN BEAGLE" arched block-letter title at top in mustard yellow with thick red outline and drop shadow, "LORD OF THE FOREST" yellow ribbon banner subtitle, Snoopy beating his chest atop a tall tree with monkeys around him',
-  '"AMAZON ADVENTURE" arched block-letter title at top in mustard yellow with thick red outline and drop shadow, "DEEP IN THE JUNGLE" yellow ribbon banner subtitle, Snoopy paddling a canoe down a winding river surrounded by toucans and crocodiles',
-  '"LOST CITY" arched block-letter title at top in mustard yellow with thick red outline and drop shadow, "ANCIENT TREASURES" yellow ribbon banner subtitle, Snoopy and Woodstock discovering a stone temple covered in vines',
-  '"TEMPLE OF DOOM" arched block-letter title at top in mustard yellow with thick red outline and drop shadow, "FORTUNE AND GLORY" yellow ribbon banner subtitle, Snoopy dodging arrow traps inside a torchlit ruin, Woodstock zipping ahead',
-  '"EXPEDITION UNKNOWN" arched block-letter title at top in mustard yellow with thick red outline and drop shadow, "BEYOND THE MAP" yellow ribbon banner subtitle, Snoopy in pith helmet leading a caravan through dense jungle',
-  '"JUNGLE FEVER" arched block-letter title at top in mustard yellow with thick red outline and drop shadow, "WILD WILD WORLD" yellow ribbon banner subtitle, Snoopy hacking through vines with a machete, Woodstock dodging a snake',
-  '"TIGER TROUBLE" arched block-letter title at top in mustard yellow with thick red outline and drop shadow, "FACE TO FACE" yellow ribbon banner subtitle, Snoopy in safari gear standing eye-to-eye with a friendly cartoon tiger',
-  '"RIVERBOAT ADVENTURE" arched block-letter title at top in mustard yellow with thick red outline and drop shadow, "DOWN THE AMAZON" yellow ribbon banner subtitle, Snoopy steering a steamboat down a wild river, Woodstock waving at parrots',
+  // JUNGLE
+  '"INDIANA SNOOPY" arched block-letter title at top, "RAIDER OF THE LOST BONE" yellow ribbon banner subtitle, Snoopy in fedora and whip running from a giant boulder, ancient temple background',
+  '"SNOOPY OF THE JUNGLE" arched block-letter title at top, "KING OF THE VINES" yellow ribbon banner subtitle, Snoopy swinging on a vine in a loincloth, Woodstock flying alongside, jungle leaves and parrots framing them',
 
   // SPORTS
-  '"SLAMMIN SNOOPY" arched block-letter title at top in mustard yellow with thick red outline and drop shadow, "HOME RUN HERO" yellow ribbon banner subtitle, Snoopy mid-baseball-swing in a vintage jersey, Woodstock as catcher, stadium lights and crowd silhouettes behind',
-  '"GRIDIRON BEAGLE" arched block-letter title at top in mustard yellow with thick red outline and drop shadow, "TOUCHDOWN" yellow ribbon banner subtitle, Snoopy in a football helmet running with the ball, Woodstock cheerleaders waving pom-poms',
-  '"HOOPS HERO" arched block-letter title at top in mustard yellow with thick red outline and drop shadow, "NOTHIN BUT NET" yellow ribbon banner subtitle, Snoopy mid-dunk slamming a basketball through a hoop, crowd cheering',
-  '"BOXING BEAGLE" arched block-letter title at top in mustard yellow with thick red outline and drop shadow, "KNOCKOUT KING" yellow ribbon banner subtitle, Snoopy in red boxing gloves throwing a punch, Woodstock as cornerman with a towel',
-  '"GOLF GETAWAY" arched block-letter title at top in mustard yellow with thick red outline and drop shadow, "HOLE IN ONE" yellow ribbon banner subtitle, Snoopy mid-swing on a green fairway, Woodstock holding the flag',
-  '"SURF CHAMPION" arched block-letter title at top in mustard yellow with thick red outline and drop shadow, "RIDING THE WAVES" yellow ribbon banner subtitle, Snoopy on a surfboard riding a giant curl, Woodstock surfing on a smaller board beside him',
-  '"TENNIS TITAN" arched block-letter title at top in mustard yellow with thick red outline and drop shadow, "GRAND SLAM" yellow ribbon banner subtitle, Snoopy mid-serve on a tennis court in retro whites, Woodstock as ball boy',
-  '"ICE HOCKEY HERO" arched block-letter title at top in mustard yellow with thick red outline and drop shadow, "SHOOT TO SCORE" yellow ribbon banner subtitle, Snoopy in hockey gear slapping a puck, ice and goalie net behind him',
-  '"RACING WHEELS" arched block-letter title at top in mustard yellow with thick red outline and drop shadow, "FAST AND FURRY" yellow ribbon banner subtitle, Snoopy in a red race car speeding around a curve, Woodstock waving a checkered flag',
-  '"SKI JUMPER" arched block-letter title at top in mustard yellow with thick red outline and drop shadow, "OFF THE CLIFF" yellow ribbon banner subtitle, Snoopy launching off a ski ramp midair, snowy peaks behind him',
-  '"WRESTLING CHAMPION" arched block-letter title at top in mustard yellow with thick red outline and drop shadow, "BODY SLAM" yellow ribbon banner subtitle, Snoopy in a wrestling singlet flexing in the ring, championship belt around his waist',
-  '"OLYMPIC BEAGLE" arched block-letter title at top in mustard yellow with thick red outline and drop shadow, "GOING FOR GOLD" yellow ribbon banner subtitle, Snoopy holding a gold medal high, Woodstock waving a flag, podium beneath them',
-  '"SKATEBOARD KING" arched block-letter title at top in mustard yellow with thick red outline and drop shadow, "AIRBORNE" yellow ribbon banner subtitle, Snoopy doing a kickflip mid-air on a skateboard, urban brick wall background',
-  '"BMX BANDIT" arched block-letter title at top in mustard yellow with thick red outline and drop shadow, "WHEELS OF STEEL" yellow ribbon banner subtitle, Snoopy popping a wheelie on a BMX bike, Woodstock cheering from the curb',
+  '"SLAMMIN SNOOPY" arched block-letter title at top, "HOME RUN HERO" yellow ribbon banner subtitle, Snoopy mid-baseball-swing in a vintage jersey, Woodstock as catcher, stadium lights and crowd silhouettes behind',
+  '"SURF CHAMPION" arched block-letter title at top, "RIDING THE WAVES" yellow ribbon banner subtitle, Snoopy on a surfboard riding a giant curl, Woodstock surfing on a smaller board beside him',
 
-  // MUSIC / ROCK
-  '"SNOOPY ROCKS" arched block-letter title at top in mustard yellow with thick red outline and drop shadow, "WORLD TOUR" yellow ribbon banner subtitle, Snoopy with electric guitar mid-jump, Woodstock on drums, stage lights and concert crowd silhouettes behind',
-  '"THE BEAGLES" arched block-letter title at top in mustard yellow with thick red outline and drop shadow, "LIVE IN CONCERT" yellow ribbon banner subtitle, Snoopy and Woodstock as a band, vintage concert poster style with bold typography',
-  '"JAZZ NIGHT" arched block-letter title at top in mustard yellow with thick red outline and drop shadow, "ALL THAT JAZZ" yellow ribbon banner subtitle, Snoopy playing a saxophone in a smoky club, Woodstock on a tiny piano',
-  '"ROCK STAR BEAGLE" arched block-letter title at top in mustard yellow with thick red outline and drop shadow, "TURN IT UP" yellow ribbon banner subtitle, Snoopy with a microphone screaming on stage, amplifiers stacked behind him',
-  '"DJ WOODSTOCK" arched block-letter title at top in mustard yellow with thick red outline and drop shadow, "DROP THE BEAT" yellow ribbon banner subtitle, Woodstock spinning records on a turntable, Snoopy dancing in disco lights',
-  '"PIANO MAN" arched block-letter title at top in mustard yellow with thick red outline and drop shadow, "TICKLING THE IVORIES" yellow ribbon banner subtitle, Snoopy at a grand piano in a tuxedo, candelabras glowing',
-  '"OPERA BEAGLE" arched block-letter title at top in mustard yellow with thick red outline and drop shadow, "HIT THE HIGH NOTE" yellow ribbon banner subtitle, Snoopy in opera costume singing dramatically, Woodstock conducting',
-  '"BLUES BROTHERS" arched block-letter title at top in mustard yellow with thick red outline and drop shadow, "MISSION FROM DOG" yellow ribbon banner subtitle, Snoopy and Woodstock in black suits, sunglasses and fedoras singing into mics',
-  '"PUNK ROCK" arched block-letter title at top in mustard yellow with thick red outline and drop shadow, "ANARCHY IN THE BACKYARD" yellow ribbon banner subtitle, Snoopy with a mohawk and electric guitar, Woodstock with safety pins through his feathers',
-  '"BAND ON THE RUN" arched block-letter title at top in mustard yellow with thick red outline and drop shadow, "WORLD TOUR FORTUNE" yellow ribbon banner subtitle, Snoopy and Woodstock running with instruments past adoring fans',
+  // MUSIC
+  '"SNOOPY ROCKS" arched block-letter title at top, "WORLD TOUR" yellow ribbon banner subtitle, Snoopy with electric guitar mid-jump, Woodstock on drums, stage lights and concert crowd silhouettes behind',
+  '"JAZZ NIGHT" arched block-letter title at top, "ALL THAT JAZZ" yellow ribbon banner subtitle, Snoopy playing a saxophone in a smoky club, Woodstock on a tiny piano',
 
-  // CIRCUS / PERFORMANCE
-  '"SNOOPYS BIG TOP" arched block-letter title at top in mustard yellow with thick red outline and drop shadow, "GREATEST SHOW ON EARTH" yellow ribbon banner subtitle, Snoopy as ringmaster with top hat and red coat, Woodstock juggling beside him, circus tent background',
-  '"THE FLYING BEAGLE" arched block-letter title at top in mustard yellow with thick red outline and drop shadow, "DEATH DEFYING ACT" yellow ribbon banner subtitle, Snoopy as trapeze artist swinging high, Woodstock catching from another bar, big top tent stripes',
-  '"RINGMASTER BEAGLE" arched block-letter title at top in mustard yellow with thick red outline and drop shadow, "STEP RIGHT UP" yellow ribbon banner subtitle, Snoopy in a red coat raising a megaphone, circus animals lined up behind him',
-  '"MAGIC SHOW" arched block-letter title at top in mustard yellow with thick red outline and drop shadow, "NOW YOU SEE HIM" yellow ribbon banner subtitle, Snoopy in a wizard cape pulling Woodstock from a top hat, sparkles and stars around them',
-  '"STRONGMAN BEAGLE" arched block-letter title at top in mustard yellow with thick red outline and drop shadow, "FEATS OF STRENGTH" yellow ribbon banner subtitle, Snoopy with handlebar mustache lifting a giant barbell over his head',
-  '"FIRE BREATHER" arched block-letter title at top in mustard yellow with thick red outline and drop shadow, "DONT TRY THIS HOME" yellow ribbon banner subtitle, Snoopy blowing a giant flame, Woodstock holding a fire extinguisher',
-  '"CLOWN PRINCE" arched block-letter title at top in mustard yellow with thick red outline and drop shadow, "JESTER OF THE RING" yellow ribbon banner subtitle, Snoopy in a clown costume juggling, Woodstock honking a tiny horn',
-  '"TIGHTROPE TERROR" arched block-letter title at top in mustard yellow with thick red outline and drop shadow, "ONE WRONG STEP" yellow ribbon banner subtitle, Snoopy balancing on a high wire with a parasol, Woodstock cheering from below',
+  // TRAVEL
+  '"PARIS ADVENTURE" arched block-letter title at top, "VIVE LE BEAGLE" yellow ribbon banner subtitle, Snoopy with a beret and baguette, Eiffel Tower behind him, Woodstock balancing on a croissant',
+  '"ROMAN HOLIDAY" arched block-letter title at top, "WHEN IN ROME" yellow ribbon banner subtitle, Snoopy on a vintage scooter, Colosseum in the background, Woodstock holding gelato',
+  '"TOKYO NIGHTS" arched block-letter title at top, "NEON DREAMS" yellow ribbon banner subtitle, Snoopy holding ramen in a glowing alley with neon signs, Woodstock peeking from a lantern',
+  '"SAFARI ADVENTURE" arched block-letter title at top, "WILD AT HEART" yellow ribbon banner subtitle, Snoopy in pith helmet and binoculars, giraffes and elephants in the savanna behind',
 
-  // RACING / SPEED
-  '"BEAGLE SPEEDWAY" arched block-letter title at top in mustard yellow with thick red outline and drop shadow, "FULL THROTTLE" yellow ribbon banner subtitle, Snoopy in racing helmet driving a vintage race car, Woodstock holding a checkered flag, speed lines streaking',
-  '"SNOOPY ON WHEELS" arched block-letter title at top in mustard yellow with thick red outline and drop shadow, "BORN TO RIDE" yellow ribbon banner subtitle, Snoopy on a vintage motorcycle wearing leather jacket, Woodstock riding shotgun, open highway behind',
-  '"DRAG RACER" arched block-letter title at top in mustard yellow with thick red outline and drop shadow, "QUARTER MILE KING" yellow ribbon banner subtitle, Snoopy in a hot rod laying down rubber at a starting line',
-  '"RALLY CHAMPION" arched block-letter title at top in mustard yellow with thick red outline and drop shadow, "OFF THE BEATEN PATH" yellow ribbon banner subtitle, Snoopy driving a rally car through mud and dust, Woodstock as navigator with a map',
-  '"BIKER BEAGLE" arched block-letter title at top in mustard yellow with thick red outline and drop shadow, "BURN RUBBER" yellow ribbon banner subtitle, Snoopy in leather jacket and aviators on a chopper motorcycle, Route 66 sign in the back',
-  '"GRAND PRIX GLORY" arched block-letter title at top in mustard yellow with thick red outline and drop shadow, "LAP OF VICTORY" yellow ribbon banner subtitle, Snoopy spraying champagne on a podium, Woodstock holding a trophy',
+  // RETRO / JOE COOL
+  '"JOE COOL" arched block-letter title at top, "TOO COOL FOR SCHOOL" yellow ribbon banner subtitle, Snoopy in black sunglasses leaning against a brick wall, Woodstock perched on his shoulder, retro starbursts framing him',
+  '"DISCO INFERNO" arched block-letter title at top, "GET DOWN" yellow ribbon banner subtitle, Snoopy in a white suit pointing to the sky on a lit-up disco floor, Woodstock spinning a mirror ball',
+  '"DINER DAYS" arched block-letter title at top, "MILKSHAKES AND MEMORIES" yellow ribbon banner subtitle, Snoopy on a stool at a 1950s diner counter, Woodstock sipping a shake',
 
-  // HOLIDAY / SEASONAL
-  '"SNOOPY SAVES CHRISTMAS" arched block-letter title at top in mustard yellow with thick red outline and drop shadow, "A HOLIDAY ADVENTURE" yellow ribbon banner subtitle, Snoopy in Santa hat carrying a giant gift, Woodstock as elf, snowflakes and pine trees framing them',
-  '"SLEIGH BELL BEAGLE" arched block-letter title at top in mustard yellow with thick red outline and drop shadow, "ROCKIN AROUND THE DOGHOUSE" yellow ribbon banner subtitle, Snoopy ice skating in a scarf, retro Christmas ornaments and holly around him',
-  '"HALLOWEEN HORROR" arched block-letter title at top in mustard yellow with thick red outline and drop shadow, "TRICK OR TREAT" yellow ribbon banner subtitle, Snoopy in a ghost costume holding a candy bag, Woodstock as a pumpkin',
-  '"GREAT PUMPKIN PATCH" arched block-letter title at top in mustard yellow with thick red outline and drop shadow, "WAITING ALL NIGHT" yellow ribbon banner subtitle, Snoopy and Woodstock sitting in a moonlit pumpkin field looking up at the sky',
-  '"VALENTINES VICTORY" arched block-letter title at top in mustard yellow with thick red outline and drop shadow, "BE MINE" yellow ribbon banner subtitle, Snoopy holding a giant heart-shaped box of chocolates, Woodstock with cupid wings',
-  '"EASTER ESCAPADE" arched block-letter title at top in mustard yellow with thick red outline and drop shadow, "EGGSTRA SPECIAL" yellow ribbon banner subtitle, Snoopy in bunny ears holding a basket, Woodstock hopping with painted eggs',
-  '"FOURTH OF JULY" arched block-letter title at top in mustard yellow with thick red outline and drop shadow, "STARS AND STRIPES" yellow ribbon banner subtitle, Snoopy holding sparklers, Woodstock with a tiny flag, fireworks bursting',
-  '"THANKSGIVING FEAST" arched block-letter title at top in mustard yellow with thick red outline and drop shadow, "GOBBLE GOBBLE" yellow ribbon banner subtitle, Snoopy in a pilgrim hat at a giant turkey dinner, Woodstock perched on the gravy boat',
-  '"NEW YEAR NEW BEAGLE" arched block-letter title at top in mustard yellow with thick red outline and drop shadow, "HAPPY NEW YEAR" yellow ribbon banner subtitle, Snoopy with a party hat and noisemaker, confetti raining down, clock at midnight',
-  '"WINTER WONDERLAND" arched block-letter title at top in mustard yellow with thick red outline and drop shadow, "SNOWY ADVENTURES" yellow ribbon banner subtitle, Snoopy and Woodstock building a snowman in a falling snow scene',
-  '"AUTUMN ADVENTURE" arched block-letter title at top in mustard yellow with thick red outline and drop shadow, "FALLING LEAVES" yellow ribbon banner subtitle, Snoopy jumping in a giant pile of red and orange leaves, Woodstock floating among them',
-  '"SPRING AWAKENING" arched block-letter title at top in mustard yellow with thick red outline and drop shadow, "BLOOM AND GROW" yellow ribbon banner subtitle, Snoopy in a flower crown, Woodstock surrounded by butterflies and tulips',
-  '"SUMMER VACATION" arched block-letter title at top in mustard yellow with thick red outline and drop shadow, "ENDLESS DAYS" yellow ribbon banner subtitle, Snoopy in sunglasses on a beach chair sipping a drink, Woodstock on a tiny float',
-  '"BACK TO SCHOOL" arched block-letter title at top in mustard yellow with thick red outline and drop shadow, "FIRST DAY JITTERS" yellow ribbon banner subtitle, Snoopy with a backpack and apple, Woodstock with a tiny notebook',
+  // CIRCUS
+  '"CLOWN PRINCE" arched block-letter title at top, "JESTER OF THE RING" yellow ribbon banner subtitle, Snoopy in a clown costume juggling, Woodstock honking a tiny horn',
+  '"SNOOPYS BIG TOP" arched block-letter title at top, "GREATEST SHOW ON EARTH" yellow ribbon banner subtitle, Snoopy as ringmaster with top hat and red coat, Woodstock juggling beside him, circus tent background',
 
-  // TRAVEL / CITIES
-  '"PARIS ADVENTURE" arched block-letter title at top in mustard yellow with thick red outline and drop shadow, "VIVE LE BEAGLE" yellow ribbon banner subtitle, Snoopy with a beret and baguette, Eiffel Tower behind him, Woodstock balancing on a croissant',
-  '"NEW YORK STORY" arched block-letter title at top in mustard yellow with thick red outline and drop shadow, "BIG APPLE BEAGLE" yellow ribbon banner subtitle, Snoopy in a yellow taxi with the Statue of Liberty and skyline behind him',
-  '"TOKYO NIGHTS" arched block-letter title at top in mustard yellow with thick red outline and drop shadow, "NEON DREAMS" yellow ribbon banner subtitle, Snoopy holding ramen in a glowing alley with neon signs, Woodstock peeking from a lantern',
-  '"LONDON CALLING" arched block-letter title at top in mustard yellow with thick red outline and drop shadow, "CHEERIO" yellow ribbon banner subtitle, Snoopy in a red telephone booth with Big Ben behind him, Woodstock with a bowler hat',
-  '"ROMAN HOLIDAY" arched block-letter title at top in mustard yellow with thick red outline and drop shadow, "WHEN IN ROME" yellow ribbon banner subtitle, Snoopy on a vintage scooter, Colosseum in the background, Woodstock holding gelato',
-  '"SAFARI ADVENTURE" arched block-letter title at top in mustard yellow with thick red outline and drop shadow, "WILD AT HEART" yellow ribbon banner subtitle, Snoopy in pith helmet and binoculars, giraffes and elephants in the savanna behind',
-  '"EGYPTIAN MYSTERY" arched block-letter title at top in mustard yellow with thick red outline and drop shadow, "PAWS OF THE PHARAOH" yellow ribbon banner subtitle, Snoopy on a camel beside the pyramids, Woodstock with hieroglyphic wings',
-  '"VENICE GONDOLA" arched block-letter title at top in mustard yellow with thick red outline and drop shadow, "FLOATING ROMANCE" yellow ribbon banner subtitle, Snoopy as a gondolier in a striped shirt, Woodstock as passenger with a rose',
-  '"SWISS ALPS" arched block-letter title at top in mustard yellow with thick red outline and drop shadow, "PEAK PERFORMANCE" yellow ribbon banner subtitle, Snoopy in lederhosen yodeling on a mountaintop, snow-capped peaks around him',
-  '"TROPICAL ESCAPE" arched block-letter title at top in mustard yellow with thick red outline and drop shadow, "PARADISE FOUND" yellow ribbon banner subtitle, Snoopy in a Hawaiian shirt with a coconut drink under a palm tree',
-  '"MOUNTAIN MISSION" arched block-letter title at top in mustard yellow with thick red outline and drop shadow, "REACH THE SUMMIT" yellow ribbon banner subtitle, Snoopy planting a flag on top of a snowy peak, Woodstock huddled in a parka',
-  '"DESERT JOURNEY" arched block-letter title at top in mustard yellow with thick red outline and drop shadow, "ENDLESS HORIZON" yellow ribbon banner subtitle, Snoopy in a turban riding a camel through golden dunes',
-  '"ARCTIC ADVENTURE" arched block-letter title at top in mustard yellow with thick red outline and drop shadow, "FROZEN FRONTIER" yellow ribbon banner subtitle, Snoopy bundled in fur on a dogsled, Woodstock leading a tiny husky team',
-  '"OUTBACK ADVENTURE" arched block-letter title at top in mustard yellow with thick red outline and drop shadow, "DOWN UNDER" yellow ribbon banner subtitle, Snoopy in a cork hat with a kangaroo and koala, red Australian desert behind',
-  '"GREEK GETAWAY" arched block-letter title at top in mustard yellow with thick red outline and drop shadow, "ANCIENT WONDERS" yellow ribbon banner subtitle, Snoopy among white-and-blue Greek buildings, Woodstock with a tiny laurel crown',
-
-  // OUTDOOR / NATURE
-  '"CAMPFIRE TALES" arched block-letter title at top in mustard yellow with thick red outline and drop shadow, "STORIES IN THE SMOKE" yellow ribbon banner subtitle, Snoopy roasting marshmallows by a fire, Woodstock toasting one on a stick',
-  '"FISHING TRIP" arched block-letter title at top in mustard yellow with thick red outline and drop shadow, "GONE FISHIN" yellow ribbon banner subtitle, Snoopy in a bucket hat fishing from a small boat, Woodstock on a tiny lily pad',
-  '"MOUNTAIN CLIMBER" arched block-letter title at top in mustard yellow with thick red outline and drop shadow, "REACH THE TOP" yellow ribbon banner subtitle, Snoopy scaling a cliff with rope and pickaxe, Woodstock floating above with a balloon',
-  '"RIVER RAFTING" arched block-letter title at top in mustard yellow with thick red outline and drop shadow, "RAPIDS AHEAD" yellow ribbon banner subtitle, Snoopy paddling a raft through whitewater, Woodstock holding on for dear life',
-  '"FOREST RANGER" arched block-letter title at top in mustard yellow with thick red outline and drop shadow, "PROTECT THE WILD" yellow ribbon banner subtitle, Snoopy in a ranger uniform and hat next to a wooden sign, Woodstock perched on his shoulder',
-  '"STORM CHASER" arched block-letter title at top in mustard yellow with thick red outline and drop shadow, "RIDING THE TWISTER" yellow ribbon banner subtitle, Snoopy clinging to a windmill in a tornado, Woodstock spinning by',
-  '"TRAIL BLAZER" arched block-letter title at top in mustard yellow with thick red outline and drop shadow, "INTO THE WILD" yellow ribbon banner subtitle, Snoopy in hiking boots and backpack on a mountain trail, compass in hand',
-  '"LAKE LIFE" arched block-letter title at top in mustard yellow with thick red outline and drop shadow, "PERFECT DAY" yellow ribbon banner subtitle, Snoopy floating on an inflatable in a calm lake, Woodstock as lifeguard',
-  '"FOREST ADVENTURE" arched block-letter title at top in mustard yellow with thick red outline and drop shadow, "INTO THE WOODS" yellow ribbon banner subtitle, Snoopy and Woodstock walking through a mossy forest with sunbeams',
-  '"AVALANCHE ATTACK" arched block-letter title at top in mustard yellow with thick red outline and drop shadow, "OUTRUN THE SNOW" yellow ribbon banner subtitle, Snoopy on skis racing down a slope, giant snow wave chasing him',
-
-  // DOMESTIC / COZY
-  '"BREAKFAST CLUB" arched block-letter title at top in mustard yellow with thick red outline and drop shadow, "PANCAKES AND PALS" yellow ribbon banner subtitle, Snoopy flipping a giant pancake, Woodstock catching one on his head',
-  '"MOVIE NIGHT" arched block-letter title at top in mustard yellow with thick red outline and drop shadow, "POPCORN AND PALS" yellow ribbon banner subtitle, Snoopy in 3D glasses with a giant popcorn bucket, Woodstock peeking out of it',
-  '"BOOK CLUB" arched block-letter title at top in mustard yellow with thick red outline and drop shadow, "PAGE TURNERS" yellow ribbon banner subtitle, Snoopy reading a giant book in an armchair, Woodstock perched on the spine',
-  '"GAME NIGHT" arched block-letter title at top in mustard yellow with thick red outline and drop shadow, "DICE AND DOGS" yellow ribbon banner subtitle, Snoopy and Woodstock playing a board game at a glowing table',
-  '"PIZZA NIGHT" arched block-letter title at top in mustard yellow with thick red outline and drop shadow, "EXTRA CHEESE" yellow ribbon banner subtitle, Snoopy holding a giant slice of pizza, Woodstock balancing on a pepperoni',
-  '"TEA TIME" arched block-letter title at top in mustard yellow with thick red outline and drop shadow, "PROPER PROPER" yellow ribbon banner subtitle, Snoopy with a teacup and monocle, Woodstock perched on a sugar cube',
-  '"BAKING DAY" arched block-letter title at top in mustard yellow with thick red outline and drop shadow, "FLOUR POWER" yellow ribbon banner subtitle, Snoopy in apron and chef hat covered in flour, Woodstock rolling out dough',
-
-  // DISASTER / PERIL (vintage pulp style)
-  '"VOLCANO ESCAPE" arched block-letter title at top in mustard yellow with thick red outline and drop shadow, "OUTRUN THE LAVA" yellow ribbon banner subtitle, Snoopy and Woodstock sprinting away from an erupting volcano, lava flowing behind',
-  '"TIDAL WAVE TERROR" arched block-letter title at top in mustard yellow with thick red outline and drop shadow, "TO HIGHER GROUND" yellow ribbon banner subtitle, Snoopy clinging to a palm tree as a giant wave crashes, Woodstock flying for safety',
-  '"EARTHQUAKE EMERGENCY" arched block-letter title at top in mustard yellow with thick red outline and drop shadow, "SHAKE RATTLE AND ROLL" yellow ribbon banner subtitle, Snoopy bracing in a doorway as buildings sway around him',
-  '"BLIZZARD BATTLE" arched block-letter title at top in mustard yellow with thick red outline and drop shadow, "FROZEN FATE" yellow ribbon banner subtitle, Snoopy trudging through a snowstorm in a heavy coat, Woodstock huddled in his hood',
-  '"FOREST FIRE FRENZY" arched block-letter title at top in mustard yellow with thick red outline and drop shadow, "INTO THE FLAMES" yellow ribbon banner subtitle, Snoopy as firefighter spraying a hose at a burning forest, Woodstock with a tiny axe',
-  '"QUICKSAND PERIL" arched block-letter title at top in mustard yellow with thick red outline and drop shadow, "SLOWLY SINKING" yellow ribbon banner subtitle, Snoopy reaching for a vine as he sinks into quicksand, Woodstock pulling',
-  '"DEEP SEA DESCENT" arched block-letter title at top in mustard yellow with thick red outline and drop shadow, "TO THE DEPTHS" yellow ribbon banner subtitle, Snoopy in a vintage diving suit on the ocean floor, giant fish silhouettes around him',
-  '"TYPHOON TROUBLE" arched block-letter title at top in mustard yellow with thick red outline and drop shadow, "INTO THE EYE" yellow ribbon banner subtitle, Snoopy steering a small boat through enormous stormy waves',
-
-  // ROMANCE PARODY
-  '"BEAGLE LOVE STORY" arched block-letter title at top in mustard yellow with thick red outline and drop shadow, "FOREVER AND ALWAYS" yellow ribbon banner subtitle, Snoopy presenting a single rose, Woodstock with hearts floating around him',
-  '"FROM PARIS WITH LOVE" arched block-letter title at top in mustard yellow with thick red outline and drop shadow, "LE GRAND AMOUR" yellow ribbon banner subtitle, Snoopy holding a heart-shaped balloon under the Eiffel Tower at sunset',
-  '"SUMMER ROMANCE" arched block-letter title at top in mustard yellow with thick red outline and drop shadow, "ENDLESS LOVE" yellow ribbon banner subtitle, Snoopy and Woodstock walking on a beach at sunset with footprints in the sand',
-  '"WEDDING DAY" arched block-letter title at top in mustard yellow with thick red outline and drop shadow, "I DO" yellow ribbon banner subtitle, Snoopy in a top hat and bowtie, Woodstock as flower bird, confetti raining down',
-  '"FIRST DATE JITTERS" arched block-letter title at top in mustard yellow with thick red outline and drop shadow, "WILL HE OR WONT HE" yellow ribbon banner subtitle, Snoopy nervously holding flowers at a doorstep, Woodstock peeking out',
-
-  // BEACH / SURF
-  '"SURFIN SNOOPY" arched block-letter title at top in mustard yellow with thick red outline and drop shadow, "CATCH A WAVE" yellow ribbon banner subtitle, Snoopy on a surfboard riding a giant curl, Woodstock surfing on a smaller board beside him',
-  '"BEACH BUM BEAGLE" arched block-letter title at top in mustard yellow with thick red outline and drop shadow, "SUMMER OF 69" yellow ribbon banner subtitle, Snoopy in sunglasses lounging with a coconut drink, palm trees and sun rays framing him',
-  '"TROPICAL TROUBLE" arched block-letter title at top in mustard yellow with thick red outline and drop shadow, "PARADISE LOST" yellow ribbon banner subtitle, Snoopy stranded on a tiny island holding an SOS sign, Woodstock fanning him with a leaf',
-  '"SHARK ATTACK" arched block-letter title at top in mustard yellow with thick red outline and drop shadow, "GET OUT OF THE WATER" yellow ribbon banner subtitle, Snoopy paddling away on a surfboard from a cartoon shark fin chasing him',
-  '"TIKI ISLAND" arched block-letter title at top in mustard yellow with thick red outline and drop shadow, "ALOHA ADVENTURES" yellow ribbon banner subtitle, Snoopy with a lei and ukulele in front of giant tiki statues',
-
-  // VINTAGE PROFESSIONS
-  '"FIREMAN BEAGLE" arched block-letter title at top in mustard yellow with thick red outline and drop shadow, "HEROES IN RED" yellow ribbon banner subtitle, Snoopy in fireman gear holding a hose, Woodstock as dalmatian sidekick',
-  '"LIGHTHOUSE KEEPER" arched block-letter title at top in mustard yellow with thick red outline and drop shadow, "GUARDING THE COAST" yellow ribbon banner subtitle, Snoopy in a sailor cap shining a lantern from a lighthouse in a stormy night',
-  '"BEEKEEPER BEAGLE" arched block-letter title at top in mustard yellow with thick red outline and drop shadow, "SWEET STING" yellow ribbon banner subtitle, Snoopy in a beekeeping suit holding a honeycomb, bees buzzing around',
-  '"MAILMAN MISSION" arched block-letter title at top in mustard yellow with thick red outline and drop shadow, "RAIN OR SHINE" yellow ribbon banner subtitle, Snoopy in mail carrier uniform delivering letters, Woodstock fluttering beside him',
-  '"PARK RANGER" arched block-letter title at top in mustard yellow with thick red outline and drop shadow, "PROTECTING NATURE" yellow ribbon banner subtitle, Snoopy in ranger gear next to a national park sign, mountains behind',
-  '"RAILROAD ENGINEER" arched block-letter title at top in mustard yellow with thick red outline and drop shadow, "ALL ABOARD" yellow ribbon banner subtitle, Snoopy in striped overalls and conductor cap leaning out of a steam train',
-  '"MINER MISSION" arched block-letter title at top in mustard yellow with thick red outline and drop shadow, "GOLD RUSH" yellow ribbon banner subtitle, Snoopy with a pickaxe and lantern striking gold, Woodstock holding a nugget',
-  '"SAILOR BEAGLE" arched block-letter title at top in mustard yellow with thick red outline and drop shadow, "ANCHORS AWEIGH" yellow ribbon banner subtitle, Snoopy in a navy uniform saluting on the deck of a ship',
-  '"DOCTOR BEAGLE" arched block-letter title at top in mustard yellow with thick red outline and drop shadow, "DOCTORS ORDERS" yellow ribbon banner subtitle, Snoopy in a white coat with a stethoscope, Woodstock holding a giant pill',
-  '"TEACHER TROUBLES" arched block-letter title at top in mustard yellow with thick red outline and drop shadow, "BACK TO SCHOOL" yellow ribbon banner subtitle, Snoopy at a chalkboard pointing at math problems, Woodstock as struggling student',
-
-  // JOE COOL / RETRO LIFESTYLE
-  '"JOE COOL" arched block-letter title at top in mustard yellow with thick red outline and drop shadow, "TOO COOL FOR SCHOOL" yellow ribbon banner subtitle, Snoopy in black sunglasses leaning against a brick wall, Woodstock perched on his shoulder, retro starbursts framing him',
-  '"THE LEGEND OF JOE COOL" arched block-letter title at top in mustard yellow with thick red outline and drop shadow, "EST 1971" yellow ribbon banner subtitle, Snoopy with sunglasses arms crossed in a heroic stance, vintage starburst halftone background',
-  '"DISCO INFERNO" arched block-letter title at top in mustard yellow with thick red outline and drop shadow, "GET DOWN" yellow ribbon banner subtitle, Snoopy in a white suit pointing to the sky on a lit-up disco floor, Woodstock spinning a mirror ball',
-  '"DRIVE IN MOVIE" arched block-letter title at top in mustard yellow with thick red outline and drop shadow, "DOUBLE FEATURE" yellow ribbon banner subtitle, Snoopy in a vintage convertible at a drive-in theater, Woodstock with popcorn',
-  '"DINER DAYS" arched block-letter title at top in mustard yellow with thick red outline and drop shadow, "MILKSHAKES AND MEMORIES" yellow ribbon banner subtitle, Snoopy on a stool at a 1950s diner counter, Woodstock sipping a shake',
+  // PROFESSIONS
+  '"LIGHTHOUSE KEEPER" arched block-letter title at top, "GUARDING THE COAST" yellow ribbon banner subtitle, Snoopy in a sailor cap shining a lantern from a lighthouse in a stormy night',
+  '"BEEKEEPER BEAGLE" arched block-letter title at top, "SWEET STING" yellow ribbon banner subtitle, Snoopy in a beekeeping suit holding a honeycomb, bees buzzing around',
+  '"FIREMAN BEAGLE" arched block-letter title at top, "HEROES IN RED" yellow ribbon banner subtitle, Snoopy in fireman gear holding a hose, Woodstock as dalmatian sidekick',
 ];
 
-// Flat rate prices in cents - only 2:3 ratio variants for perfect framing
-const VERTICAL_VARIANTS = [
+// Retro: only 4 perfect-fit 2:3 sizes
+const RETRO_VARIANTS = [
   { id: 91644,  w: 3600,  h: 5400,  price: 8420  }, // 12 x 18
   { id: 91647,  w: 4800,  h: 7200,  price: 10820 }, // 16 x 24
   { id: 91655,  w: 9600,  h: 14400, price: 34684 }, // 32 x 48
   { id: 112955, w: 12000, h: 18000, price: 50026 }, // 40 x 60
 ];
 
-// Sizes we DO NOT want enabled (Printify auto-includes them otherwise).
-// We explicitly send these with is_enabled: false to force them off.
-const DISABLED_VARIANT_IDS = [
+const RETRO_DISABLED_VARIANT_IDS = [
   101413, // 8 x 10
   91641,  // 11 x 14
   91649,  // 20 x 24
@@ -337,10 +508,24 @@ const DISABLED_VARIANT_IDS = [
   91654,  // 30 x 40
 ];
 
-function pickPrompts() {
-  var shuffled = PROMPTS.slice().sort(function() { return Math.random() - 0.5; });
-  return shuffled.slice(0, 5);
+// =============================================================================
+// PROMPT PICKERS
+// =============================================================================
+
+function pickPromptsForRun() {
+  // 3 old-style + 2 retro per run
+  var oldShuffled = OLD_PROMPTS.slice().sort(function() { return Math.random() - 0.5; });
+  var retroShuffled = RETRO_PROMPTS.slice().sort(function() { return Math.random() - 0.5; });
+  var picks = [];
+  for (var i = 0; i < 3; i++) picks.push({ style: 'old', prompt: oldShuffled[i] });
+  for (var j = 0; j < 2; j++) picks.push({ style: 'retro', prompt: retroShuffled[j] });
+  // Shuffle the order so old/retro are interleaved
+  return picks.sort(function() { return Math.random() - 0.5; });
 }
+
+// =============================================================================
+// SHARED HELPERS
+// =============================================================================
 
 async function retry(fn, retries, delay) {
   retries = retries || 3;
@@ -389,15 +574,30 @@ async function cropToVertical(base64Data) {
   return outputBuffer.toString("base64");
 }
 
-async function generateListing(prompt) {
-  console.log("Generating listing content...");
+// =============================================================================
+// LISTING GENERATION (style-aware)
+// =============================================================================
+
+async function generateListing(prompt, style) {
+  console.log("Generating listing content (" + style + " style)...");
+  var styleDescription, titleFormat, tagsExample;
+  if (style === 'retro') {
+    styleDescription = "Snoopy and Woodstock retro vintage comic poster";
+    titleFormat = "Snoopy Woodstock [Theme] Canvas Print Retro Comic Poster Vintage Wall Art";
+    tagsExample = "Snoopy wall art, retro comic art, vintage Snoopy, Peanuts poster, comic book art, Snoopy gift, Woodstock print, vintage poster, Snoopy canvas, retro Peanuts, pulp comic art, Snoopy lover, beagle wall art";
+  } else {
+    styleDescription = "Snoopy and Woodstock art";
+    titleFormat = "Snoopy Woodstock [Scene] Canvas Print Peanuts [Theme] Wall Decor";
+    tagsExample = "Snoopy wall art, Peanuts poster, Woodstock print, Snoopy gift, Peanuts decor, cartoon art print, Snoopy canvas, kids room art, Peanuts fan gift, Snoopy lover, beagle wall art, nursery art, Peanuts artwork";
+  }
+
   var res = await fetch(
     "https://generativelanguage.googleapis.com/v1beta/models/gemini-3.1-flash-image-preview:generateContent?key=" + NB_API_KEY,
     {
       method: "POST",
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify({
-        contents: [{ parts: [{ text: "Based on this Snoopy and Woodstock retro vintage comic poster description: \"" + prompt + "\"\n\nGenerate an optimized Etsy product listing. Respond with raw JSON only, no markdown, no backticks:\n{\n  \"title\": \"Etsy optimized title under 80 chars. Format: Snoopy Woodstock [Theme/Title from comic] Canvas Print Retro Comic Poster Vintage Wall Art. Examples: Snoopy Woodstock Flying Ace Canvas Print Retro Comic Poster Vintage Wall Art. Snoopy Woodstock Joe Cool Canvas Print Retro Comic Poster Vintage Wall Art. NO dashes, NO hyphens, NO special characters, keep it clean and specific to the comic theme.\",\n  \"description\": \"3 engaging paragraphs about this specific retro vintage comic-style artwork, the canvas print quality, the 1960s pulp comic poster aesthetic with halftone shading and aged paper textures, and who would love it as a gift.\",\n  \"tags\": [\"IMPORTANT: exactly 13 tags, each tag must be under 20 characters, no special characters, focused on retro vintage comic Snoopy Peanuts theme. Examples: Snoopy wall art, retro comic art, vintage Snoopy, Peanuts poster, comic book art, Snoopy gift, Woodstock print, vintage poster, Snoopy canvas, retro Peanuts, pulp comic art, Snoopy lover, beagle wall art\"]\n}" }] }],
+        contents: [{ parts: [{ text: "Based on this " + styleDescription + " description: \"" + prompt + "\"\n\nGenerate an optimized Etsy product listing. Respond with raw JSON only, no markdown, no backticks:\n{\n  \"title\": \"Etsy optimized title under 80 chars. Format: " + titleFormat + ". NO dashes, NO hyphens, NO special characters.\",\n  \"description\": \"3 engaging paragraphs about this specific artwork, the canvas print quality, and who would love it as a gift.\",\n  \"tags\": [\"IMPORTANT: exactly 13 tags, each tag must be under 20 characters, no special characters. Examples: " + tagsExample + "\"]\n}" }] }],
         generationConfig: { responseModalities: ["TEXT"] }
       })
     }
@@ -408,34 +608,23 @@ async function generateListing(prompt) {
   var clean = text.replace(/```json|```/g, "").trim();
   var listing = JSON.parse(clean);
 
-  // Validate and fix tags - ensure all under 20 chars
-  var validTags = [
-    "Snoopy wall art",
-    "retro comic art",
-    "vintage Snoopy",
-    "Peanuts poster",
-    "comic book art",
-    "Snoopy gift",
-    "Woodstock print",
-    "vintage poster",
-    "Snoopy canvas",
-    "retro Peanuts",
-    "pulp comic art",
-    "Snoopy lover",
-    "beagle wall art",
-    "Peanuts decor",
-    "Peanuts fan gift",
-    "comic poster art",
-    "vintage wall art",
-    "Snoopy print",
-    "retro wall art",
-    "Snoopy art print"
+  var validTags = style === 'retro' ? [
+    "Snoopy wall art", "retro comic art", "vintage Snoopy", "Peanuts poster",
+    "comic book art", "Snoopy gift", "Woodstock print", "vintage poster",
+    "Snoopy canvas", "retro Peanuts", "pulp comic art", "Snoopy lover",
+    "beagle wall art", "Peanuts decor", "Peanuts fan gift", "comic poster art",
+    "vintage wall art", "Snoopy print", "retro wall art", "Snoopy art print"
+  ] : [
+    "Snoopy wall art", "Peanuts poster", "Woodstock print", "Snoopy gift",
+    "Peanuts decor", "cartoon art print", "Snoopy canvas", "kids room art",
+    "Peanuts fan gift", "Snoopy lover", "beagle wall art", "nursery art",
+    "Peanuts artwork", "Snoopy print", "Peanuts wall art", "Snoopy home decor",
+    "Woodstock art", "Peanuts gift", "cartoon canvas", "Snoopy art print"
   ];
 
   if (!listing.tags || !Array.isArray(listing.tags) || listing.tags.length === 0) {
     listing.tags = validTags.slice(0, 13);
   } else {
-    // Filter out any tags over 20 chars and replace with valid ones
     var filtered = listing.tags.filter(function(t) {
       return t && t.length <= 20 && t.length > 0;
     });
@@ -455,11 +644,21 @@ async function generateListing(prompt) {
   return listing;
 }
 
-async function generateImage(prompt) {
-  console.log("Generating image...");
-  var palette = pickPalette();
-  console.log("Using palette:", palette);
-  var fullPrompt = prompt + buildStyleSuffix(palette) + " Generate as a tall vertical portrait poster artwork in 2:3 aspect ratio, taller than wide, fill the entire frame edge to edge with no white borders, no margins, suitable for canvas wall art print.";
+// =============================================================================
+// IMAGE GENERATION (style-aware)
+// =============================================================================
+
+async function generateImage(prompt, style) {
+  console.log("Generating image (" + style + " style)...");
+  var fullPrompt;
+  if (style === 'retro') {
+    var palette = pickPalette();
+    console.log("Using palette:", palette);
+    fullPrompt = prompt + buildRetroStyleSuffix(palette) + " Generate as a tall vertical portrait poster artwork in 2:3 aspect ratio, taller than wide, fill the entire frame edge to edge with no white borders, no margins, suitable for canvas wall art print.";
+  } else {
+    fullPrompt = prompt + " Generate as a tall vertical portrait poster artwork in 2:3 aspect ratio, taller than wide. Fill the entire frame edge to edge with no white borders, no margins. Suitable for canvas wall art print. No text, no words, no letters.";
+  }
+
   var res = await fetch(
     "https://generativelanguage.googleapis.com/v1beta/models/gemini-3.1-flash-image-preview:generateContent?key=" + NB_API_KEY,
     {
@@ -479,6 +678,10 @@ async function generateImage(prompt) {
   return await cropToVertical(imagePart.inlineData.data);
 }
 
+// =============================================================================
+// PRINTIFY UPLOAD + PRODUCT CREATE (style-aware)
+// =============================================================================
+
 async function uploadToPrintify(base64Data) {
   console.log("Uploading image to Printify...");
   var res = await fetch("https://api.printify.com/v1/uploads/images.json", {
@@ -492,34 +695,31 @@ async function uploadToPrintify(base64Data) {
   return data.id;
 }
 
-async function createProduct(imageId, listing) {
-  console.log("Creating Printify product...");
-  // Build the variants array: enabled ones at our prices, disabled ones explicitly
-  // marked is_enabled: false. We need to send the disabled ones too because Printify
-  // defaults to enabling all blueprint variants if they're not in the request.
-  var variants = VERTICAL_VARIANTS.map(function(v) {
+async function createProduct(imageId, listing, style) {
+  console.log("Creating Printify product (" + style + " style)...");
+  var enabledVariants = style === 'retro' ? RETRO_VARIANTS : OLD_VARIANTS;
+
+  var variants = enabledVariants.map(function(v) {
     return { id: v.id, is_enabled: true, price: v.price };
-  }).concat(DISABLED_VARIANT_IDS.map(function(id) {
-    return { id: id, is_enabled: false, price: 999 };
-  }));
-  console.log("Variants: " + VERTICAL_VARIANTS.length + " enabled, " + DISABLED_VARIANT_IDS.length + " disabled");
-  // Image is generated at 2:3 ratio (3000x4500). For each variant:
-  // - scale: cover-fill the print area regardless of aspect ratio
-  // - y position: anchor the top edge of the image to the top edge of the print
-  //   area so the title is never cropped. Bottom (clouds/decoration) gets cropped
-  //   instead. Math: y = scale/2 places image-top exactly at print-area-top.
-  //   For 2:3 variants (scale 1.0) this gives y=0.5 (centered, no crop).
-  var IMAGE_RATIO = 3000 / 4500; // 0.667
-  var print_areas = VERTICAL_VARIANTS.map(function(v) {
-    var variantRatio = v.w / v.h;
-    var scale = Math.max(variantRatio, IMAGE_RATIO) / Math.min(variantRatio, IMAGE_RATIO);
-    var yPos = scale / 2;
-    console.log("Variant " + v.id + " (" + v.w + "x" + v.h + ") -> scale " + scale.toFixed(3) + ", y " + yPos.toFixed(3));
+  });
+
+  // For retro, explicitly disable the unwanted sizes
+  if (style === 'retro') {
+    variants = variants.concat(RETRO_DISABLED_VARIANT_IDS.map(function(id) {
+      return { id: id, is_enabled: false, price: 999 };
+    }));
+    console.log("Variants: " + RETRO_VARIANTS.length + " enabled, " + RETRO_DISABLED_VARIANT_IDS.length + " disabled");
+  } else {
+    console.log("Variants: all " + OLD_VARIANTS.length + " enabled");
+  }
+
+  var print_areas = enabledVariants.map(function(v) {
     return {
       variant_ids: [v.id],
-      placeholders: [{ position: "front", images: [{ id: imageId, x: 0.5, y: yPos, scale: scale, angle: 0, print_area_width: v.w, print_area_height: v.h }] }]
+      placeholders: [{ position: "front", images: [{ id: imageId, x: 0.5, y: 0.5, scale: 1, angle: 0, print_area_width: v.w, print_area_height: v.h }] }]
     };
   });
+
   var res = await fetch("https://api.printify.com/v1/shops/" + SHOP_ID + "/products.json", {
     method: "POST",
     headers: { "Authorization": "Bearer " + PRINTIFY_API_KEY, "Content-Type": "application/json" },
@@ -538,6 +738,10 @@ async function createProduct(imageId, listing) {
   console.log("Product created, ID:", data.id);
   return data.id;
 }
+
+// =============================================================================
+// PRINTIFY PUBLISH + STATUS CHECK
+// =============================================================================
 
 async function enableOffsiteAdsPuppeteer(productId) {
   var PRINTIFY_BEARER = process.env.PRINTIFY_BEARER;
@@ -568,52 +772,16 @@ async function enableOffsiteAdsPuppeteer(productId) {
   }
 }
 
-
-async function createAndPublishEbay(etsyProductId) {
-  console.log("Copying product to eBay store...");
-  var res = await fetch(
-    "https://api.printify.com/v1/shops/" + SHOP_ID + "/products/" + etsyProductId + "/duplicate.json",
-    {
-      method: "POST",
-      headers: { "Authorization": "Bearer " + PRINTIFY_API_KEY, "Content-Type": "application/json" },
-      body: JSON.stringify({ shop_id: parseInt(EBAY_SHOP_ID) })
-    }
-  );
-  var data = await res.json();
-  console.log("Copy response (status " + res.status + "):", JSON.stringify(data).substring(0, 200));
-  if (!data.id) { console.log("eBay copy failed"); return; }
-  console.log("eBay product copied, ID:", data.id);
-
-  // Publish to eBay
-  await new Promise(function(r) { setTimeout(r, 15000); });
-  console.log("Publishing to eBay...");
-  var pubRes = await fetch(
-    "https://api.printify.com/v1/shops/" + EBAY_SHOP_ID + "/products/" + data.id + "/publish.json",
-    {
-      method: "POST",
-      headers: { "Authorization": "Bearer " + PRINTIFY_API_KEY, "Content-Type": "application/json" },
-      body: JSON.stringify({ title: true, description: true, images: true, variants: true, tags: true, keyFeatures: true, shipping_template: true })
-    }
-  );
-  console.log("eBay publish response (status " + pubRes.status + "):", await pubRes.text());
-}
-
 async function publishToEtsy(productId) {
   console.log("Waiting 45s for product images to fully process...");
   await new Promise(function(r) { setTimeout(r, 45000); });
   console.log("Publishing to Etsy...");
 
   var body = JSON.stringify({
-    title: true,
-    description: true,
-    images: true,
-    variants: true,
-    tags: true,
-    keyFeatures: true,
-    shipping_template: true
+    title: true, description: true, images: true, variants: true,
+    tags: true, keyFeatures: true, shipping_template: true
   });
 
-  // Try publishing up to 3 times
   var publishAccepted = false;
   for (var attempt = 1; attempt <= 3; attempt++) {
     console.log("Publish attempt " + attempt + "...");
@@ -630,15 +798,11 @@ async function publishToEtsy(productId) {
     console.log("Publish response (status " + statusCode + "):", text);
 
     if (statusCode === 200 || statusCode === 204) {
-      console.log("Publish request accepted by Printify, now waiting for Etsy to process...");
+      console.log("Publish request accepted by Printify, polling for actual Etsy result...");
       publishAccepted = true;
       break;
     }
-
-    if (attempt < 3) {
-      console.log("Waiting 20s before retry...");
-      await new Promise(function(r) { setTimeout(r, 20000); });
-    }
+    if (attempt < 3) await new Promise(function(r) { setTimeout(r, 20000); });
   }
 
   if (!publishAccepted) {
@@ -646,77 +810,65 @@ async function publishToEtsy(productId) {
     return;
   }
 
-  // Etsy publishing happens asynchronously after Printify accepts. Poll to find
-  // out what actually happened. Check every 30s for up to 3 minutes.
-  console.log("Polling for actual Etsy publish result (up to 3 min)...");
-  var finalProduct = null;
+  // Poll for actual result
   for (var pollAttempt = 1; pollAttempt <= 6; pollAttempt++) {
     await new Promise(function(r) { setTimeout(r, 30000); });
     var checkRes = await fetch(
       "https://api.printify.com/v1/shops/" + SHOP_ID + "/products/" + productId + ".json",
       { headers: { "Authorization": "Bearer " + PRINTIFY_API_KEY } }
     );
-    finalProduct = await checkRes.json();
-    var locked = finalProduct.is_locked;
-    var external = finalProduct.external;
+    var product = await checkRes.json();
+    var locked = product.is_locked;
+    var external = product.external;
     var hasHandle = external && external.handle;
     console.log("Poll " + pollAttempt + ": is_locked=" + locked + ", has_external_handle=" + !!hasHandle);
 
-    // Success: product unlocked AND has external handle (Etsy listing URL)
     if (!locked && hasHandle) {
-      console.log("✅ Successfully published to Etsy!");
-      console.log("   Etsy listing: " + external.handle);
+      console.log("✅ Successfully published to Etsy: " + external.handle);
       return;
     }
-
-    // Failure: product unlocked but NO external handle = Etsy rejected
     if (!locked && !hasHandle) {
       console.log("❌ Etsy REJECTED the listing.");
-      console.log("   Most common causes:");
-      console.log("   1. Trademark/IP filter on 'Snoopy' or 'Peanuts' in title/tags");
-      console.log("   2. Shipping template not configured for this product type");
-      console.log("   3. Image dimensions/quality issue");
-      console.log("   Check Printify > Products > this product for the exact error.");
-      console.log("   Full product state:", JSON.stringify({
-        is_locked: finalProduct.is_locked,
-        visible: finalProduct.visible,
-        external: finalProduct.external
-      }));
+      console.log("   Likely: trademark filter on Snoopy/Peanuts, shipping template issue, or image issue.");
+      console.log("   Check Printify dashboard for exact error.");
       return;
     }
-    // Still locked = still processing, keep polling
   }
-
-  console.log("⚠️  Timed out waiting for Etsy. Still locked after 3 minutes.");
-  console.log("   Listing may still publish later or may be stuck. Check Printify dashboard.");
+  console.log("⚠️  Timed out after 3 minutes. Check Printify dashboard.");
 }
+
+// =============================================================================
+// MAIN RUN LOOP
+// =============================================================================
 
 async function run() {
   try { require("sharp"); } catch (e) {
     require("child_process").execSync("npm install sharp", { stdio: "inherit" });
   }
 
-  var prompts = pickPrompts();
-  console.log("Selected 5 unique prompts for this run");
+  var picks = pickPromptsForRun();
+  console.log("Selected " + picks.length + " prompts: " +
+    picks.filter(function(p) { return p.style === 'old'; }).length + " old-style + " +
+    picks.filter(function(p) { return p.style === 'retro'; }).length + " retro comic");
 
-  for (var i = 0; i < 5; i++) {
-    var prompt = prompts[i];
-    console.log("\n--- Listing " + (i + 1) + " of 5 ---");
-    console.log("Prompt:", prompt);
+  for (var i = 0; i < picks.length; i++) {
+    var pick = picks[i];
+    console.log("\n--- Listing " + (i + 1) + " of " + picks.length + " (" + pick.style + ") ---");
+    console.log("Prompt:", pick.prompt);
     try {
-      var listing = await retry(function() { return generateListing(prompt); });
-      var base64Image = await retry(function() { return generateImage(prompt); });
+      var listing = await retry(function() { return generateListing(pick.prompt, pick.style); });
+      var base64Image = await retry(function() { return generateImage(pick.prompt, pick.style); });
       var imageId = await uploadToPrintify(base64Image);
-      var productId = await createProduct(imageId, listing);
+      var productId = await createProduct(imageId, listing, pick.style);
       try { await enableOffsiteAdsPuppeteer(productId); } catch(e) { console.log("Offsite ads skipped:", e.message); }
       await publishToEtsy(productId);
       console.log("Listing " + (i + 1) + " complete!");
-      if (i < 4) await new Promise(function(r) { setTimeout(r, 10000); });
+      if (i < picks.length - 1) await new Promise(function(r) { setTimeout(r, 10000); });
     } catch (err) {
       console.error("Listing " + (i + 1) + " failed:", err.message);
     }
   }
-  console.log("\nDone! All 5 listings processed.");
+  console.log("\nDone! All " + picks.length + " listings processed.");
 }
 
 run();
