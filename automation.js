@@ -444,11 +444,13 @@ const RETRO_PROMPTS = [
   '"FIREMAN BEAGLE" arched block-letter title at top, "HEROES IN RED" yellow ribbon banner subtitle, Snoopy in fireman gear holding a hose, Woodstock as dalmatian sidekick',
 ];
 
-// Retro: 3 larger sizes only
+// Retro: 5 sizes, 12x16 through 30x40
 const RETRO_VARIANTS = [
-  { id: 96944, w: 4727, h: 5920, price: 9915  }, // 16x20
-  { id: 96946, w: 5920, h: 7101, price: 12095 }, // 20x24
-  { id: 96956, w: 7101, h: 8884, price: 17164 }, // 24x30
+  { id: 96937, w: 3546, h: 4727,  price: 9915  }, // 12x16
+  { id: 96944, w: 4727, h: 5920,  price: 12095 }, // 16x20
+  { id: 96946, w: 5920, h: 7101,  price: 17164 }, // 20x24
+  { id: 96956, w: 7101, h: 8884,  price: 22000 }, // 24x30
+  { id: 96958, w: 8884, h: 11837, price: 29900 }, // 30x40
 ];
 
 // Disable smaller sizes for retro listings
