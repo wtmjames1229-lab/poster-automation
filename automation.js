@@ -451,8 +451,8 @@ const RETRO_VARIANTS = [
   { id: 96957, w: 7101, h: 10656, price: 25000 }, // 24x36
 ];
 
-// Disable smaller sizes for retro listings
-const RETRO_DISABLED_VARIANT_IDS = [96926, 96930];
+// Disable all old sizes for retro listings
+const RETRO_DISABLED_VARIANT_IDS = [96926, 96930, 96944, 96946, 96956];
 
 // =============================================================================
 // PROMPT PICKERS
@@ -489,13 +489,16 @@ async function retry(fn, retries, delay) {
   }
 }
 
-async function cropToVertical(base64Data) {
+async function cropImage(base64Data, style) {
   var sharp = require("sharp");
   var inputBuffer = Buffer.from(base64Data, "base64");
   var metadata = await sharp(inputBuffer).metadata();
   var width = metadata.width;
   var height = metadata.height;
-  var targetRatio = 2 / 3;
+  // Retro uses tall narrow 3:5 ratio, old style uses 2:3
+  var targetRatio = style === 'retro' ? 3 / 5 : 2 / 3;
+  var outW = style === 'retro' ? 3000 : 3000;
+  var outH = style === 'retro' ? 5000 : 4500;
   var currentRatio = width / height;
   var cropWidth, cropHeight, left, top;
   if (currentRatio > targetRatio) {
@@ -511,10 +514,10 @@ async function cropToVertical(base64Data) {
   }
   var outputBuffer = await sharp(inputBuffer)
     .extract({ left: left, top: top, width: cropWidth, height: cropHeight })
-    .resize(3000, 4500)
+    .resize(outW, outH)
     .png()
     .toBuffer();
-  console.log("Image cropped to 2:3 (" + width + "x" + height + " -> 3000x4500)");
+  console.log("Image cropped to " + (style === 'retro' ? '3:5' : '2:3') + " (" + width + "x" + height + " -> " + outW + "x" + outH + ")");
   return outputBuffer.toString("base64");
 }
 
@@ -593,7 +596,7 @@ async function generateImage(prompt, style) {
   if (style === 'retro') {
     var palette = pickPalette();
     console.log("Using palette:", palette);
-    fullPrompt = prompt + buildRetroStyleSuffix(palette) + " Generate as a tall vertical portrait poster artwork in 2:3 aspect ratio, taller than wide, fill the entire frame edge to edge with no white borders, no margins, suitable for canvas wall art print.";
+    fullPrompt = prompt + buildRetroStyleSuffix(palette) + " Generate as a very tall narrow vertical poster artwork in 3:5 aspect ratio, much taller than wide, fill the entire frame edge to edge with no white borders, no margins, suitable for canvas wall art print.";
   } else {
     fullPrompt = prompt + " Generate as a tall vertical portrait poster artwork in 2:3 aspect ratio, taller than wide. Fill the entire frame edge to edge with no white borders, no margins. Suitable for canvas wall art print. No text, no words, no letters.";
   }
@@ -614,7 +617,7 @@ async function generateImage(prompt, style) {
   var imagePart = parts && parts.find(function(p) { return p.inlineData; });
   if (!imagePart) throw new Error("Image generation failed: " + JSON.stringify(data));
   console.log("Image generated successfully");
-  return await cropToVertical(imagePart.inlineData.data);
+  return await cropImage(imagePart.inlineData.data, style);
 }
 
 // =============================================================================
