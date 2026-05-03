@@ -1,5 +1,5 @@
 // POD Automation Pipeline - Hybrid (Old Style + Retro Comic)
-// Each run: 3 old-style listings (all 9 sizes, no text) + 2 retro comic listings (4 sizes, with text)
+// Each run: 3 old-style listings (all 5 sizes) + 2 retro comic listings (3 larger sizes)
 // Gemini → Printify → Etsy
 // Run with: node automation.js
 
@@ -9,11 +9,11 @@ const PRINTIFY_EMAIL = process.env.PRINTIFY_EMAIL;
 const PRINTIFY_PASSWORD = process.env.PRINTIFY_PASSWORD;
 const SHOP_ID = '18634010';
 const EBAY_SHOP_ID = '27315339';
-const BLUEPRINT_ID = 1159;
-const PRINT_PROVIDER_ID = 99;
+const BLUEPRINT_ID = 1297;
+const PRINT_PROVIDER_ID = 259;
 
 // =============================================================================
-// OLD STYLE - clean illustrations, no text, all 9 canvas sizes
+// OLD STYLE - clean illustrations, no text, all 5 canvas sizes
 // =============================================================================
 
 const OLD_PROMPTS = [
@@ -336,21 +336,17 @@ const OLD_PROMPTS = [
   "Snoopy and Woodstock as cloud watchers on a grassy hill",
 ];
 
-// Old style: all 9 sizes
+// Old style: all 5 sizes with new blueprint
 const OLD_VARIANTS = [
-  { id: 101413, w: 2400,  h: 3000,  price: 5142  },
-  { id: 91641,  w: 3300,  h: 4200,  price: 6336  },
-  { id: 91644,  w: 3600,  h: 5400,  price: 8420  },
-  { id: 91647,  w: 4800,  h: 7200,  price: 10820 },
-  { id: 91649,  w: 6000,  h: 7200,  price: 13200 },
-  { id: 101411, w: 7200,  h: 9000,  price: 16966 },
-  { id: 91654,  w: 9000,  h: 12000, price: 23762 },
-  { id: 91655,  w: 9600,  h: 14400, price: 34684 },
-  { id: 112955, w: 12000, h: 18000, price: 50026 },
+  { id: 96926, w: 2365, h: 2955, price: 5038  }, // 8x10
+  { id: 96930, w: 2955, h: 3546, price: 6669  }, // 10x12
+  { id: 96944, w: 4727, h: 5920, price: 9915  }, // 16x20
+  { id: 96946, w: 5920, h: 7101, price: 12095 }, // 20x24
+  { id: 96956, w: 7101, h: 8884, price: 17164 }, // 24x30
 ];
 
 // =============================================================================
-// RETRO COMIC STYLE - vintage pulp covers with title text, only 4 perfect sizes
+// RETRO COMIC STYLE - vintage pulp covers with title text, 3 larger sizes
 // =============================================================================
 
 const BACKGROUND_COLORS = [
@@ -409,7 +405,6 @@ function buildRetroStyleSuffix(palette) {
 }
 
 const RETRO_PROMPTS = [
-  // FLYING ACE / AVIATION
   '"SNOOPY: FLYING ACE" arched block-letter title at top, "SCOURGE OF THE SKIES" yellow ribbon banner subtitle, Snoopy in goggles and red scarf piloting his red doghouse through clouds, biplanes and Woodstock wingmen circling around him',
   '"THE RED BARON RETURNS" arched block-letter title at top, "DOGFIGHT AT DAWN" yellow ribbon banner subtitle, Snoopy as Flying Ace shaking his fist at the sky, smoke trails and propellers swirling around him',
   '"BEAGLE SQUADRON" arched block-letter title at top, "NO MISSION TOO SMALL" yellow ribbon banner subtitle, Snoopy saluting in pilot gear, Woodstock co-pilot beside him, vintage airplane silhouettes in formation',
@@ -420,106 +415,55 @@ const RETRO_PROMPTS = [
   '"MIDNIGHT MISSION" arched block-letter title at top, "STEALTH AND COURAGE" yellow ribbon banner subtitle, Snoopy in pilot gear sneaking past spotlights at night',
   '"PARACHUTE PANIC" arched block-letter title at top, "BAILOUT" yellow ribbon banner subtitle, Snoopy clutching parachute strings, Woodstock dangling beside him, tangled lines',
   '"BIPLANE BANDIT" arched block-letter title at top, "RIDER OF THE WIND" yellow ribbon banner subtitle, Snoopy doing a barrel roll on his doghouse plane, Woodstock holding on for dear life',
-  '"FLIGHT 1969" arched block-letter title at top, "DESTINATION UNKNOWN" yellow ribbon banner subtitle, Snoopy as airline captain at the controls, Woodstock as flight attendant in retro uniform',
-  '"ACE OF THE SKIES" arched block-letter title at top, "TOP OF HIS GAME" yellow ribbon banner subtitle, Snoopy in flight goggles giving a thumbs up, vintage planes behind him',
-
-  // WESTERN
   '"WANTED" arched block-letter title at top, "DEAD OR ALIVE" yellow ribbon banner subtitle, Snoopy in cowboy hat and bandana, Woodstock as outlaw sidekick, desert cacti and wanted posters around them',
   '"THE GOOD THE BAD AND THE BEAGLE" arched block-letter title at top, "HIGH NOON" yellow ribbon banner subtitle, Snoopy as cowboy at a showdown, tumbleweeds and a setting sun behind him',
   '"OUTLAW BEAGLE" arched block-letter title at top, "LAST STAND" yellow ribbon banner subtitle, Snoopy with two pistols drawn, bandana over his snout, Woodstock with a tiny lasso',
   '"GUNSLINGER" arched block-letter title at top, "QUICK PAW" yellow ribbon banner subtitle, Snoopy in poncho squinting under his hat, dusty western town behind him',
-  '"DESERT JUSTICE" arched block-letter title at top, "WHEN THE SUN SETS" yellow ribbon banner subtitle, Snoopy riding a horse across red rock canyons at sunset',
   '"SHERIFF SNOOPY" arched block-letter title at top, "TOWN AINT BIG ENOUGH" yellow ribbon banner subtitle, Snoopy with a tin star badge standing in front of a saloon',
-
-  // SPACE / SCI-FI
   '"MOON MISSION" arched block-letter title at top, "ONE SMALL PAW" yellow ribbon banner subtitle, Snoopy in astronaut helmet floating among planets, Woodstock in a tiny spacesuit beside him',
   '"COSMIC BEAGLE" arched block-letter title at top, "LOST IN THE STARS" yellow ribbon banner subtitle, Snoopy in retro spacesuit pointing at a comet, rockets and ringed planets surrounding him',
   '"SPACE INVADERS" arched block-letter title at top, "DEFEND THE GALAXY" yellow ribbon banner subtitle, Snoopy with a ray gun shooting at retro flying saucers, Woodstock in a bubble helmet',
-  '"STARFLEET BEAGLE" arched block-letter title at top, "TO BOLDLY GO" yellow ribbon banner subtitle, Snoopy as a starship captain in a vintage uniform, Woodstock at the helm',
   '"ROCKET RIDERS" arched block-letter title at top, "BLAST OFF" yellow ribbon banner subtitle, Snoopy and Woodstock launching in a vintage red rocket trailing flame',
   '"MARS OR BUST" arched block-letter title at top, "RED PLANET ADVENTURE" yellow ribbon banner subtitle, Snoopy planting a flag on Mars, retro rover and Woodstock astronaut behind him',
-  '"ALIEN ENCOUNTER" arched block-letter title at top, "WE COME IN PEACE" yellow ribbon banner subtitle, Snoopy shaking hands with a friendly green alien, Woodstock peeking from a UFO',
-
-  // SUPERHERO
   '"SUPER SNOOPY" arched block-letter title at top, "DEFENDER OF THE DOGHOUSE" yellow ribbon banner subtitle, Snoopy in flowing red cape arms outstretched flying through clouds, comic action lines radiating outward',
   '"MASKED MARVEL" arched block-letter title at top, "BEWARE THE BEAGLE" yellow ribbon banner subtitle, Snoopy in a domino mask and cape striking a hero pose, Woodstock as sidekick at his feet',
-  '"CAPTAIN BEAGLE" arched block-letter title at top, "WORLDS GREATEST" yellow ribbon banner subtitle, Snoopy in a star-spangled costume holding a shield, action burst behind him',
-
-  // SPY / DETECTIVE
   '"SECRET AGENT SNOOPY" arched block-letter title at top, "LICENSE TO SNIFF" yellow ribbon banner subtitle, Snoopy in trench coat and fedora holding a magnifying glass, silhouettes of suspects in shadow behind him',
   '"THE BEAGLE FILES" arched block-letter title at top, "CLASSIFIED" yellow ribbon banner subtitle, Snoopy as detective with a pipe, Woodstock in a tiny trench coat, foggy noir alley background',
-  '"CODE NAME BEAGLE" arched block-letter title at top, "TOP SECRET" yellow ribbon banner subtitle, Snoopy in a tuxedo holding a martini glass, vintage spy gadgets around him',
-
-  // HORROR / MONSTER
   '"DRACULA BEAGLE" arched block-letter title at top, "THE BITE OF NIGHT" yellow ribbon banner subtitle, Snoopy in a black cape with vampire fangs, castle and bats in the background',
-  '"MUMMY MENACE" arched block-letter title at top, "ANCIENT CURSE" yellow ribbon banner subtitle, Snoopy wrapped in bandages stumbling out of a sarcophagus, Woodstock screaming',
-  '"GHOST IN THE DOGHOUSE" arched block-letter title at top, "WHO YA GONNA CALL" yellow ribbon banner subtitle, Snoopy with a proton pack chasing a friendly ghost out of his red doghouse',
-
-  // PIRATE
   '"CAPTAIN SNOOPY" arched block-letter title at top, "TERROR OF THE SEAS" yellow ribbon banner subtitle, Snoopy in pirate hat with eye patch holding a sword, Woodstock as parrot on his shoulder, ship and waves behind',
-  '"TREASURE OF THE BEAGLE" arched block-letter title at top, "X MARKS THE SPOT" yellow ribbon banner subtitle, Snoopy with a treasure map and shovel, palm trees and a treasure chest behind him',
-
-  // JUNGLE
   '"INDIANA SNOOPY" arched block-letter title at top, "RAIDER OF THE LOST BONE" yellow ribbon banner subtitle, Snoopy in fedora and whip running from a giant boulder, ancient temple background',
   '"SNOOPY OF THE JUNGLE" arched block-letter title at top, "KING OF THE VINES" yellow ribbon banner subtitle, Snoopy swinging on a vine in a loincloth, Woodstock flying alongside, jungle leaves and parrots framing them',
-
-  // SPORTS
   '"SLAMMIN SNOOPY" arched block-letter title at top, "HOME RUN HERO" yellow ribbon banner subtitle, Snoopy mid-baseball-swing in a vintage jersey, Woodstock as catcher, stadium lights and crowd silhouettes behind',
-  '"SURF CHAMPION" arched block-letter title at top, "RIDING THE WAVES" yellow ribbon banner subtitle, Snoopy on a surfboard riding a giant curl, Woodstock surfing on a smaller board beside him',
-
-  // MUSIC
   '"SNOOPY ROCKS" arched block-letter title at top, "WORLD TOUR" yellow ribbon banner subtitle, Snoopy with electric guitar mid-jump, Woodstock on drums, stage lights and concert crowd silhouettes behind',
-  '"JAZZ NIGHT" arched block-letter title at top, "ALL THAT JAZZ" yellow ribbon banner subtitle, Snoopy playing a saxophone in a smoky club, Woodstock on a tiny piano',
-
-  // TRAVEL
-  '"PARIS ADVENTURE" arched block-letter title at top, "VIVE LE BEAGLE" yellow ribbon banner subtitle, Snoopy with a beret and baguette, Eiffel Tower behind him, Woodstock balancing on a croissant',
-  '"ROMAN HOLIDAY" arched block-letter title at top, "WHEN IN ROME" yellow ribbon banner subtitle, Snoopy on a vintage scooter, Colosseum in the background, Woodstock holding gelato',
-  '"TOKYO NIGHTS" arched block-letter title at top, "NEON DREAMS" yellow ribbon banner subtitle, Snoopy holding ramen in a glowing alley with neon signs, Woodstock peeking from a lantern',
-  '"SAFARI ADVENTURE" arched block-letter title at top, "WILD AT HEART" yellow ribbon banner subtitle, Snoopy in pith helmet and binoculars, giraffes and elephants in the savanna behind',
-
-  // RETRO / JOE COOL
   '"JOE COOL" arched block-letter title at top, "TOO COOL FOR SCHOOL" yellow ribbon banner subtitle, Snoopy in black sunglasses leaning against a brick wall, Woodstock perched on his shoulder, retro starbursts framing him',
   '"DISCO INFERNO" arched block-letter title at top, "GET DOWN" yellow ribbon banner subtitle, Snoopy in a white suit pointing to the sky on a lit-up disco floor, Woodstock spinning a mirror ball',
-  '"DINER DAYS" arched block-letter title at top, "MILKSHAKES AND MEMORIES" yellow ribbon banner subtitle, Snoopy on a stool at a 1950s diner counter, Woodstock sipping a shake',
-
-  // CIRCUS
-  '"CLOWN PRINCE" arched block-letter title at top, "JESTER OF THE RING" yellow ribbon banner subtitle, Snoopy in a clown costume juggling, Woodstock honking a tiny horn',
+  '"PARIS ADVENTURE" arched block-letter title at top, "VIVE LE BEAGLE" yellow ribbon banner subtitle, Snoopy with a beret and baguette, Eiffel Tower behind him, Woodstock balancing on a croissant',
+  '"SAFARI ADVENTURE" arched block-letter title at top, "WILD AT HEART" yellow ribbon banner subtitle, Snoopy in pith helmet and binoculars, giraffes and elephants in the savanna behind',
   '"SNOOPYS BIG TOP" arched block-letter title at top, "GREATEST SHOW ON EARTH" yellow ribbon banner subtitle, Snoopy as ringmaster with top hat and red coat, Woodstock juggling beside him, circus tent background',
-
-  // PROFESSIONS
   '"LIGHTHOUSE KEEPER" arched block-letter title at top, "GUARDING THE COAST" yellow ribbon banner subtitle, Snoopy in a sailor cap shining a lantern from a lighthouse in a stormy night',
-  '"BEEKEEPER BEAGLE" arched block-letter title at top, "SWEET STING" yellow ribbon banner subtitle, Snoopy in a beekeeping suit holding a honeycomb, bees buzzing around',
   '"FIREMAN BEAGLE" arched block-letter title at top, "HEROES IN RED" yellow ribbon banner subtitle, Snoopy in fireman gear holding a hose, Woodstock as dalmatian sidekick',
 ];
 
-// Retro: only 4 perfect-fit 2:3 sizes
+// Retro: 3 larger sizes only
 const RETRO_VARIANTS = [
-  { id: 91644,  w: 3600,  h: 5400,  price: 8420  }, // 12 x 18
-  { id: 91647,  w: 4800,  h: 7200,  price: 10820 }, // 16 x 24
-  { id: 91655,  w: 9600,  h: 14400, price: 34684 }, // 32 x 48
-  { id: 112955, w: 12000, h: 18000, price: 50026 }, // 40 x 60
+  { id: 96944, w: 4727, h: 5920, price: 9915  }, // 16x20
+  { id: 96946, w: 5920, h: 7101, price: 12095 }, // 20x24
+  { id: 96956, w: 7101, h: 8884, price: 17164 }, // 24x30
 ];
 
-const RETRO_DISABLED_VARIANT_IDS = [
-  101413, // 8 x 10
-  91641,  // 11 x 14
-  91649,  // 20 x 24
-  101411, // 24 x 30
-  91654,  // 30 x 40
-];
+// Disable smaller sizes for retro listings
+const RETRO_DISABLED_VARIANT_IDS = [96926, 96930];
 
 // =============================================================================
 // PROMPT PICKERS
 // =============================================================================
 
 function pickPromptsForRun() {
-  // 3 old-style + 2 retro per run
   var oldShuffled = OLD_PROMPTS.slice().sort(function() { return Math.random() - 0.5; });
   var retroShuffled = RETRO_PROMPTS.slice().sort(function() { return Math.random() - 0.5; });
   var picks = [];
   for (var i = 0; i < 3; i++) picks.push({ style: 'old', prompt: oldShuffled[i] });
   for (var j = 0; j < 2; j++) picks.push({ style: 'retro', prompt: retroShuffled[j] });
-  // Shuffle the order so old/retro are interleaved
   return picks.sort(function() { return Math.random() - 0.5; });
 }
 
@@ -625,16 +569,11 @@ async function generateListing(prompt, style) {
   if (!listing.tags || !Array.isArray(listing.tags) || listing.tags.length === 0) {
     listing.tags = validTags.slice(0, 13);
   } else {
-    var filtered = listing.tags.filter(function(t) {
-      return t && t.length <= 20 && t.length > 0;
-    });
+    var filtered = listing.tags.filter(function(t) { return t && t.length <= 20 && t.length > 0; });
     while (filtered.length < 13) {
       var fallback = validTags[filtered.length % validTags.length];
-      if (filtered.indexOf(fallback) === -1) {
-        filtered.push(fallback);
-      } else {
-        filtered.push("Snoopy art " + filtered.length);
-      }
+      if (filtered.indexOf(fallback) === -1) filtered.push(fallback);
+      else filtered.push("Snoopy art " + filtered.length);
     }
     listing.tags = filtered.slice(0, 13);
   }
@@ -703,14 +642,10 @@ async function createProduct(imageId, listing, style) {
     return { id: v.id, is_enabled: true, price: v.price };
   });
 
-  // For retro, explicitly disable the unwanted sizes
   if (style === 'retro') {
     variants = variants.concat(RETRO_DISABLED_VARIANT_IDS.map(function(id) {
       return { id: id, is_enabled: false, price: 999 };
     }));
-    console.log("Variants: " + RETRO_VARIANTS.length + " enabled, " + RETRO_DISABLED_VARIANT_IDS.length + " disabled");
-  } else {
-    console.log("Variants: all " + OLD_VARIANTS.length + " enabled");
   }
 
   var print_areas = enabledVariants.map(function(v) {
@@ -740,101 +675,42 @@ async function createProduct(imageId, listing, style) {
 }
 
 // =============================================================================
-// PRINTIFY PUBLISH + STATUS CHECK
+// PUBLISH
 // =============================================================================
 
 async function enableOffsiteAdsPuppeteer(productId) {
   var PRINTIFY_BEARER = process.env.PRINTIFY_BEARER;
-  if (!PRINTIFY_BEARER) {
-    console.log("No PRINTIFY_BEARER token set, skipping offsite ads");
-    return;
-  }
-  console.log("Enabling offsite ads via bearer token...");
+  if (!PRINTIFY_BEARER) { console.log("No PRINTIFY_BEARER token set, skipping offsite ads"); return; }
   try {
-    var USER_ID = "19310315";
     var res = await fetch(
-      "https://printify.com/api/v1/users/" + USER_ID + "/shops/" + SHOP_ID + "/products/" + productId,
+      "https://printify.com/api/v1/users/19310315/shops/" + SHOP_ID + "/products/" + productId,
       {
         method: "PUT",
-        headers: {
-          "Authorization": "Bearer " + PRINTIFY_BEARER,
-          "Content-Type": "application/json",
-          "Origin": "https://printify.com",
-          "Referer": "https://printify.com/app/store/products/1"
-        },
+        headers: { "Authorization": "Bearer " + PRINTIFY_BEARER, "Content-Type": "application/json", "Origin": "https://printify.com" },
         body: JSON.stringify({ sales_channel_properties: { etsy: { offsite_adds: 0.12 } } })
       }
     );
-    var text = await res.text();
-    console.log("Offsite ads response (status " + res.status + "):", text.substring(0, 200));
-  } catch (err) {
-    console.log("Offsite ads error:", err.message);
-  }
+    console.log("Offsite ads response (status " + res.status + "):", (await res.text()).substring(0, 200));
+  } catch (err) { console.log("Offsite ads error:", err.message); }
 }
 
 async function publishToEtsy(productId) {
   console.log("Waiting 45s for product images to fully process...");
   await new Promise(function(r) { setTimeout(r, 45000); });
   console.log("Publishing to Etsy...");
-
-  var body = JSON.stringify({
-    title: true, description: true, images: true, variants: true,
-    tags: true, keyFeatures: true, shipping_template: true
-  });
-
-  var publishAccepted = false;
+  var body = JSON.stringify({ title: true, description: true, images: true, variants: true, tags: true, keyFeatures: true, shipping_template: true });
   for (var attempt = 1; attempt <= 3; attempt++) {
     console.log("Publish attempt " + attempt + "...");
     var res = await fetch(
       "https://api.printify.com/v1/shops/" + SHOP_ID + "/products/" + productId + "/publish.json",
-      {
-        method: "POST",
-        headers: { "Authorization": "Bearer " + PRINTIFY_API_KEY, "Content-Type": "application/json" },
-        body: body
-      }
+      { method: "POST", headers: { "Authorization": "Bearer " + PRINTIFY_API_KEY, "Content-Type": "application/json" }, body: body }
     );
     var statusCode = res.status;
     var text = await res.text();
     console.log("Publish response (status " + statusCode + "):", text);
-
-    if (statusCode === 200 || statusCode === 204) {
-      console.log("Publish request accepted by Printify, polling for actual Etsy result...");
-      publishAccepted = true;
-      break;
-    }
+    if (statusCode === 200 || statusCode === 204) { console.log("Publish succeeded!"); break; }
     if (attempt < 3) await new Promise(function(r) { setTimeout(r, 20000); });
   }
-
-  if (!publishAccepted) {
-    console.log("❌ Publish request never accepted by Printify");
-    return;
-  }
-
-  // Poll for actual result
-  for (var pollAttempt = 1; pollAttempt <= 6; pollAttempt++) {
-    await new Promise(function(r) { setTimeout(r, 30000); });
-    var checkRes = await fetch(
-      "https://api.printify.com/v1/shops/" + SHOP_ID + "/products/" + productId + ".json",
-      { headers: { "Authorization": "Bearer " + PRINTIFY_API_KEY } }
-    );
-    var product = await checkRes.json();
-    var locked = product.is_locked;
-    var external = product.external;
-    var hasHandle = external && external.handle;
-    console.log("Poll " + pollAttempt + ": is_locked=" + locked + ", has_external_handle=" + !!hasHandle);
-
-    if (!locked && hasHandle) {
-      console.log("✅ Successfully published to Etsy: " + external.handle);
-      return;
-    }
-    if (!locked && !hasHandle) {
-      console.log("❌ Etsy REJECTED the listing.");
-      console.log("   Likely: trademark filter on Snoopy/Peanuts, shipping template issue, or image issue.");
-      console.log("   Check Printify dashboard for exact error.");
-      return;
-    }
-  }
-  console.log("⚠️  Timed out after 3 minutes. Check Printify dashboard.");
 }
 
 // =============================================================================
