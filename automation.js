@@ -336,7 +336,7 @@ const OLD_PROMPTS = [
   "Snoopy and Woodstock as cloud watchers on a grassy hill",
 ];
 
-// Old style: all 5 sizes with new blueprint
+// Old style: original 5 sizes
 const OLD_VARIANTS = [
   { id: 96926, w: 2365, h: 2955, price: 5038  }, // 8x10
   { id: 96930, w: 2955, h: 3546, price: 6669  }, // 10x12
@@ -444,15 +444,16 @@ const RETRO_PROMPTS = [
   '"FIREMAN BEAGLE" arched block-letter title at top, "HEROES IN RED" yellow ribbon banner subtitle, Snoopy in fireman gear holding a hose, Woodstock as dalmatian sidekick',
 ];
 
-// Retro: tall narrow sizes 12x20, 16x30, 24x36
+// Retro: 2:3 ratio sizes only
 const RETRO_VARIANTS = [
-  { id: 96940, w: 3546, h: 5920,  price: 9915  }, // 12x20
-  { id: 96949, w: 4727, h: 8884,  price: 17164 }, // 16x30
-  { id: 96957, w: 7101, h: 10656, price: 25000 }, // 24x36
+  { id: 96927, w: 2365, h: 3546,  price: 5999  }, // 8x12
+  { id: 96945, w: 4727, h: 7101,  price: 11500 }, // 16x24
+  { id: 96951, w: 5920, h: 8884,  price: 15500 }, // 20x30
+  { id: 96957, w: 7101, h: 10656, price: 19500 }, // 24x36
 ];
 
-// Disable all old sizes for retro listings
-const RETRO_DISABLED_VARIANT_IDS = [96926, 96930, 96944, 96946, 96956];
+// Disable all non-retro sizes for retro listings
+const RETRO_DISABLED_VARIANT_IDS = [96926, 96933, 96930, 96935, 96937, 96944, 96940, 96949, 96946, 96956];
 
 // =============================================================================
 // PROMPT PICKERS
@@ -495,10 +496,7 @@ async function cropImage(base64Data, style) {
   var metadata = await sharp(inputBuffer).metadata();
   var width = metadata.width;
   var height = metadata.height;
-  // Retro uses tall narrow 3:5 ratio, old style uses 2:3
-  var targetRatio = style === 'retro' ? 3 / 5 : 2 / 3;
-  var outW = style === 'retro' ? 3000 : 3000;
-  var outH = style === 'retro' ? 5000 : 4500;
+  var targetRatio = 2 / 3;
   var currentRatio = width / height;
   var cropWidth, cropHeight, left, top;
   if (currentRatio > targetRatio) {
@@ -514,10 +512,10 @@ async function cropImage(base64Data, style) {
   }
   var outputBuffer = await sharp(inputBuffer)
     .extract({ left: left, top: top, width: cropWidth, height: cropHeight })
-    .resize(outW, outH)
+    .resize(3000, 4500)
     .png()
     .toBuffer();
-  console.log("Image cropped to " + (style === 'retro' ? '3:5' : '2:3') + " (" + width + "x" + height + " -> " + outW + "x" + outH + ")");
+  console.log("Image cropped to 2:3 (" + width + "x" + height + " -> 3000x4500)");
   return outputBuffer.toString("base64");
 }
 
@@ -596,7 +594,7 @@ async function generateImage(prompt, style) {
   if (style === 'retro') {
     var palette = pickPalette();
     console.log("Using palette:", palette);
-    fullPrompt = prompt + buildRetroStyleSuffix(palette) + " Generate as a very tall narrow vertical poster artwork in 3:5 aspect ratio, much taller than wide, fill the entire frame edge to edge with no white borders, no margins, suitable for canvas wall art print.";
+    fullPrompt = prompt + buildRetroStyleSuffix(palette) + " Generate as a tall vertical portrait poster artwork in 2:3 aspect ratio, taller than wide, fill the entire frame edge to edge with no white borders, no margins, suitable for canvas wall art print.";
   } else {
     fullPrompt = prompt + " Generate as a tall vertical portrait poster artwork in 2:3 aspect ratio, taller than wide. Fill the entire frame edge to edge with no white borders, no margins. Suitable for canvas wall art print. No text, no words, no letters.";
   }
