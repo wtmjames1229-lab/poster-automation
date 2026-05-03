@@ -401,7 +401,7 @@ function pickPalette() {
 }
 
 function buildRetroStyleSuffix(palette) {
-  return " in vintage 1960s pulp comic book cover style, aged paper texture, halftone dot shading, bold black ink outlines, color scheme: " + palette + ", slight registration offset like old print, weathered edges, dynamic action composition, bold colorful flat illustration. Render the title text and ribbon banner text exactly as quoted in the prompt, clearly legible and prominently displayed at the top.";
+  return " in vintage 1960s pulp comic book cover style, aged paper texture, halftone dot shading, bold black ink outlines, color scheme: " + palette + ", slight registration offset like old print, weathered edges, dynamic action composition, bold colorful flat illustration, no drop shadows, no 3D effects, no perspective distortion, completely flat artwork. Render the title text and ribbon banner text exactly as quoted in the prompt, clearly legible and prominently displayed at the top.";
 }
 
 const RETRO_PROMPTS = [
@@ -594,9 +594,9 @@ async function generateImage(prompt, style) {
   if (style === 'retro') {
     var palette = pickPalette();
     console.log("Using palette:", palette);
-    fullPrompt = prompt + buildRetroStyleSuffix(palette) + " Generate as a tall vertical portrait poster artwork in 2:3 aspect ratio, taller than wide, fill the entire frame edge to edge with no white borders, no margins, suitable for canvas wall art print.";
+    fullPrompt = prompt + buildRetroStyleSuffix(palette) + " Generate as a tall vertical portrait poster artwork in 2:3 aspect ratio, taller than wide, fill the entire frame edge to edge with no white borders, no margins, no shadows, no perspective distortion, no 3D effects, completely flat design, suitable for canvas wall art print.";
   } else {
-    fullPrompt = prompt + " Generate as a tall vertical portrait poster artwork in 2:3 aspect ratio, taller than wide. Fill the entire frame edge to edge with no white borders, no margins. Suitable for canvas wall art print. No text, no words, no letters.";
+    fullPrompt = prompt + " Generate as a tall vertical portrait poster artwork in 2:3 aspect ratio, taller than wide. Fill the entire frame edge to edge with no white borders, no margins, no shadows, no drop shadows, no perspective distortion, no 3D effects, completely flat design. Suitable for canvas wall art print. No text, no words, no letters.";
   }
 
   var res = await fetch(
