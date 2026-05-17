@@ -37,9 +37,17 @@ if (-not $Token) { throw "No token provided." }
 $gh = "${env:ProgramFiles}\GitHub CLI\gh.exe"
 if (-not (Test-Path $gh)) { $gh = "gh" }
 
-Write-Host "Authenticating with GitHub CLI..." -ForegroundColor Cyan
-$Token | & $gh auth login --with-token
-if ($LASTEXITCODE -ne 0) { throw "gh auth login failed" }
+$env:GH_TOKEN = $Token
+$env:GITHUB_TOKEN = $Token
+
+# gh uses GH_TOKEN automatically; only run login when not using env token flow
+if (-not $env:GH_TOKEN) {
+  Write-Host "Authenticating with GitHub CLI..." -ForegroundColor Cyan
+  $Token | & $gh auth login --with-token
+  if ($LASTEXITCODE -ne 0) { throw "gh auth login failed" }
+} else {
+  Write-Host "Using token from environment for GitHub API..." -ForegroundColor Cyan
+}
 
 # Ensure remote
 git remote remove origin 2>$null
