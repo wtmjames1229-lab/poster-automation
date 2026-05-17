@@ -32,7 +32,8 @@ const gh = findGh();
 
 console.log(`Session JSON: ${json.length} chars, uploading to ${repo}...`);
 
-const r = spawnSync(gh, ['secret', 'set', 'PRINTIFY_SESSION_JSON', '--repo', repo, '-b', '-'], {
+// Do not use `-b -`: that stores the literal "-" character, not stdin.
+const r = spawnSync(gh, ['secret', 'set', 'PRINTIFY_SESSION_JSON', '--repo', repo], {
   input: json,
   encoding: 'utf8',
   maxBuffer: 15 * 1024 * 1024,

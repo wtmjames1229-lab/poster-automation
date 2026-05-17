@@ -43,7 +43,7 @@ foreach ($key in $map.Keys) {
   $tmpFile = Join-Path $tmpDir $key
   [IO.File]::WriteAllText($tmpFile, $val, [Text.UTF8Encoding]::new($false))
   Write-Host "Setting secret: $key"
-  Get-Content -Path $tmpFile -Raw -Encoding UTF8 | & $gh secret set $key --repo $repo -b -
+  Get-Content -Path $tmpFile -Raw -Encoding UTF8 | & $gh secret set $key --repo $repo
   if ($LASTEXITCODE -ne 0) { throw "Failed to set $key" }
 }
 

@@ -104,8 +104,12 @@ jobs:
           node << 'NODE'
           const fs = require('fs');
           const raw = process.env.PRINTIFY_SESSION_JSON || '';
-          if (!raw.trim()) {
-            console.error('PRINTIFY_SESSION_JSON is empty');
+          if (!raw.trim() || raw.trim() === '-') {
+            console.error('PRINTIFY_SESSION_JSON is empty or invalid (re-run: npm run session:github)');
+            process.exit(1);
+          }
+          if (!raw.trim().startsWith('{')) {
+            console.error('PRINTIFY_SESSION_JSON must be JSON — run: npm run session:github');
             process.exit(1);
           }
           fs.writeFileSync('printify_session.json', raw);
