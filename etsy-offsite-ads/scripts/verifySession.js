@@ -14,7 +14,7 @@ const {
   setContextMode,
 } = require('../src/offsiteAds');
 
-const TEST_PRODUCT_ID = process.env.VERIFY_PRODUCT_ID || '6a08463f315e8641c5061426';
+const productId = (process.env.VERIFY_PRODUCT_ID || '').trim();
 
 async function main() {
   const mode = process.env.PLAYWRIGHT_VERIFY_MODE;
@@ -41,15 +41,21 @@ async function main() {
     });
     ok = ok && (await isLoggedIn(page)) && !page.url().includes('login');
 
-    const productUrl = `https://printify.com/app/product-details/${TEST_PRODUCT_ID}`;
-    await page.goto(productUrl, { waitUntil: 'domcontentloaded', timeout: 90000 });
-    await new Promise((r) => setTimeout(r, 3000));
-    const onProduct =
-      page.url().includes('product-details') && !page.url().includes('login');
-    ok = ok && onProduct;
+    if (productId) {
+      const productUrl = `https://printify.com/app/product-details/${productId}`;
+      await page.goto(productUrl, { waitUntil: 'domcontentloaded', timeout: 90000 });
+      await new Promise((r) => setTimeout(r, 3000));
+      const onProduct =
+        page.url().includes('product-details') && !page.url().includes('login');
+      if (!onProduct) {
+        console.log('PRODUCT_CHECK_FAILED', productId);
+        console.log('URL:', page.url());
+      }
+      ok = ok && onProduct;
+    }
 
     console.log(ok ? 'SESSION_OK' : 'SESSION_EXPIRED');
-    if (!ok) console.log('URL:', page.url());
+    if (!ok && !productId) console.log('URL:', page.url());
     process.exit(ok ? 0 : 3);
   } finally {
     await page.close().catch(() => null);

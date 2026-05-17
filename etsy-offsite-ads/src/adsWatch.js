@@ -221,6 +221,10 @@ async function runWatch() {
       return;
     }
 
+    if (work[0]?.id) {
+      process.env.VERIFY_PRODUCT_ID = work[0].id;
+    }
+
     const sessionOk = await verifySessionOrNotify();
     if (!sessionOk) {
       process.exit(3);

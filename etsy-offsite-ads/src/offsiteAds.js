@@ -361,19 +361,58 @@ async function ensureSession(options = {}) {
   await resetBrowserSession();
   setContextMode(null);
 
+  const allowLogin =
+    process.env.ADS_WATCH_ALLOW_LOGIN === 'true' &&
+    CONFIG.email &&
+    CONFIG.password;
+
+  if (strict && allowLogin) {
+    console.log('[offsiteAds] Session invalid — attempting headless login (ADS_WATCH_ALLOW_LOGIN)...');
+    try {
+      _browser = await launchBrowser();
+      _context = await _browser.newContext({
+        userAgent:
+          'Mozilla/5.0 (Windows NT 10.0; Win64; x64) ' +
+          'AppleWebKit/537.36 (KHTML, like Gecko) ' +
+          'Chrome/124.0.0.0 Safari/537.36',
+        viewport: { width: 1440, height: 900 },
+      });
+      const page = await _context.newPage();
+      const { performPrintifyLogin } = require('./lib/printifyLogin');
+      await performPrintifyLogin(
+        page,
+        { email: CONFIG.email, password: CONFIG.password },
+        {
+          headed: false,
+          captchaMaxMs: parseInt(process.env.LOGIN_CAPTCHA_MAX_MS || '120000', 10),
+        }
+      );
+      await saveSession(_context);
+      await page.close().catch(() => null);
+      setContextMode('session');
+      const r = runVerifySession('session');
+      if (r.status === 0) {
+        console.log('[offsiteAds] Session OK after headless login.');
+        return 'session';
+      }
+      console.warn('[offsiteAds] Login succeeded but verify still failed.');
+    } catch (e) {
+      console.warn('[offsiteAds] Headless login failed:', e.message);
+    } finally {
+      await resetBrowserSession();
+      setContextMode(null);
+    }
+  }
+
   if (strict) {
     throw new Error(
-      'No valid Printify session. Run: npm run login:headed  then  node scripts/exportSession.js'
+      'No valid Printify session. Run: npm run login  then  npm run session:export  then  npm run session:github'
     );
   }
 
-  console.log('[offsiteAds] Attempting automated login...');
-  const r = spawnScriptSync('scripts/autoLogin.js');
-  if (r.status !== 0) {
-    throw new Error(
-      'Automated login failed (Cloudflare). Run: npm run login:headed  then  node scripts/exportSession.js'
-    );
-  }
+  throw new Error(
+    'No valid Printify session and ADS_WATCH_ALLOW_LOGIN is not enabled.'
+  );
 }
 
 // ─── Core toggle logic ────────────────────────────────────────────────────────

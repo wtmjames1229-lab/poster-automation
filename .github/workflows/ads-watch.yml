@@ -86,6 +86,7 @@ jobs:
             echo "PLAYWRIGHT_USE_PROFILE=false"
             echo "PLAYWRIGHT_PREFER_SESSION=true"
             echo "PLAYWRIGHT_HEADLESS=true"
+            echo "ADS_WATCH_ALLOW_LOGIN=true"
             echo "PRINTIFY_NAV_VIA_PRODUCTS=false"
             echo "ADS_WATCH_RETRY_FAILED=true"
             echo "MAIL_TO=${MAIL_TO}"
