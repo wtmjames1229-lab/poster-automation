@@ -40,15 +40,23 @@ $map = @{
   MAIL_TO                = if ($vars["MAIL_TO"]) { $vars["MAIL_TO"] } else { $vars["PRINTIFY_EMAIL"] }
 }
 
+$tmpDir = Join-Path $env:TEMP "gh-secrets-$([Guid]::NewGuid().ToString('n'))"
+New-Item -ItemType Directory -Path $tmpDir -Force | Out-Null
+
 foreach ($key in $map.Keys) {
   $val = $map[$key]
   if (-not $val) {
     Write-Warning "Skipping empty: $key"
     continue
   }
+  $tmpFile = Join-Path $tmpDir $key
+  # ASCII + no BOM — piping to gh from PowerShell can corrupt base64 (UTF-16)
+  [IO.File]::WriteAllText($tmpFile, $val, [Text.UTF8Encoding]::new($false))
   Write-Host "Setting secret: $key"
-  $val | & $gh secret set $key --repo $repo --body -
+  Get-Content -Path $tmpFile -Raw -Encoding UTF8 | & $gh secret set $key --repo $repo -b -
   if ($LASTEXITCODE -ne 0) { throw "Failed to set $key" }
 }
+
+Remove-Item -Recurse -Force $tmpDir -ErrorAction SilentlyContinue
 
 Write-Host "All secrets set for $repo" -ForegroundColor Green

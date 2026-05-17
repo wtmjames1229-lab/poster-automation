@@ -101,9 +101,23 @@ jobs:
         env:
           PRINTIFY_SESSION_B64: ${{ secrets.PRINTIFY_SESSION_B64 }}
         run: |
-          echo "$PRINTIFY_SESSION_B64" | base64 -d > printify_session.json
-          test -s printify_session.json
-          echo "Session file restored ($(wc -c < printify_session.json) bytes)"
+          python3 << 'PY'
+          import os, base64, json, sys
+          raw = os.environ.get("PRINTIFY_SESSION_B64", "")
+          cleaned = "".join(raw.split())
+          if not cleaned:
+              sys.exit("PRINTIFY_SESSION_B64 is empty")
+          try:
+              data = base64.b64decode(cleaned, validate=True)
+          except Exception as e:
+              sys.exit(f"base64 decode failed: {e}")
+          with open("printify_session.json", "wb") as f:
+              f.write(data)
+          j = json.loads(data.decode("utf-8"))
+          if not j.get("cookies"):
+              sys.exit("Decoded JSON has no cookies — re-export session locally")
+          print(f"Session OK ({len(data)} bytes, {len(j['cookies'])} cookies)")
+          PY
 
       - name: Restore watch state (previous runs)
         uses: actions/cache/restore@v4
