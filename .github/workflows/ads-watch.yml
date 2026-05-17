@@ -28,7 +28,7 @@ jobs:
       - name: Validate required secrets
         run: |
           missing=""
-          for key in PRINTIFY_API_KEY PRINTIFY_EMAIL PRINTIFY_PASSWORD PRINTIFY_SHOP_ID PRINTIFY_SESSION_B64 MAIL_TO; do
+          for key in PRINTIFY_API_KEY PRINTIFY_EMAIL PRINTIFY_PASSWORD PRINTIFY_SHOP_ID PRINTIFY_SESSION_JSON MAIL_TO; do
             val="${!key}"
             if [ -z "$val" ]; then
               missing="$missing $key"
@@ -37,7 +37,7 @@ jobs:
           if [ -n "$missing" ]; then
             echo "::error::Missing GitHub secrets:$missing"
             echo "Add them at: https://github.com/wtmjames1229-lab/poster-automation/settings/secrets/actions"
-            echo "For PRINTIFY_SESSION_B64 run locally: cd etsy-offsite-ads && npm run session:b64"
+            echo "For PRINTIFY_SESSION_JSON run locally: cd etsy-offsite-ads && npm run session:export && npm run session:github"
             exit 1
           fi
         env:
@@ -45,7 +45,7 @@ jobs:
           PRINTIFY_EMAIL: ${{ secrets.PRINTIFY_EMAIL }}
           PRINTIFY_PASSWORD: ${{ secrets.PRINTIFY_PASSWORD }}
           PRINTIFY_SHOP_ID: ${{ secrets.PRINTIFY_SHOP_ID }}
-          PRINTIFY_SESSION_B64: ${{ secrets.PRINTIFY_SESSION_B64 }}
+          PRINTIFY_SESSION_JSON: ${{ secrets.PRINTIFY_SESSION_JSON }}
           MAIL_TO: ${{ secrets.MAIL_TO }}
 
       - name: Setup Node
@@ -99,29 +99,22 @@ jobs:
 
       - name: Restore Printify session
         env:
-          PRINTIFY_SESSION_B64: ${{ secrets.PRINTIFY_SESSION_B64 }}
+          PRINTIFY_SESSION_JSON: ${{ secrets.PRINTIFY_SESSION_JSON }}
         run: |
           node << 'NODE'
           const fs = require('fs');
-          const raw = process.env.PRINTIFY_SESSION_B64 || '';
-          const clean = raw.replace(/\s/g, '');
-          if (!clean) {
-            console.error('PRINTIFY_SESSION_B64 is empty');
+          const raw = process.env.PRINTIFY_SESSION_JSON || '';
+          if (!raw.trim()) {
+            console.error('PRINTIFY_SESSION_JSON is empty');
             process.exit(1);
           }
-          let buf;
-          if (clean.startsWith('{') || clean.startsWith('[')) {
-            buf = Buffer.from(clean, 'utf8');
-          } else {
-            buf = Buffer.from(clean, 'base64');
-          }
-          fs.writeFileSync('printify_session.json', buf);
-          const j = JSON.parse(fs.readFileSync('printify_session.json', 'utf8'));
+          fs.writeFileSync('printify_session.json', raw);
+          const j = JSON.parse(raw);
           if (!j.cookies || !j.cookies.length) {
-            console.error('No cookies in session — run locally: npm run session:export');
+            console.error('No cookies in session — run: npm run session:github');
             process.exit(1);
           }
-          console.log(`Session OK (${buf.length} bytes, ${j.cookies.length} cookies)`);
+          console.log(`Session OK (${raw.length} chars, ${j.cookies.length} cookies)`);
           NODE
 
       - name: Restore watch state (previous runs)

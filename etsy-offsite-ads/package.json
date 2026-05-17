@@ -23,6 +23,7 @@
     "watch:dry": "node src/adsWatch.js --dry-run",
     "watch:status": "node src/adsWatch.js --status",
     "session:b64": "node scripts/sessionToBase64.js",
+    "session:github": "node scripts/sessionToGithub.js",
     "install:browser": "npx playwright install chromium"
   },
   "engines": {
