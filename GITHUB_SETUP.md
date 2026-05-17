@@ -17,7 +17,7 @@ git status
 # Confirm .env and data/*.json are NOT listed
 git commit -m "Initial commit: POD automation and Etsy ads watch"
 git branch -M main
-git remote add origin https://github.com/YOUR_USER/YOUR_REPO.git
+git remote add origin https://github.com/wtmjames1229-lab/poster-automation.git
 git push -u origin main
 ```
 

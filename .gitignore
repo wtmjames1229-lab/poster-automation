@@ -3,6 +3,8 @@ node_modules/
 
 # Secrets and sessions (never commit)
 .env
+.github-token
+github-token.txt
 .env.local
 .env.*.local
 printify_session.json

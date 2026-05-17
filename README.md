@@ -15,7 +15,7 @@ Automates your Printify → Etsy workflow and **Etsy off-site ads** toggles in t
 
 Summary:
 
-1. Push this repo to GitHub (**private** recommended).
+1. Push this repo to GitHub: **https://github.com/wtmjames1229-lab/poster-automation** (private recommended).
 2. Add secrets (Printify API, login, session base64, email).
 3. Run workflow **Etsy Ads Watch** manually once, then it runs every 6 hours.
 
