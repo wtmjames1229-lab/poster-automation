@@ -107,15 +107,19 @@ jobs:
           cleaned = "".join(raw.split())
           if not cleaned:
               sys.exit("PRINTIFY_SESSION_B64 is empty")
-          try:
-              data = base64.b64decode(cleaned, validate=True)
-          except Exception as e:
-              sys.exit(f"base64 decode failed: {e}")
+          if cleaned.startswith("{") or cleaned.startswith("["):
+              data = cleaned.encode("utf-8")
+          else:
+              pad = (-len(cleaned)) % 4
+              try:
+                  data = base64.b64decode(cleaned + "=" * pad, validate=False)
+              except Exception as e:
+                  sys.exit(f"base64 decode failed: {e}")
           with open("printify_session.json", "wb") as f:
               f.write(data)
           j = json.loads(data.decode("utf-8"))
           if not j.get("cookies"):
-              sys.exit("Decoded JSON has no cookies — re-export session locally")
+              sys.exit("Decoded JSON has no cookies — run: npm run session:export && npm run session:b64")
           print(f"Session OK ({len(data)} bytes, {len(j['cookies'])} cookies)")
           PY
 

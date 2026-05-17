@@ -20,15 +20,9 @@ Get-Content $envFile | ForEach-Object {
   $vars[$line.Substring(0, $i).Trim()] = $line.Substring($i + 1).Trim()
 }
 
-$sessionB64Path = Join-Path $root ".session-b64.tmp"
 $sessionFile = Join-Path $root "etsy-offsite-ads\printify_session.json"
-if (Test-Path $sessionB64Path) {
-  $sessionB64 = (Get-Content $sessionB64Path -Raw).Trim()
-} elseif (Test-Path $sessionFile) {
-  $bytes = [IO.File]::ReadAllBytes($sessionFile)
-  $sessionB64 = [Convert]::ToBase64String($bytes)
-} else {
-  throw "No session: add .session-b64.tmp or run npm run session:export in etsy-offsite-ads"
+if (-not (Test-Path $sessionFile)) {
+  throw "Missing $sessionFile — run: cd etsy-offsite-ads && npm run login && npm run session:export"
 }
 
 $map = @{
@@ -36,7 +30,6 @@ $map = @{
   PRINTIFY_EMAIL         = $vars["PRINTIFY_EMAIL"]
   PRINTIFY_PASSWORD      = $vars["PRINTIFY_PASSWORD"]
   PRINTIFY_SHOP_ID       = $vars["PRINTIFY_SHOP_ID"]
-  PRINTIFY_SESSION_B64   = $sessionB64
   MAIL_TO                = if ($vars["MAIL_TO"]) { $vars["MAIL_TO"] } else { $vars["PRINTIFY_EMAIL"] }
 }
 
@@ -50,12 +43,15 @@ foreach ($key in $map.Keys) {
     continue
   }
   $tmpFile = Join-Path $tmpDir $key
-  # ASCII + no BOM — piping to gh from PowerShell can corrupt base64 (UTF-16)
   [IO.File]::WriteAllText($tmpFile, $val, [Text.UTF8Encoding]::new($false))
   Write-Host "Setting secret: $key"
   Get-Content -Path $tmpFile -Raw -Encoding UTF8 | & $gh secret set $key --repo $repo -b -
   if ($LASTEXITCODE -ne 0) { throw "Failed to set $key" }
 }
+
+Write-Host "Setting secret: PRINTIFY_SESSION_B64 (via Node, clean base64)"
+node -e "const fs=require('fs');const {spawnSync}=require('child_process');const b64=fs.readFileSync(process.argv[1]).toString('base64');const r=spawnSync(process.argv[2],['secret','set','PRINTIFY_SESSION_B64','--repo',process.argv[3],'-b','-'],{input:b64,encoding:'utf8'});process.exit(r.status||0);" $sessionFile $gh $repo
+if ($LASTEXITCODE -ne 0) { throw "Failed to set PRINTIFY_SESSION_B64" }
 
 Remove-Item -Recurse -Force $tmpDir -ErrorAction SilentlyContinue
 
