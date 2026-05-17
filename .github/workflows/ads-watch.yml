@@ -101,27 +101,28 @@ jobs:
         env:
           PRINTIFY_SESSION_B64: ${{ secrets.PRINTIFY_SESSION_B64 }}
         run: |
-          python3 << 'PY'
-          import os, base64, json, sys
-          raw = os.environ.get("PRINTIFY_SESSION_B64", "")
-          cleaned = "".join(raw.split())
-          if not cleaned:
-              sys.exit("PRINTIFY_SESSION_B64 is empty")
-          if cleaned.startswith("{") or cleaned.startswith("["):
-              data = cleaned.encode("utf-8")
-          else:
-              pad = (-len(cleaned)) % 4
-              try:
-                  data = base64.b64decode(cleaned + "=" * pad, validate=False)
-              except Exception as e:
-                  sys.exit(f"base64 decode failed: {e}")
-          with open("printify_session.json", "wb") as f:
-              f.write(data)
-          j = json.loads(data.decode("utf-8"))
-          if not j.get("cookies"):
-              sys.exit("Decoded JSON has no cookies — run: npm run session:export && npm run session:b64")
-          print(f"Session OK ({len(data)} bytes, {len(j['cookies'])} cookies)")
-          PY
+          node << 'NODE'
+          const fs = require('fs');
+          const raw = process.env.PRINTIFY_SESSION_B64 || '';
+          const clean = raw.replace(/\s/g, '');
+          if (!clean) {
+            console.error('PRINTIFY_SESSION_B64 is empty');
+            process.exit(1);
+          }
+          let buf;
+          if (clean.startsWith('{') || clean.startsWith('[')) {
+            buf = Buffer.from(clean, 'utf8');
+          } else {
+            buf = Buffer.from(clean, 'base64');
+          }
+          fs.writeFileSync('printify_session.json', buf);
+          const j = JSON.parse(fs.readFileSync('printify_session.json', 'utf8'));
+          if (!j.cookies || !j.cookies.length) {
+            console.error('No cookies in session — run locally: npm run session:export');
+            process.exit(1);
+          }
+          console.log(`Session OK (${buf.length} bytes, ${j.cookies.length} cookies)`);
+          NODE
 
       - name: Restore watch state (previous runs)
         uses: actions/cache/restore@v4
