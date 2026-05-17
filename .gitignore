@@ -5,6 +5,7 @@ node_modules/
 .env
 .github-token
 github-token.txt
+.session-b64.tmp
 .env.local
 .env.*.local
 printify_session.json
