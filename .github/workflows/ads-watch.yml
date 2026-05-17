@@ -1,11 +1,10 @@
 # Scheduled Etsy off-site ads watch (set-and-forget).
-# Requires repository secrets — see etsy-offsite-ads/RUN.md § Automatic watch mode.
+# Secrets: https://github.com/wtmjames1229-lab/poster-automation/settings/secrets/actions
 
 name: Etsy Ads Watch
 
 on:
   schedule:
-    # Every 6 hours (UTC) — adjust as needed
     - cron: '0 */6 * * *'
   workflow_dispatch:
 
@@ -25,6 +24,29 @@ jobs:
     steps:
       - name: Checkout
         uses: actions/checkout@v4
+
+      - name: Validate required secrets
+        run: |
+          missing=""
+          for key in PRINTIFY_API_KEY PRINTIFY_EMAIL PRINTIFY_PASSWORD PRINTIFY_SHOP_ID PRINTIFY_SESSION_B64 MAIL_TO; do
+            val="${!key}"
+            if [ -z "$val" ]; then
+              missing="$missing $key"
+            fi
+          done
+          if [ -n "$missing" ]; then
+            echo "::error::Missing GitHub secrets:$missing"
+            echo "Add them at: https://github.com/wtmjames1229-lab/poster-automation/settings/secrets/actions"
+            echo "For PRINTIFY_SESSION_B64 run locally: cd etsy-offsite-ads && npm run session:b64"
+            exit 1
+          fi
+        env:
+          PRINTIFY_API_KEY: ${{ secrets.PRINTIFY_API_KEY }}
+          PRINTIFY_EMAIL: ${{ secrets.PRINTIFY_EMAIL }}
+          PRINTIFY_PASSWORD: ${{ secrets.PRINTIFY_PASSWORD }}
+          PRINTIFY_SHOP_ID: ${{ secrets.PRINTIFY_SHOP_ID }}
+          PRINTIFY_SESSION_B64: ${{ secrets.PRINTIFY_SESSION_B64 }}
+          MAIL_TO: ${{ secrets.MAIL_TO }}
 
       - name: Setup Node
         uses: actions/setup-node@v4
@@ -55,44 +77,41 @@ jobs:
           MAIL_SMTP_PASS: ${{ secrets.MAIL_SMTP_PASS }}
         run: |
           OFFSITE="${OFFSITE_ADS_ENABLED:-false}"
-          cat > .env << EOF
-          PRINTIFY_API_KEY=${PRINTIFY_API_KEY}
-          PRINTIFY_EMAIL=${PRINTIFY_EMAIL}
-          PRINTIFY_PASSWORD=${PRINTIFY_PASSWORD}
-          PRINTIFY_SHOP_ID=${PRINTIFY_SHOP_ID}
-          OFFSITE_ADS_ENABLED=${OFFSITE}
-          PLAYWRIGHT_USE_PROFILE=false
-          PLAYWRIGHT_PREFER_SESSION=true
-          PLAYWRIGHT_HEADLESS=true
-          PRINTIFY_NAV_VIA_PRODUCTS=false
-          ADS_WATCH_RETRY_FAILED=true
-          MAIL_TO=${MAIL_TO}
-          MAIL_FROM=${MAIL_FROM}
-          SENDGRID_API_KEY=${SENDGRID_API_KEY}
-          MAIL_SMTP_HOST=${MAIL_SMTP_HOST}
-          MAIL_SMTP_PORT=${MAIL_SMTP_PORT}
-          MAIL_SMTP_USER=${MAIL_SMTP_USER}
-          MAIL_SMTP_PASS=${MAIL_SMTP_PASS}
-          EOF
+          {
+            echo "PRINTIFY_API_KEY=${PRINTIFY_API_KEY}"
+            echo "PRINTIFY_EMAIL=${PRINTIFY_EMAIL}"
+            echo "PRINTIFY_PASSWORD=${PRINTIFY_PASSWORD}"
+            echo "PRINTIFY_SHOP_ID=${PRINTIFY_SHOP_ID}"
+            echo "OFFSITE_ADS_ENABLED=${OFFSITE}"
+            echo "PLAYWRIGHT_USE_PROFILE=false"
+            echo "PLAYWRIGHT_PREFER_SESSION=true"
+            echo "PLAYWRIGHT_HEADLESS=true"
+            echo "PRINTIFY_NAV_VIA_PRODUCTS=false"
+            echo "ADS_WATCH_RETRY_FAILED=true"
+            echo "MAIL_TO=${MAIL_TO}"
+            echo "MAIL_FROM=${MAIL_FROM}"
+            echo "SENDGRID_API_KEY=${SENDGRID_API_KEY}"
+            echo "MAIL_SMTP_HOST=${MAIL_SMTP_HOST}"
+            echo "MAIL_SMTP_PORT=${MAIL_SMTP_PORT}"
+            echo "MAIL_SMTP_USER=${MAIL_SMTP_USER}"
+            echo "MAIL_SMTP_PASS=${MAIL_SMTP_PASS}"
+          } > .env
 
       - name: Restore Printify session
         env:
           PRINTIFY_SESSION_B64: ${{ secrets.PRINTIFY_SESSION_B64 }}
         run: |
-          if [ -z "$PRINTIFY_SESSION_B64" ]; then
-            echo "::error::PRINTIFY_SESSION_B64 secret is missing"
-            exit 1
-          fi
           echo "$PRINTIFY_SESSION_B64" | base64 -d > printify_session.json
           test -s printify_session.json
+          echo "Session file restored ($(wc -c < printify_session.json) bytes)"
 
       - name: Restore watch state (previous runs)
         uses: actions/cache/restore@v4
         with:
-          path: data/ads-watch-state.json
-          key: ads-watch-state-${{ secrets.PRINTIFY_SHOP_ID || 'default' }}-v1
+          path: etsy-offsite-ads/data/ads-watch-state.json
+          key: ads-watch-state-${{ secrets.PRINTIFY_SHOP_ID }}-v1
           restore-keys: |
-            ads-watch-state-${{ secrets.PRINTIFY_SHOP_ID || 'default' }}-
+            ads-watch-state-${{ secrets.PRINTIFY_SHOP_ID }}-
 
       - name: Dry-run queue (log only)
         run: node src/adsWatch.js --dry-run
@@ -105,8 +124,8 @@ jobs:
         if: always()
         uses: actions/cache/save@v4
         with:
-          path: data/ads-watch-state.json
-          key: ads-watch-state-${{ secrets.PRINTIFY_SHOP_ID || 'default' }}-v1
+          path: etsy-offsite-ads/data/ads-watch-state.json
+          key: ads-watch-state-${{ secrets.PRINTIFY_SHOP_ID }}-v1
 
       - name: Upload watch logs (debug)
         if: always()
@@ -114,6 +133,7 @@ jobs:
         with:
           name: ads-watch-logs-${{ github.run_id }}
           path: |
-            data/ads-watch-state.json
-            data/ads-watch-job.json
+            etsy-offsite-ads/data/ads-watch-state.json
+            etsy-offsite-ads/data/ads-watch-job.json
+          if-no-files-found: ignore
           retention-days: 14
