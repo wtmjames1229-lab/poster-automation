@@ -1,0 +1,40 @@
+# Dependencies
+node_modules/
+
+# Secrets and sessions (never commit)
+.env
+.env.local
+.env.*.local
+printify_session.json
+**/printify_session.json
+
+# Runtime data (sessions, jobs, browser profile)
+data/
+!data/.gitkeep
+!**/data/.gitkeep
+**/chrome-profile/
+**/ads-sync-job.json
+**/ads-watch-state.json
+**/ads-watch-job.json
+**/ads-watch.lock
+
+# Build / OS
+dist/
+out/
+.DS_Store
+Thumbs.db
+*.log
+
+# Debug captures
+debug_*.png
+debug_login.png
+
+# IDE
+.idea/
+.vscode/
+*.swp
+
+# Archives (local backups)
+*.zip
+
+*.zip

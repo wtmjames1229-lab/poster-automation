@@ -1,0 +1,168 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>Etsy Offsite Ads</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com" />
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+  <link href="https://fonts.googleapis.com/css2?family=IBM+Plex+Mono:wght@400;500&family=Plus+Jakarta+Sans:wght@400;500;600;700&display=swap" rel="stylesheet" />
+  <link rel="stylesheet" href="styles.css" />
+</head>
+<body>
+  <div class="shell">
+    <aside class="sidebar">
+      <div class="sidebar-brand">
+        <div class="logo" aria-hidden="true">
+          <svg viewBox="0 0 32 32" fill="none"><rect width="32" height="32" rx="8" fill="url(#g)"/><path d="M10 22V10l6 6 6-6v12h-3.2V14.8L16 18.4l-2.8-3.6V22H10z" fill="#fff"/><defs><linearGradient id="g" x1="0" y1="0" x2="32" y2="32"><stop stop-color="#f97316"/><stop offset="1" stop-color="#ea580c"/></linearGradient></defs></svg>
+        </div>
+        <div>
+          <h1>Offsite Ads</h1>
+          <p>Printify × Etsy</p>
+        </div>
+      </div>
+
+      <div class="sidebar-block">
+        <span class="block-label">Printify connection</span>
+        <div class="connection-panel">
+          <div class="connection-header">
+            <span id="sessionDot" class="status-dot status-dot-lg"></span>
+            <div class="connection-titles">
+              <span class="connection-label">Printify</span>
+              <span id="sessionStatus" class="connection-state">Checking…</span>
+            </div>
+          </div>
+          <p id="sessionDetail" class="connection-detail">Verifying session…</p>
+          <p id="sessionChecked" class="connection-meta">—</p>
+          <span id="shopBadge" class="shop-pill">Shop —</span>
+          <div class="connection-actions">
+            <button type="button" class="btn btn-primary btn-block" data-action="reconnect">
+              <span class="btn-icon">⟳</span> Reconnect Printify
+            </button>
+            <button type="button" class="btn btn-secondary btn-block" data-action="refresh-session">
+              <span class="btn-icon">↻</span> Check connection
+            </button>
+            <button type="button" class="btn btn-ghost btn-block btn-sm" data-action="open-config">
+              Open settings folder
+            </button>
+          </div>
+        </div>
+      </div>
+
+      <div class="sidebar-block">
+        <span class="block-label">Run state</span>
+        <div class="status-card highlight">
+          <span id="runDot" class="status-dot dot-idle"></span>
+          <div>
+            <span id="runBadge" class="status-title">Idle</span>
+            <span id="phaseStatus" class="status-value">Ready</span>
+          </div>
+        </div>
+        <p id="messageStatus" class="message-line">—</p>
+      </div>
+
+      <div class="sidebar-block sidebar-actions">
+        <span class="block-label">Quick actions</span>
+        <button type="button" class="btn btn-secondary btn-block" data-action="preflight">
+          <span class="btn-icon">✓</span> Run preflight
+        </button>
+        <button type="button" class="btn btn-secondary btn-block" data-action="login">
+          <span class="btn-icon">↗</span> Login in browser
+        </button>
+        <button type="button" class="btn btn-stop btn-block" data-action="stop">
+          <span class="btn-icon">■</span> Stop current task
+        </button>
+      </div>
+
+      <div class="sidebar-block sidebar-job">
+        <span class="block-label">Sync job</span>
+        <p id="jobTarget" class="job-line">No active job</p>
+        <div id="jobStats" class="job-metrics">—</div>
+      </div>
+    </aside>
+
+    <main class="main">
+      <section class="panel panel-hero">
+        <div class="hero-top">
+          <div>
+            <h2>Execution progress</h2>
+            <p class="hero-sub">Live status while toggling Etsy off-site ads in Printify</p>
+          </div>
+          <div class="hero-pct">
+            <span id="progressPct" class="pct-num">0</span>
+            <span class="pct-sym">%</span>
+          </div>
+        </div>
+        <div class="progress-track">
+          <div id="progressFill" class="progress-fill"></div>
+        </div>
+        <div class="hero-meta">
+          <span id="progressCounts">0 of 0 products</span>
+          <span class="meta-dot">·</span>
+          <span id="progressEta">ETA —</span>
+        </div>
+        <p id="progressCurrent" class="current-id">—</p>
+        <div class="metric-grid">
+          <div class="metric"><span class="metric-num" id="sDone">0</span><span class="metric-lbl">Done</span></div>
+          <div class="metric metric-accent"><span class="metric-num" id="sChanged">0</span><span class="metric-lbl">Changed</span></div>
+          <div class="metric"><span class="metric-num" id="sUnchanged">0</span><span class="metric-lbl">Already set</span></div>
+          <div class="metric metric-warn"><span class="metric-num" id="sFailed">0</span><span class="metric-lbl">Failed</span></div>
+        </div>
+      </section>
+
+      <div class="panel-row">
+        <section class="panel">
+          <div class="panel-head">
+            <h2>Single product</h2>
+            <p>Toggle one listing by Printify ID</p>
+          </div>
+          <label class="input-wrap">
+            <span>Product ID</span>
+            <input type="text" id="productId" placeholder="6a08463f315e8641c5061426" spellcheck="false" />
+          </label>
+          <div class="btn-pair">
+            <button type="button" class="btn btn-success" data-action="toggle-on">Enable ads</button>
+            <button type="button" class="btn btn-danger" data-action="toggle-off">Disable ads</button>
+          </div>
+        </section>
+
+        <section class="panel panel-bulk">
+          <div class="panel-head">
+            <h2>Bulk sync</h2>
+            <p>All Etsy-published products in your shop</p>
+          </div>
+          <div class="bulk-primary">
+            <button type="button" class="btn btn-success btn-lg" data-action="sync-on">Sync entire store → ON</button>
+            <button type="button" class="btn btn-danger btn-lg" data-action="sync-off">Sync entire store → OFF</button>
+          </div>
+          <div class="bulk-grid">
+            <button type="button" class="btn btn-ghost" data-action="sync-resume-on">Resume ON</button>
+            <button type="button" class="btn btn-ghost" data-action="sync-resume-off">Resume OFF</button>
+            <button type="button" class="btn btn-ghost" data-action="sync-retry-on">Retry failed</button>
+            <button type="button" class="btn btn-ghost" data-action="sync-fresh-on">Fresh job ON</button>
+            <button type="button" class="btn btn-ghost" data-action="sync-fresh-off">Fresh job OFF</button>
+          </div>
+          <label class="limit-row">
+            <span>Product limit</span>
+            <input type="number" id="syncLimit" min="0" value="0" />
+            <span class="limit-hint">0 = full catalog</span>
+          </label>
+        </section>
+      </div>
+
+      <section class="panel panel-log">
+        <div class="panel-head row">
+          <div>
+            <h2>Activity log</h2>
+            <p>Real-time output from the automation engine</p>
+          </div>
+          <button type="button" class="btn btn-ghost btn-sm" id="clearLog">Clear</button>
+        </div>
+        <div id="logView" class="log-view" aria-live="polite"></div>
+      </section>
+    </main>
+  </div>
+  <script src="app.js"></script>
+</body>
+</html>
+

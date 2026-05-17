@@ -1,0 +1,39 @@
+{
+  "name": "etsy-offsite-ads",
+  "version": "1.0.0",
+  "description": "Standalone Printify Etsy off-site ads toggle (Playwright)",
+  "private": true,
+  "main": "desktop/main.js",
+  "author": "Snoopy",
+  "bin": {
+    "etsy-ads": "bin/toggle.js"
+  },
+  "scripts": {
+    "start": "electron .",
+    "desktop": "electron .",
+    "login": "node scripts/headedLogin.js",
+    "session:export": "node scripts/exportSession.js",
+    "verify": "node scripts/verifySession.js",
+    "preflight": "node scripts/preflight.js",
+    "toggle": "node bin/toggle.js",
+    "sync:on": "node src/adsSync.js --on",
+    "sync:off": "node src/adsSync.js --off",
+    "sync:status": "node src/adsSync.js --status",
+    "watch": "node src/adsWatch.js",
+    "watch:dry": "node src/adsWatch.js --dry-run",
+    "watch:status": "node src/adsWatch.js --status",
+    "session:b64": "node scripts/sessionToBase64.js",
+    "install:browser": "npx playwright install chromium"
+  },
+  "engines": {
+    "node": ">=18.0.0"
+  },
+  "dependencies": {
+    "dotenv": "^16.4.5",
+    "nodemailer": "^6.10.1",
+    "playwright": "^1.44.0"
+  },
+  "devDependencies": {
+    "electron": "^33.2.0"
+  }
+}

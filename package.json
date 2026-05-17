@@ -1,0 +1,28 @@
+{
+  "name": "printify-pod-automation",
+  "version": "2.0.0",
+  "description": "Snoopy canvas POD automation: Gemini → Printify → Etsy",
+  "main": "automation.js",
+  "scripts": {
+    "start":          "node automation.js",
+    "check":          "node scripts/checkSetup.js",
+    "install:browser":"npx playwright install chromium",
+    "ads":            "cd etsy-offsite-ads && npm run toggle",
+    "ads:login":      "cd etsy-offsite-ads && npm run login",
+    "ads:preflight":  "cd etsy-offsite-ads && npm run preflight",
+    "ads:sync:on":    "cd etsy-offsite-ads && npm run sync:on",
+    "ads:sync:off":   "cd etsy-offsite-ads && npm run sync:off",
+    "ads:sync:status":"cd etsy-offsite-ads && npm run sync:status",
+    "ads:desktop":    "cd etsy-offsite-ads && npm start",
+    "ads:watch":      "cd etsy-offsite-ads && npm run watch",
+    "ads:watch:dry":  "cd etsy-offsite-ads && npm run watch:dry"
+  },
+  "engines": {
+    "node": ">=18.0.0"
+  },
+  "dependencies": {
+    "dotenv":     "^16.4.5",
+    "playwright": "^1.44.0",
+    "sharp":      "^0.33.4"
+  }
+}

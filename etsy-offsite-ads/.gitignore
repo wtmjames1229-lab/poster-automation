@@ -1,0 +1,12 @@
+node_modules/
+
+.env
+.env.local
+printify_session.json
+
+data/*
+!data/.gitkeep
+
+dist/
+*.log
+debug_*.png

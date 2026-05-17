@@ -1,0 +1,119 @@
+# Scheduled Etsy off-site ads watch (set-and-forget).
+# Requires repository secrets — see etsy-offsite-ads/RUN.md § Automatic watch mode.
+
+name: Etsy Ads Watch
+
+on:
+  schedule:
+    # Every 6 hours (UTC) — adjust as needed
+    - cron: '0 */6 * * *'
+  workflow_dispatch:
+
+concurrency:
+  group: ads-watch
+  cancel-in-progress: false
+
+jobs:
+  watch:
+    runs-on: ubuntu-latest
+    timeout-minutes: 360
+
+    defaults:
+      run:
+        working-directory: etsy-offsite-ads
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Setup Node
+        uses: actions/setup-node@v4
+        with:
+          node-version: '20'
+          cache: npm
+          cache-dependency-path: etsy-offsite-ads/package-lock.json
+
+      - name: Install dependencies
+        run: npm ci
+
+      - name: Install Playwright Chromium
+        run: npx playwright install chromium --with-deps
+
+      - name: Write .env from secrets
+        env:
+          PRINTIFY_API_KEY: ${{ secrets.PRINTIFY_API_KEY }}
+          PRINTIFY_EMAIL: ${{ secrets.PRINTIFY_EMAIL }}
+          PRINTIFY_PASSWORD: ${{ secrets.PRINTIFY_PASSWORD }}
+          PRINTIFY_SHOP_ID: ${{ secrets.PRINTIFY_SHOP_ID }}
+          OFFSITE_ADS_ENABLED: ${{ vars.OFFSITE_ADS_ENABLED }}
+          MAIL_TO: ${{ secrets.MAIL_TO }}
+          MAIL_FROM: ${{ secrets.MAIL_FROM }}
+          SENDGRID_API_KEY: ${{ secrets.SENDGRID_API_KEY }}
+          MAIL_SMTP_HOST: ${{ secrets.MAIL_SMTP_HOST }}
+          MAIL_SMTP_PORT: ${{ secrets.MAIL_SMTP_PORT }}
+          MAIL_SMTP_USER: ${{ secrets.MAIL_SMTP_USER }}
+          MAIL_SMTP_PASS: ${{ secrets.MAIL_SMTP_PASS }}
+        run: |
+          OFFSITE="${OFFSITE_ADS_ENABLED:-false}"
+          cat > .env << EOF
+          PRINTIFY_API_KEY=${PRINTIFY_API_KEY}
+          PRINTIFY_EMAIL=${PRINTIFY_EMAIL}
+          PRINTIFY_PASSWORD=${PRINTIFY_PASSWORD}
+          PRINTIFY_SHOP_ID=${PRINTIFY_SHOP_ID}
+          OFFSITE_ADS_ENABLED=${OFFSITE}
+          PLAYWRIGHT_USE_PROFILE=false
+          PLAYWRIGHT_PREFER_SESSION=true
+          PLAYWRIGHT_HEADLESS=true
+          PRINTIFY_NAV_VIA_PRODUCTS=false
+          ADS_WATCH_RETRY_FAILED=true
+          MAIL_TO=${MAIL_TO}
+          MAIL_FROM=${MAIL_FROM}
+          SENDGRID_API_KEY=${SENDGRID_API_KEY}
+          MAIL_SMTP_HOST=${MAIL_SMTP_HOST}
+          MAIL_SMTP_PORT=${MAIL_SMTP_PORT}
+          MAIL_SMTP_USER=${MAIL_SMTP_USER}
+          MAIL_SMTP_PASS=${MAIL_SMTP_PASS}
+          EOF
+
+      - name: Restore Printify session
+        env:
+          PRINTIFY_SESSION_B64: ${{ secrets.PRINTIFY_SESSION_B64 }}
+        run: |
+          if [ -z "$PRINTIFY_SESSION_B64" ]; then
+            echo "::error::PRINTIFY_SESSION_B64 secret is missing"
+            exit 1
+          fi
+          echo "$PRINTIFY_SESSION_B64" | base64 -d > printify_session.json
+          test -s printify_session.json
+
+      - name: Restore watch state (previous runs)
+        uses: actions/cache/restore@v4
+        with:
+          path: data/ads-watch-state.json
+          key: ads-watch-state-${{ secrets.PRINTIFY_SHOP_ID || 'default' }}-v1
+          restore-keys: |
+            ads-watch-state-${{ secrets.PRINTIFY_SHOP_ID || 'default' }}-
+
+      - name: Dry-run queue (log only)
+        run: node src/adsWatch.js --dry-run
+        continue-on-error: true
+
+      - name: Run ads watch
+        run: node src/adsWatch.js
+
+      - name: Save watch state for next run
+        if: always()
+        uses: actions/cache/save@v4
+        with:
+          path: data/ads-watch-state.json
+          key: ads-watch-state-${{ secrets.PRINTIFY_SHOP_ID || 'default' }}-v1
+
+      - name: Upload watch logs (debug)
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: ads-watch-logs-${{ github.run_id }}
+          path: |
+            data/ads-watch-state.json
+            data/ads-watch-job.json
+          retention-days: 14
