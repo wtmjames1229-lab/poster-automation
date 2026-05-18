@@ -1,4 +1,5 @@
-# Scheduled Etsy off-site ads watch (set-and-forget).
+# Cloud CI — requires periodic npm run session:prepare (Printify captcha blocks datacenter IPs).
+# For fully autonomous "Run workflow": use ads-watch-selfhosted.yml on your PC instead.
 # Secrets: https://github.com/wtmjames1229-lab/poster-automation/settings/secrets/actions
 
 name: Etsy Ads Watch

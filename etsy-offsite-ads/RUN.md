@@ -577,7 +577,18 @@ MAIL_SMTP_USER=you@gmail.com
 MAIL_SMTP_PASS=app-password
 ```
 
-### GitHub Actions setup
+### Fully autonomous (recommended)
+
+**GitHub’s cloud runners cannot log into Printify by themselves** (Cloudflare captcha). For “press Run workflow and forget”, use one of these:
+
+| Mode | Setup once | Then |
+|------|------------|------|
+| **Self-hosted runner** (keeps GitHub UI) | `.\scripts\install-selfhosted-runner.ps1` then `npm run login` | Actions → **Etsy Ads Watch (Autonomous)** → Run workflow |
+| **Windows Task Scheduler** (no GitHub) | `.\scripts\install-watch-scheduler.ps1` then `npm run login` | PC on → runs every 6h automatically |
+
+Cloud workflow **Etsy Ads Watch** still needs `npm run session:prepare` when the session expires.
+
+### GitHub Actions setup (cloud — session refresh required)
 
 Workflow: `.github/workflows/ads-watch.yml` (every 6 hours + manual trigger).
 

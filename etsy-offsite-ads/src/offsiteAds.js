@@ -372,47 +372,71 @@ async function ensureSession(options = {}) {
   await resetBrowserSession();
   setContextMode(null);
 
+  const isCloudCi =
+    !!process.env.GITHUB_ACTIONS && process.env.ADS_WATCH_SELF_HOSTED !== 'true';
+  const autoRelogin =
+    process.env.ADS_WATCH_AUTO_RELOGIN === 'true' && !isCloudCi && CONFIG.email && CONFIG.password;
   const allowLogin =
     process.env.ADS_WATCH_ALLOW_LOGIN === 'true' &&
-    !process.env.GITHUB_ACTIONS &&
+    !isCloudCi &&
     process.env.PLAYWRIGHT_HEADLESS !== 'true' &&
     CONFIG.email &&
     CONFIG.password;
 
-  if (strict && allowLogin) {
-    console.log('[offsiteAds] Session invalid — attempting visible login (ADS_WATCH_ALLOW_LOGIN)...');
-    try {
-      _browser = await launchBrowser({ headless: false });
-      _context = await _browser.newContext(sessionState.getContextExtras());
-      await sessionState.applyStealthScripts(_context);
-      const page = await _context.newPage();
-      const { performPrintifyLogin } = require('./lib/printifyLogin');
-      await performPrintifyLogin(
-        page,
-        { email: CONFIG.email, password: CONFIG.password },
-        { headed: true }
-      );
-      await saveSession(_context);
-      await page.close().catch(() => null);
-      setContextMode('session');
-      const r = runVerifySession('session');
-      if (r.status === 0) {
-        console.log('[offsiteAds] Session OK after login.');
-        return 'session';
+  if (strict && (autoRelogin || allowLogin)) {
+    if (autoRelogin) {
+      console.log('[offsiteAds] Session invalid — running headed login (ADS_WATCH_AUTO_RELOGIN)...');
+      const loginRun = spawnScriptSync('scripts/headedLogin.js');
+      if (loginRun.status === 0) {
+        for (const mode of ['profile', 'session']) {
+          if (mode === 'profile' && !CONFIG.useProfile) continue;
+          if (mode === 'session' && !fs.existsSync(CONFIG.sessionFile)) continue;
+          await resetBrowserSession();
+          setContextMode(mode);
+          const vr = runVerifySession(mode);
+          if (vr.status === 0) {
+            console.log(`[offsiteAds] Session OK after auto-login (${mode}).`);
+            return mode;
+          }
+        }
+      } else {
+        console.warn('[offsiteAds] headedLogin failed:', loginRun.stderr || loginRun.stdout);
       }
-      console.warn('[offsiteAds] Login succeeded but verify still failed.');
-    } catch (e) {
-      if (e instanceof CaptchaRequiredError) throw e;
-      console.warn('[offsiteAds] Login failed:', e.message);
-    } finally {
-      await resetBrowserSession();
-      setContextMode(null);
+    } else {
+      console.log('[offsiteAds] Session invalid — attempting visible login (ADS_WATCH_ALLOW_LOGIN)...');
+      try {
+        _browser = await launchBrowser({ headless: false });
+        _context = await _browser.newContext(sessionState.getContextExtras());
+        await sessionState.applyStealthScripts(_context);
+        const page = await _context.newPage();
+        const { performPrintifyLogin } = require('./lib/printifyLogin');
+        await performPrintifyLogin(
+          page,
+          { email: CONFIG.email, password: CONFIG.password },
+          { headed: true }
+        );
+        await saveSession(_context);
+        await page.close().catch(() => null);
+        setContextMode('session');
+        const r = runVerifySession('session');
+        if (r.status === 0) {
+          console.log('[offsiteAds] Session OK after login.');
+          return 'session';
+        }
+        console.warn('[offsiteAds] Login succeeded but verify still failed.');
+      } catch (e) {
+        if (e instanceof CaptchaRequiredError) throw e;
+        console.warn('[offsiteAds] Login failed:', e.message);
+      } finally {
+        await resetBrowserSession();
+        setContextMode(null);
+      }
     }
   }
 
   if (strict) {
-    const ci = process.env.GITHUB_ACTIONS
-      ? ' GitHub Actions cannot pass Cloudflare captcha — refresh session on your PC.'
+    const ci = isCloudCi
+      ? ' Use workflow "Etsy Ads Watch (Autonomous)" on a self-hosted runner, or npm run session:prepare for cloud CI.'
       : '';
     throw new Error(
       'No valid Printify session.' +

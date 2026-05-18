@@ -25,7 +25,8 @@
     "session:b64": "node scripts/sessionToBase64.js",
     "session:github": "node scripts/sessionToGithub.js",
     "session:prepare": "node scripts/prepareSession.js",
-    "install:browser": "npx playwright install chromium"
+    "install:browser": "npx playwright install chromium",
+    "install:scheduler": "powershell -NoProfile -ExecutionPolicy Bypass -File ../scripts/install-watch-scheduler.ps1"
   },
   "engines": {
     "node": ">=18.0.0"
