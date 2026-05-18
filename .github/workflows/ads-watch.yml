@@ -87,7 +87,7 @@ jobs:
             echo "PLAYWRIGHT_PREFER_SESSION=true"
             echo "PLAYWRIGHT_HEADLESS=true"
             echo "ADS_WATCH_ALLOW_LOGIN=false"
-            echo "PRINTIFY_NAV_VIA_PRODUCTS=false"
+            echo "PRINTIFY_NAV_VIA_PRODUCTS=true"
             echo "ADS_WATCH_RETRY_FAILED=true"
             echo "MAIL_TO=${MAIL_TO}"
             echo "MAIL_FROM=${MAIL_FROM}"
@@ -135,13 +135,10 @@ jobs:
           PLAYWRIGHT_VERIFY_MODE: session
           PRINTIFY_API_KEY: ${{ secrets.PRINTIFY_API_KEY }}
           PRINTIFY_SHOP_ID: ${{ secrets.PRINTIFY_SHOP_ID }}
+          PRINTIFY_NAV_VIA_PRODUCTS: 'true'
         run: |
-          VERIFY_PRODUCT_ID=$(node -e "
-          const key=process.env.PRINTIFY_API_KEY, shop=process.env.PRINTIFY_SHOP_ID;
-          fetch('https://api.printify.com/v1/shops/'+shop+'/products.json?limit=1',{
-            headers:{Authorization:'Bearer '+key}
-          }).then(r=>r.json()).then(d=>process.stdout.write(String(d.data?.[0]?.id||'')));
-          ")
+          VERIFY_PRODUCT_ID=$(node scripts/pickVerifyProductId.js)
+          echo "Verify product: $VERIFY_PRODUCT_ID"
           export VERIFY_PRODUCT_ID
           node scripts/verifySession.js
 

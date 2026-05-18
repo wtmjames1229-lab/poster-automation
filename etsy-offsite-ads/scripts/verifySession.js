@@ -13,8 +13,12 @@ const {
   isLoggedIn,
   setContextMode,
 } = require('../src/offsiteAds');
+const { openEtsyProductListing } = require('../src/lib/printifyProductsNav');
+const { isLoginUrl } = require('../src/lib/printifyProductPage');
 
 const productId = (process.env.VERIFY_PRODUCT_ID || '').trim();
+const viaList =
+  process.env.PRINTIFY_NAV_VIA_PRODUCTS === 'true' || !!process.env.GITHUB_ACTIONS;
 
 async function main() {
   const mode = process.env.PLAYWRIGHT_VERIFY_MODE;
@@ -35,7 +39,7 @@ async function main() {
   const page = await context.newPage();
   try {
     if (process.env.GITHUB_ACTIONS) {
-      await warmPrintifySession(page, { productId });
+      await warmPrintifySession(page, { skipProduct: true });
     } else {
       await warmSession(page);
     }
@@ -45,19 +49,30 @@ async function main() {
       waitUntil: 'domcontentloaded',
       timeout: 60000,
     });
-    ok = ok && (await isLoggedIn(page)) && !page.url().includes('login');
+    await page.waitForTimeout(parseInt(process.env.PAGE_SETTLE_MS || '5000', 10));
+    const productsUrl = page.url();
+    const productsOk = (await isLoggedIn(page)) && !isLoginUrl(productsUrl);
+    console.log('[verify] products page:', productsUrl, productsOk ? 'OK' : 'FAIL');
+    ok = ok && productsOk;
 
-    if (productId) {
-      const productUrl = `https://printify.com/app/product-details/${productId}`;
-      await page.goto(productUrl, { waitUntil: 'domcontentloaded', timeout: 90000 });
-      await new Promise((r) => setTimeout(r, 3000));
+    if (productId && productsOk) {
+      try {
+        await openEtsyProductListing(page, productId, { viaProductsList: viaList });
+        await page.waitForTimeout(3000);
+      } catch (err) {
+        console.log('PRODUCT_OPEN_FAILED', productId, err.message);
+      }
+      const detailUrl = page.url();
       const onProduct =
-        page.url().includes('product-details') && !page.url().includes('login');
+        detailUrl.includes('product-details') && !isLoginUrl(detailUrl);
       if (!onProduct) {
         console.log('PRODUCT_CHECK_FAILED', productId);
-        console.log('URL:', page.url());
+        console.log('URL:', detailUrl);
+        console.log('[verify] nav:', viaList ? 'products-list' : 'direct-url');
       }
       ok = ok && onProduct;
+    } else if (productId && !productsOk) {
+      console.log('PRODUCT_CHECK_SKIPPED (not logged in on products list)');
     }
 
     console.log(ok ? 'SESSION_OK' : 'SESSION_EXPIRED');

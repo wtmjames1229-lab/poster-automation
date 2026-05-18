@@ -57,7 +57,9 @@ function writeSessionFile(filePath, state) {
 async function warmPrintifySession(page, options = {}) {
   const timeout = options.timeoutMs || parseInt(process.env.PLAYWRIGHT_TIMEOUT_MS || '90000', 10);
   const settle = options.settleMs || parseInt(process.env.PAGE_SETTLE_MS || '4000', 10);
-  const productId = (options.productId || process.env.VERIFY_PRODUCT_ID || '').trim();
+  const productId = options.skipProduct
+    ? ''
+    : (options.productId || process.env.VERIFY_PRODUCT_ID || '').trim();
 
   for (const url of WARM_URLS) {
     await page.goto(url, { waitUntil: 'domcontentloaded', timeout }).catch(() => null);
