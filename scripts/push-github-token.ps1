@@ -25,11 +25,28 @@ if (-not $Token -and (Test-Path ".github-token")) {
 }
 
 if (-not $Token) {
-  Write-Host "Paste GitHub Personal Access Token (input hidden):" -ForegroundColor Cyan
-  $secure = Read-Host -AsSecureString
-  $Token = [Runtime.InteropServices.Marshal]::PtrToStringAuto(
-    [Runtime.InteropServices.Marshal]::SecureStringToBSTR($secure)
-  )
+  $canPrompt = $false
+  try { $canPrompt = -not [Console]::IsInputRedirected } catch { $canPrompt = $false }
+  if ($canPrompt) {
+    Write-Host "Paste GitHub Personal Access Token (input hidden):" -ForegroundColor Cyan
+    $secure = Read-Host -AsSecureString
+    $Token = [Runtime.InteropServices.Marshal]::PtrToStringAuto(
+      [Runtime.InteropServices.Marshal]::SecureStringToBSTR($secure)
+    )
+  } else {
+    throw @'
+No token found (non-interactive shell).
+
+  Option A - environment (recommended):
+    $env:GITHUB_TOKEN = 'ghp_...'; .\scripts\push-github-token.ps1
+
+  Option B - one-line file (gitignored):
+    Put the PAT in repo root .github-token then run this script again.
+
+  Option C - parameter:
+    .\scripts\push-github-token.ps1 -Token 'ghp_...'
+'@
+  }
 }
 
 if (-not $Token) { throw "No token provided." }
@@ -69,7 +86,9 @@ if (-not $repoExists) {
 
 Write-Host "Pushing main branch..." -ForegroundColor Cyan
 git branch -M main 2>$null
-git push -u origin main
+# git does not read GH_TOKEN; use Basic auth for this push only (token not stored in remote URL)
+$basic = [Convert]::ToBase64String([Text.Encoding]::ASCII.GetBytes("x-access-token:${Token}"))
+git -c "http.https://github.com/.extraheader=Authorization: Basic $basic" push -u origin main
 if ($LASTEXITCODE -ne 0) { throw "git push failed" }
 
 Write-Host ""
