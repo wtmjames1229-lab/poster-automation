@@ -363,6 +363,7 @@ async function ensureSession(options = {}) {
 
   const allowLogin =
     process.env.ADS_WATCH_ALLOW_LOGIN === 'true' &&
+    !process.env.GITHUB_ACTIONS &&
     CONFIG.email &&
     CONFIG.password;
 
@@ -405,8 +406,13 @@ async function ensureSession(options = {}) {
   }
 
   if (strict) {
+    const ci = process.env.GITHUB_ACTIONS
+      ? ' GitHub Actions cannot solve Printify captcha — refresh cookies on your PC (see below).'
+      : '';
     throw new Error(
-      'No valid Printify session. Run: npm run login  then  npm run session:export  then  npm run session:github'
+      'No valid Printify session.' +
+        ci +
+        ' On your PC: cd etsy-offsite-ads && npm run login && npm run session:export && npm run session:github'
     );
   }
 
