@@ -131,9 +131,19 @@ jobs:
             ads-watch-state-${{ secrets.PRINTIFY_SHOP_ID }}-
 
       - name: Verify Printify session (Playwright)
-        run: node scripts/verifySession.js
         env:
           PLAYWRIGHT_VERIFY_MODE: session
+          PRINTIFY_API_KEY: ${{ secrets.PRINTIFY_API_KEY }}
+          PRINTIFY_SHOP_ID: ${{ secrets.PRINTIFY_SHOP_ID }}
+        run: |
+          VERIFY_PRODUCT_ID=$(node -e "
+          const key=process.env.PRINTIFY_API_KEY, shop=process.env.PRINTIFY_SHOP_ID;
+          fetch('https://api.printify.com/v1/shops/'+shop+'/products.json?limit=1',{
+            headers:{Authorization:'Bearer '+key}
+          }).then(r=>r.json()).then(d=>process.stdout.write(String(d.data?.[0]?.id||'')));
+          ")
+          export VERIFY_PRODUCT_ID
+          node scripts/verifySession.js
 
       - name: Dry-run queue (log only)
         run: node src/adsWatch.js --dry-run
