@@ -130,6 +130,11 @@ jobs:
           restore-keys: |
             ads-watch-state-${{ secrets.PRINTIFY_SHOP_ID }}-
 
+      - name: Verify Printify session (Playwright)
+        run: node scripts/verifySession.js
+        env:
+          PLAYWRIGHT_VERIFY_MODE: session
+
       - name: Dry-run queue (log only)
         run: node src/adsWatch.js --dry-run
         continue-on-error: true

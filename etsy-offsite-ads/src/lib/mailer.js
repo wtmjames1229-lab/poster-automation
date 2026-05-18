@@ -143,7 +143,7 @@ async function notifySessionExpired(detail) {
       `Browser session is no longer valid.\n\n${detail}\n\n` +
       `Action required:\n` +
       `  1. Locally: cd etsy-offsite-ads && npm run login && npm run session:export\n` +
-      `  2. Update PRINTIFY_SESSION_B64 in GitHub secrets (see scripts/sessionToBase64.js)\n`,
+      `  2. Run: cd etsy-offsite-ads && npm run session:prepare\n`,
     category: 'session',
   });
 }

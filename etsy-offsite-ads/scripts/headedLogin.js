@@ -43,13 +43,19 @@ async function main() {
   const page = context.pages()[0] || (await context.newPage());
 
   try {
-    await performPrintifyLogin(page, { email, password });
-    await waitForPageReady(page, {
-      goto: 'https://printify.com/app/dashboard',
+    await performPrintifyLogin(page, { email, password }, { headed: true });
+    const sessionState = require('../src/lib/sessionState');
+    await sessionState.warmPrintifySession(page, {
       settleMs: parseInt(process.env.LOGIN_PAGE_SETTLE_MS || '8000', 10),
     });
-    fs.writeFileSync(sessionFile, JSON.stringify(await context.storageState(), null, 2));
-    console.log('[headedLogin] ✓ Session saved:', path.resolve(sessionFile));
+    const state = await context.storageState();
+    sessionState.writeSessionFile(sessionFile, state);
+    console.log(
+      '[headedLogin] ✓ Session saved:',
+      path.resolve(sessionFile),
+      `(${state.cookies?.length || 0} cookies)`
+    );
+    console.log('[headedLogin] Next: npm run session:github  (or npm run session:prepare)');
   } finally {
     await context.close();
   }

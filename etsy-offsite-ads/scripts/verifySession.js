@@ -29,10 +29,16 @@ async function main() {
     process.exit(2);
   }
 
+  const { warmPrintifySession } = require('../src/lib/sessionState');
+
   const context = await getContext();
   const page = await context.newPage();
   try {
-    await warmSession(page);
+    if (process.env.GITHUB_ACTIONS) {
+      await warmPrintifySession(page, { productId });
+    } else {
+      await warmSession(page);
+    }
     let ok = await isLoggedIn(page);
 
     await page.goto('https://printify.com/app/products', {

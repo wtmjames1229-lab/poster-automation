@@ -24,6 +24,7 @@
     "watch:status": "node src/adsWatch.js --status",
     "session:b64": "node scripts/sessionToBase64.js",
     "session:github": "node scripts/sessionToGithub.js",
+    "session:prepare": "node scripts/prepareSession.js",
     "install:browser": "npx playwright install chromium"
   },
   "engines": {

@@ -98,6 +98,8 @@ const SELECTORS = {
 
 const productPage = require('./lib/printifyProductPage');
 const { SessionExpiredError } = productPage;
+const sessionState = require('./lib/sessionState');
+const { CaptchaRequiredError } = require('./lib/errors');
 
 let _browser = null;
 let _context = null;
@@ -114,25 +116,27 @@ async function getBrowser() {
 }
 
 async function createContext(browser) {
-  const baseOptions = {
-    userAgent:
-      'Mozilla/5.0 (Windows NT 10.0; Win64; x64) ' +
-      'AppleWebKit/537.36 (KHTML, like Gecko) ' +
-      'Chrome/124.0.0.0 Safari/537.36',
-    viewport: { width: 1440, height: 900 },
-  };
+  const baseOptions = sessionState.getContextExtras();
 
   let ctx;
   if (fs.existsSync(CONFIG.sessionFile)) {
     try {
-      const saved = JSON.parse(fs.readFileSync(CONFIG.sessionFile, 'utf-8'));
+      const saved = sessionState.readSessionFile(CONFIG.sessionFile);
+      const check = sessionState.validateSessionState(saved);
+      if (!check.ok) {
+        console.warn('[offsiteAds] Session file warnings:', check.issues.join('; '));
+      }
       ctx = await browser.newContext({ ...baseOptions, storageState: saved });
+      await sessionState.applyStealthScripts(ctx);
       console.log('[offsiteAds] Restored saved Printify session.');
     } catch (e) {
       console.warn('[offsiteAds] Session file invalid, will re-login:', e.message);
     }
   }
-  if (!ctx) ctx = await browser.newContext(baseOptions);
+  if (!ctx) {
+    ctx = await browser.newContext(baseOptions);
+    await sessionState.applyStealthScripts(ctx);
+  }
 
   if (process.env.ADS_BLOCK_MEDIA === 'true') {
     await ctx.route('**/*', (route) => {
@@ -147,9 +151,10 @@ async function createContext(browser) {
   return ctx;
 }
 
-async function launchBrowser() {
+async function launchBrowser(options = {}) {
+  const headless = options.headless != null ? options.headless : CONFIG.headless;
   const launchOpts = {
-    headless: CONFIG.headless,
+    headless,
     slowMo: CONFIG.slowMo,
     args: [
       '--no-sandbox',
@@ -213,13 +218,11 @@ async function getContext() {
 
 /** Warm SPA session before product-detail navigation (bulk sync). */
 async function warmSession(page) {
-  const { waitForPageReady } = require('./lib/pageReady');
-  await waitForPageReady(page, {
-    goto: 'https://printify.com/app/dashboard',
+  await sessionState.warmPrintifySession(page, {
     settleMs: parseInt(process.env.PAGE_SETTLE_MS || '6000', 10),
-    timeout: CONFIG.timeout,
+    timeoutMs: CONFIG.timeout,
   });
-  await productPage.assertAuthenticated(page, { maxWaitMs: 30000 });
+  await productPage.assertAuthenticated(page, { maxWaitMs: 45000 });
 }
 
 async function saveSession(context) {
@@ -347,15 +350,23 @@ async function ensureSession(options = {}) {
   if (fs.existsSync(CONFIG.sessionFile) && CONFIG.preferSession) modes.push('session');
   if (!modes.length && fs.existsSync(CONFIG.sessionFile)) modes.push('session');
 
+  const maxTries = parseInt(process.env.SESSION_VERIFY_RETRIES || '2', 10);
   for (const mode of modes) {
-    await resetBrowserSession();
-    setContextMode(mode);
-    const r = runVerifySession(mode);
-    if (r.status === 0) {
-      console.log(`[offsiteAds] Session OK (${mode}).`);
-      return mode;
+    for (let attempt = 1; attempt <= maxTries; attempt++) {
+      await resetBrowserSession();
+      setContextMode(mode);
+      const r = runVerifySession(mode);
+      if (r.status === 0) {
+        console.log(`[offsiteAds] Session OK (${mode}).`);
+        return mode;
+      }
+      if (attempt < maxTries) {
+        console.warn(`[offsiteAds] ${mode} verify attempt ${attempt} failed, retrying...`);
+        await new Promise((res) => setTimeout(res, 3000));
+      } else {
+        console.warn(`[offsiteAds] ${mode} auth invalid.`);
+      }
     }
-    console.warn(`[offsiteAds] ${mode} auth invalid.`);
   }
 
   await resetBrowserSession();
@@ -364,41 +375,35 @@ async function ensureSession(options = {}) {
   const allowLogin =
     process.env.ADS_WATCH_ALLOW_LOGIN === 'true' &&
     !process.env.GITHUB_ACTIONS &&
+    process.env.PLAYWRIGHT_HEADLESS !== 'true' &&
     CONFIG.email &&
     CONFIG.password;
 
   if (strict && allowLogin) {
-    console.log('[offsiteAds] Session invalid — attempting headless login (ADS_WATCH_ALLOW_LOGIN)...');
+    console.log('[offsiteAds] Session invalid — attempting visible login (ADS_WATCH_ALLOW_LOGIN)...');
     try {
-      _browser = await launchBrowser();
-      _context = await _browser.newContext({
-        userAgent:
-          'Mozilla/5.0 (Windows NT 10.0; Win64; x64) ' +
-          'AppleWebKit/537.36 (KHTML, like Gecko) ' +
-          'Chrome/124.0.0.0 Safari/537.36',
-        viewport: { width: 1440, height: 900 },
-      });
+      _browser = await launchBrowser({ headless: false });
+      _context = await _browser.newContext(sessionState.getContextExtras());
+      await sessionState.applyStealthScripts(_context);
       const page = await _context.newPage();
       const { performPrintifyLogin } = require('./lib/printifyLogin');
       await performPrintifyLogin(
         page,
         { email: CONFIG.email, password: CONFIG.password },
-        {
-          headed: false,
-          captchaMaxMs: parseInt(process.env.LOGIN_CAPTCHA_MAX_MS || '120000', 10),
-        }
+        { headed: true }
       );
       await saveSession(_context);
       await page.close().catch(() => null);
       setContextMode('session');
       const r = runVerifySession('session');
       if (r.status === 0) {
-        console.log('[offsiteAds] Session OK after headless login.');
+        console.log('[offsiteAds] Session OK after login.');
         return 'session';
       }
       console.warn('[offsiteAds] Login succeeded but verify still failed.');
     } catch (e) {
-      console.warn('[offsiteAds] Headless login failed:', e.message);
+      if (e instanceof CaptchaRequiredError) throw e;
+      console.warn('[offsiteAds] Login failed:', e.message);
     } finally {
       await resetBrowserSession();
       setContextMode(null);
@@ -407,12 +412,12 @@ async function ensureSession(options = {}) {
 
   if (strict) {
     const ci = process.env.GITHUB_ACTIONS
-      ? ' GitHub Actions cannot solve Printify captcha — refresh cookies on your PC (see below).'
+      ? ' GitHub Actions cannot pass Cloudflare captcha — refresh session on your PC.'
       : '';
     throw new Error(
       'No valid Printify session.' +
         ci +
-        ' On your PC: cd etsy-offsite-ads && npm run login && npm run session:export && npm run session:github'
+        ' On your PC: cd etsy-offsite-ads && npm run session:prepare'
     );
   }
 

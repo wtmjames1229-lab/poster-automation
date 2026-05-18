@@ -27,10 +27,23 @@ if (!fs.existsSync(sessionPath)) {
   process.exit(1);
 }
 
-const json = JSON.stringify(JSON.parse(fs.readFileSync(sessionPath, 'utf8')));
+const { readSessionFile, validateSessionState, minifySession } = require('../src/lib/sessionState');
+
+const state = readSessionFile(sessionPath);
+const check = validateSessionState(state);
+if (!check.ok) {
+  console.error('Session validation failed:', check.issues.join('; '));
+  console.error('Run: npm run session:prepare');
+  process.exit(1);
+}
+if (check.issues.length) {
+  console.warn('[session] Warnings:', check.issues.join('; '));
+}
+
+const json = minifySession(state);
 const gh = findGh();
 
-console.log(`Session JSON: ${json.length} chars, uploading to ${repo}...`);
+console.log(`Session JSON: ${json.length} chars, ${state.cookies?.length || 0} cookies, uploading to ${repo}...`);
 
 // Do not use `-b -`: that stores the literal "-" character, not stdin.
 const r = spawnSync(gh, ['secret', 'set', 'PRINTIFY_SESSION_JSON', '--repo', repo], {

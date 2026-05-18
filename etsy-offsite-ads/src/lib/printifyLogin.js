@@ -2,6 +2,30 @@
 
 const { waitForPageReady, waitForAppShell, sleep } = require('./pageReady');
 const { handleCaptchaThenSubmit, waitForCaptchaCleared, isCaptchaVisible } = require('./cloudflare');
+const { CaptchaRequiredError } = require('./errors');
+
+function isHeadlessRun(options) {
+  return options.headed === false || process.env.PLAYWRIGHT_HEADLESS === 'true';
+}
+
+function captchaWaitBudget(options) {
+  if (options.captchaMaxMs != null) return options.captchaMaxMs;
+  if (process.env.GITHUB_ACTIONS || isHeadlessRun(options)) {
+    return parseInt(process.env.LOGIN_CAPTCHA_HEADLESS_MS || '12000', 10);
+  }
+  return parseInt(process.env.LOGIN_CAPTCHA_MAX_MS || '180000', 10);
+}
+
+async function abortIfCaptchaBlocked(page, options) {
+  if (!isHeadlessRun(options) && !process.env.GITHUB_ACTIONS) return;
+  await sleep(2000);
+  if (await isCaptchaVisible(page)) {
+    throw new CaptchaRequiredError(
+      'Cloudflare captcha is showing. GitHub Actions cannot solve it. ' +
+        'On your PC run: cd etsy-offsite-ads && npm run session:prepare'
+    );
+  }
+}
 
 const LOGIN_URLS = [
   'https://printify.com/app/auth/login',
@@ -96,6 +120,13 @@ async function performPrintifyLogin(page, credentials, options = {}) {
   const pageSettle = parseInt(process.env.LOGIN_PAGE_SETTLE_MS || '8000', 10);
   const loginTimeout = options.loginTimeoutMs ?? parseInt(process.env.LOGIN_TOTAL_MAX_MS || '600000', 10);
   const deadline = Date.now() + loginTimeout;
+  const captchaOpts = { ...options, captchaMaxMs: captchaWaitBudget(options) };
+
+  if (isHeadlessRun(options) && process.env.GITHUB_ACTIONS) {
+    throw new CaptchaRequiredError(
+      'Automated login is disabled on GitHub Actions. Refresh session on your PC: npm run session:prepare'
+    );
+  }
 
   let lastErr = null;
 
@@ -110,6 +141,7 @@ async function performPrintifyLogin(page, credentials, options = {}) {
       });
 
       await dismissOverlays(page);
+      await abortIfCaptchaBlocked(page, options);
       await clickContinueWithEmail(page);
 
       const surface = await getLoginSurface(page);
@@ -137,13 +169,19 @@ async function performPrintifyLogin(page, credentials, options = {}) {
       await passInput.pressSequentially(password, { delay: 40 });
       await sleep(1500);
 
-      await handleCaptchaThenSubmit(page, () => submitLogin(surface), options);
+      await handleCaptchaThenSubmit(page, () => submitLogin(surface), captchaOpts);
+      await abortIfCaptchaBlocked(page, options);
 
       console.log('[login] Waiting for dashboard / app load...');
       while (Date.now() < deadline) {
         if (isLoggedInUrl(page.url())) break;
         if (await isCaptchaVisible(page)) {
-          await waitForCaptchaCleared(page);
+          if (isHeadlessRun(options)) {
+            throw new CaptchaRequiredError(
+              'Captcha after login — use headed login: npm run login (then npm run session:github)'
+            );
+          }
+          await waitForCaptchaCleared(page, captchaWaitBudget(options));
         }
         await sleep(2500);
       }
@@ -170,6 +208,7 @@ async function performPrintifyLogin(page, credentials, options = {}) {
       return true;
     } catch (err) {
       lastErr = err;
+      if (err instanceof CaptchaRequiredError) throw err;
       console.warn('[login] Attempt failed at', loginUrl, ':', err.message);
       await page.screenshot({ path: 'debug_login.png', fullPage: true }).catch(() => null);
     }
