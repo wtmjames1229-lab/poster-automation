@@ -1,12 +1,18 @@
 'use strict';
 
 const paths = require('./paths');
+const { applyDeployDefaults } = require('./lib/deployDefaults');
 
 function loadEnv() {
+  if (!process.env.DEPLOY_MODE && process.env.APP_USER_DATA) {
+    process.env.DEPLOY_MODE = 'vps';
+  }
+  applyDeployDefaults();
   paths.ensureUserDataDirs();
   paths.ensureEnvFile();
   require('dotenv').config({ path: paths.getEnvPath() });
   require('dotenv').config({ path: paths.getEnvPath() + '.local' });
+  applyDeployDefaults();
 
   if (!process.env.PRINTIFY_SESSION_FILE) {
     process.env.PRINTIFY_SESSION_FILE = paths.getSessionPath();

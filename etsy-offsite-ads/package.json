@@ -26,7 +26,9 @@
     "session:github": "node scripts/sessionToGithub.js",
     "session:prepare": "node scripts/prepareSession.js",
     "install:browser": "npx playwright install chromium",
-    "install:scheduler": "powershell -NoProfile -ExecutionPolicy Bypass -File ../scripts/install-watch-scheduler.ps1"
+    "install:scheduler": "powershell -NoProfile -ExecutionPolicy Bypass -File ../scripts/install-watch-scheduler.ps1",
+    "vps:login": "node scripts/linuxHeadedLogin.js",
+    "vps:verify": "node scripts/verifySession.js"
   },
   "engines": {
     "node": ">=18.0.0"

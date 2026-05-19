@@ -100,6 +100,7 @@ const productPage = require('./lib/printifyProductPage');
 const { SessionExpiredError } = productPage;
 const sessionState = require('./lib/sessionState');
 const { CaptchaRequiredError } = require('./lib/errors');
+const { isCloudCi } = require('./lib/deployDefaults');
 
 let _browser = null;
 let _context = null;
@@ -372,13 +373,12 @@ async function ensureSession(options = {}) {
   await resetBrowserSession();
   setContextMode(null);
 
-  const isCloudCi =
-    !!process.env.GITHUB_ACTIONS && process.env.ADS_WATCH_SELF_HOSTED !== 'true';
+  const cloudCi = isCloudCi();
   const autoRelogin =
-    process.env.ADS_WATCH_AUTO_RELOGIN === 'true' && !isCloudCi && CONFIG.email && CONFIG.password;
+    process.env.ADS_WATCH_AUTO_RELOGIN === 'true' && !cloudCi && CONFIG.email && CONFIG.password;
   const allowLogin =
     process.env.ADS_WATCH_ALLOW_LOGIN === 'true' &&
-    !isCloudCi &&
+    !cloudCi &&
     process.env.PLAYWRIGHT_HEADLESS !== 'true' &&
     CONFIG.email &&
     CONFIG.password;
@@ -386,7 +386,9 @@ async function ensureSession(options = {}) {
   if (strict && (autoRelogin || allowLogin)) {
     if (autoRelogin) {
       console.log('[offsiteAds] Session invalid — running headed login (ADS_WATCH_AUTO_RELOGIN)...');
-      const loginRun = spawnScriptSync('scripts/headedLogin.js');
+      const loginScript =
+        process.platform === 'linux' ? 'scripts/linuxHeadedLogin.js' : 'scripts/headedLogin.js';
+      const loginRun = spawnScriptSync(loginScript);
       if (loginRun.status === 0) {
         for (const mode of ['profile', 'session']) {
           if (mode === 'profile' && !CONFIG.useProfile) continue;
@@ -435,9 +437,11 @@ async function ensureSession(options = {}) {
   }
 
   if (strict) {
-    const ci = isCloudCi
+    const ci = cloudCi
       ? ' Use workflow "Etsy Ads Watch (Autonomous)" on a self-hosted runner, or npm run session:prepare for cloud CI.'
-      : '';
+      : process.env.DEPLOY_MODE === 'vps'
+        ? ' On VPS run: npm run vps:login or import session — see deploy/README.md.'
+        : '';
     throw new Error(
       'No valid Printify session.' +
         ci +

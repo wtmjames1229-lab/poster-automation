@@ -579,12 +579,22 @@ MAIL_SMTP_PASS=app-password
 
 ### Fully autonomous (recommended)
 
-**GitHub’s cloud runners cannot log into Printify by themselves** (Cloudflare captcha). For “press Run workflow and forget”, use one of these:
+**Production: DigitalOcean VPS** — see **[deploy/README.md](../deploy/README.md)**.
+
+```bash
+sudo bash deploy/install.sh   # Ubuntu droplet
+# edit /var/lib/etsy-ads/.env, one-time login or import session
+```
+
+Runs every **6 hours** via systemd; persistent Chrome profile; no GitHub session upload.
+
+**Alternatives**
 
 | Mode | Setup once | Then |
 |------|------------|------|
-| **Self-hosted runner** (keeps GitHub UI) | `.\scripts\install-selfhosted-runner.ps1` then `npm run login` | Actions → **Etsy Ads Watch (Autonomous)** → Run workflow |
-| **Windows Task Scheduler** (no GitHub) | `.\scripts\install-watch-scheduler.ps1` then `npm run login` | PC on → runs every 6h automatically |
+| **DigitalOcean VPS** | `deploy/install.sh` + `.env` + login/import | Automatic timer |
+| **Self-hosted runner** (GitHub UI on your PC) | `install-selfhosted-runner.ps1` + `npm run login` | **Etsy Ads Watch (Autonomous)** |
+| **Windows Task Scheduler** | `install-watch-scheduler.ps1` + `npm run login` | Every 6h while PC on |
 
 Cloud workflow **Etsy Ads Watch** still needs `npm run session:prepare` when the session expires.
 

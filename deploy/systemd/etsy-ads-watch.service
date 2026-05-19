@@ -1,0 +1,27 @@
+[Unit]
+Description=Etsy off-site ads watch (Printify Playwright)
+After=network-online.target
+Wants=network-online.target
+
+[Service]
+Type=oneshot
+User=etsy-ads
+Group=etsy-ads
+WorkingDirectory=/opt/etsy-ads/app/etsy-offsite-ads
+
+Environment=DEPLOY_MODE=vps
+Environment=NODE_ENV=production
+EnvironmentFile=-/var/lib/etsy-ads/.env
+
+ExecStart=/usr/bin/node src/adsWatch.js
+
+# First run can take hours (full catalog)
+TimeoutStartSec=21600
+
+StandardOutput=append:/var/lib/etsy-ads/logs/watch.log
+StandardError=append:/var/lib/etsy-ads/logs/watch.log
+
+Nice=10
+
+[Install]
+WantedBy=multi-user.target

@@ -54,6 +54,10 @@ function ensureUserDataDirs() {
   const root = getUserDataRoot();
   const dataDir = path.join(root, 'data');
   if (!fs.existsSync(dataDir)) fs.mkdirSync(dataDir, { recursive: true });
+  if (process.env.DEPLOY_MODE === 'vps') {
+    const logsDir = path.join(root, 'logs');
+    if (!fs.existsSync(logsDir)) fs.mkdirSync(logsDir, { recursive: true });
+  }
 }
 
 function ensureEnvFile() {
