@@ -21,5 +21,7 @@ jobs:
           ETSY_API_KEY: ${{ secrets.ETSY_API_KEY }}
           ETSY_SHARED_SECRET: ${{ secrets.ETSY_SHARED_SECRET }}
           PRINTIFY_SHOP_ID: '18634010'
+          PRINTIFY_EMAIL: ${{ secrets.PRINTIFY_EMAIL }}
+          PRINTIFY_PASSWORD: ${{ secrets.PRINTIFY_PASSWORD }}
           TOGGLE_ALL_ETSY_PUBLISHED: 'false'
           OFFSITE_ADS_ENABLED: 'false'
