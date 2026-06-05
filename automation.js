@@ -530,7 +530,7 @@ async function cropToVertical(base64Data) {
 async function generateListing(prompt) {
   console.log("Generating listing content...");
   var res = await fetch(
-    "https://generativelanguage.googleapis.com/v1beta/models/gemini-2.0-flash-lite:generateContent?key=" + NB_API_KEY,
+    "https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash-lite:generateContent?key=" + NB_API_KEY,
     {
       method: "POST",
       headers: { "Content-Type": "application/json" },
