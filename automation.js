@@ -3,7 +3,7 @@
 // Gemini → Printify → Etsy → Offsite Ads Toggle
 // Run with: node automation.js
 //
-// Already on Etsy? Skips publish and ny toggles offsite ads (Printify API: external.id).
+// Already on Etsy? Skips publish and only toggles offsite ads (Printify API: external.id).
 // Unpublished canvas drafts are published first; new listings fill remaining daily slots.
 //
 // ─── NEW: Offsite ads control ────────────────────────────────────────────────
@@ -504,7 +504,7 @@ async function cropToVertical(base64Data) {
   var metadata = await sharp(inputBuffer).metadata();
   var width = metadata.width;
   var height = metadata.height;
-  var targetRatio = 4 / 5;
+  var targetRatio = 2 / 3;
   var currentRatio = width / height;
   var cropWidth, cropHeight, left, top;
   if (currentRatio > targetRatio) {
@@ -520,7 +520,7 @@ async function cropToVertical(base64Data) {
   }
   var outputBuffer = await sharp(inputBuffer)
     .extract({ left: left, top: top, width: cropWidth, height: cropHeight })
-    .resize(3000, 3750)
+    .resize(3000, 4500)
     .png()
     .toBuffer();
   console.log("Image cropped to 2:3 (" + width + "x" + height + " -> 3000x4500)");
@@ -530,7 +530,7 @@ async function cropToVertical(base64Data) {
 async function generateListing(prompt) {
   console.log("Generating listing content...");
   var res = await fetch(
-    "https://generativelanguage.googleapis.com/v1beta/models/gemini-3.1-flash-image:generateContent?key=" + NB_API_KEY,
+    "https://generativelanguage.googleapis.com/v1beta/models/gemini-2.0-flash-preview-image-generation:generateContent?key=" + NB_API_KEY,
     {
       method: "POST",
       headers: { "Content-Type": "application/json" },
@@ -574,12 +574,12 @@ async function generateListing(prompt) {
 async function generateImage(prompt) {
   console.log("Generating image...");
   var res = await fetch(
-    "https://generativelanguage.googleapis.com/v1beta/models/gemini-3.1-flash-image:generateContent?key=" + NB_API_KEY,
+    "https://generativelanguage.googleapis.com/v1beta/models/gemini-2.0-flash-preview-image-generation:generateContent?key=" + NB_API_KEY,
     {
       method: "POST",
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify({
-        contents: [{ parts: [{ text: prompt + " Generate as a tall vertical portrait poster artwork in 4:5 aspect ratio, taller than wide. Fill the entire frame edge to edge with no white borders, no margins, no shadows, no drop shadows, no perspective distortion, completely flat design. Suitable for canvas wall art print. No text, no words, no letters." }] }],
+        contents: [{ parts: [{ text: prompt + " Generate as a tall vertical portrait poster artwork in 2:3 aspect ratio, taller than wide. Fill the entire frame edge to edge with no white borders, no margins, no shadows, no drop shadows, no perspective distortion, completely flat design. Suitable for canvas wall art print. No text, no words, no letters." }] }],
         generationConfig: { responseModalities: ["IMAGE", "TEXT"] }
       })
     }
