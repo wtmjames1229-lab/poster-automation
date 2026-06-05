@@ -2,7 +2,7 @@
 // 5 listings per day, all old style clean illustrations
 // Gemini → Printify → Etsy → Offsite Ads Toggle
 // Run with: node automation.js
-//
+/
 // Already on Etsy? Skips publish and ny toggles offsite ads (Printify API: external.id).
 // Unpublished canvas drafts are published first; new listings fill remaining daily slots.
 //
@@ -504,7 +504,7 @@ async function cropToVertical(base64Data) {
   var metadata = await sharp(inputBuffer).metadata();
   var width = metadata.width;
   var height = metadata.height;
-  var targetRatio = 2 / 3;
+  var targetRatio = 4 / 5;
   var currentRatio = width / height;
   var cropWidth, cropHeight, left, top;
   if (currentRatio > targetRatio) {
@@ -520,7 +520,7 @@ async function cropToVertical(base64Data) {
   }
   var outputBuffer = await sharp(inputBuffer)
     .extract({ left: left, top: top, width: cropWidth, height: cropHeight })
-    .resize(3000, 4500)
+    .resize(3000, 3750)
     .png()
     .toBuffer();
   console.log("Image cropped to 2:3 (" + width + "x" + height + " -> 3000x4500)");
@@ -579,7 +579,7 @@ async function generateImage(prompt) {
       method: "POST",
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify({
-        contents: [{ parts: [{ text: prompt + " Generate as a tall vertical portrait poster artwork in 2:3 aspect ratio, taller than wide. Fill the entire frame edge to edge with no white borders, no margins, no shadows, no drop shadows, no perspective distortion, completely flat design. Suitable for canvas wall art print. No text, no words, no letters." }] }],
+        contents: [{ parts: [{ text: prompt + " Generate as a tall vertical portrait poster artwork in 4:5 aspect ratio, taller than wide. Fill the entire frame edge to edge with no white borders, no margins, no shadows, no drop shadows, no perspective distortion, completely flat design. Suitable for canvas wall art print. No text, no words, no letters." }] }],
         generationConfig: { responseModalities: ["IMAGE", "TEXT"] }
       })
     }
