@@ -3,7 +3,7 @@
 // Gemini → Printify → Etsy → Offsite Ads Toggle
 // Run with: node automation.js
 //
-// Already on Etsy? Skips publish and only toggles offsite ads (Printify API: external.id).
+// Already on Etsy? Skips publish and ny toggles offsite ads (Printify API: external.id).
 // Unpublished canvas drafts are published first; new listings fill remaining daily slots.
 //
 // ─── NEW: Offsite ads control ────────────────────────────────────────────────
@@ -530,7 +530,7 @@ async function cropToVertical(base64Data) {
 async function generateListing(prompt) {
   console.log("Generating listing content...");
   var res = await fetch(
-    "https://generativelanguage.googleapis.com/v1beta/models/gemini-3.1-flash-image-preview:generateContent?key=" + NB_API_KEY,
+    "https://generativelanguage.googleapis.com/v1beta/models/gemini-2.0-flash-preview-image-generation:generateContent?key=" + NB_API_KEY,
     {
       method: "POST",
       headers: { "Content-Type": "application/json" },
@@ -574,7 +574,7 @@ async function generateListing(prompt) {
 async function generateImage(prompt) {
   console.log("Generating image...");
   var res = await fetch(
-    "https://generativelanguage.googleapis.com/v1beta/models/gemini-3.1-flash-image-preview:generateContent?key=" + NB_API_KEY,
+    "https://generativelanguage.googleapis.com/v1beta/models/gemini-2.0-flash-preview-image-generation:generateContent?key=" + NB_API_KEY,
     {
       method: "POST",
       headers: { "Content-Type": "application/json" },
