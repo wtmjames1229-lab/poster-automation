@@ -11,7 +11,7 @@ jobs:
       - uses: actions/setup-node@v4
         with:
           node-version: '20'
-      - run: npm install sharp
+      - run: npm install sharp dotenv
       - run: node automation.js
         env:
           NB_API_KEY: ${{ secrets.NB_API_KEY }}
