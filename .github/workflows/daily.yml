@@ -23,5 +23,6 @@ jobs:
           PRINTIFY_SHOP_ID: '18634010'
           PRINTIFY_EMAIL: ${{ secrets.PRINTIFY_EMAIL }}
           PRINTIFY_PASSWORD: ${{ secrets.PRINTIFY_PASSWORD }}
+                    PRINTIFY_SESSION_TOKEN: ${{ secrets.PRINTIFY_SESSION_TOKEN }}
           TOGGLE_ALL_ETSY_PUBLISHED: 'false'
           OFFSITE_ADS_ENABLED: 'false'
