@@ -253,6 +253,40 @@ var isCanvasProduct = shop.isCanvasProduct;
 var fetchAllShopProducts = shop.fetchAllShopProducts;
 var getProduct = shop.getProduct;
 
+async function selectMockupsForProduct(productId) {
+  console.log("Selecting mockups for product " + productId + "...");
+  // Wait for Printify to generate mockup images
+  await new Promise(function(r) { setTimeout(r, 15000); });
+  var getRes = await fetch(
+    "https://api.printify.com/v1/shops/" + SHOP_ID + "/products/" + productId + ".json",
+    { headers: { "Authorization": "Bearer " + PRINTIFY_API_KEY } }
+  );
+  var product = await getRes.json();
+  if (!product.images || product.images.length === 0) {
+    console.log("No images found on product, skipping mockup selection");
+    return;
+  }
+  // Set is_selected_for_publishing: true on all images (includes mockups)
+  var updatedImages = product.images.map(function(img) {
+    return Object.assign({}, img, { is_selected_for_publishing: true });
+  });
+  console.log("Setting " + updatedImages.length + " image(s) as selected for publishing...");
+  var putRes = await fetch(
+    "https://api.printify.com/v1/shops/" + SHOP_ID + "/products/" + productId + ".json",
+    {
+      method: "PUT",
+      headers: { "Authorization": "Bearer " + PRINTIFY_API_KEY, "Content-Type": "application/json" },
+      body: JSON.stringify({ images: updatedImages })
+    }
+  );
+  var putData = await putRes.json();
+  if (putData.id) {
+    console.log("Mockups selected successfully for product " + productId);
+  } else {
+    console.log("Mockup selection response:", JSON.stringify(putData).substring(0, 200));
+  }
+}
+
 async function publishToEtsy(productId) {
   var product = await getProduct(productId);
   if (isPublishedToEtsy(product)) {
@@ -375,6 +409,7 @@ async function processUnpublishedDrafts(drafts, maxCount, adsEnable) {
     console.log('Product:', p.id);
     console.log('Title:', (p.title || '').substring(0, 60));
     try {
+      await selectMockupsForProduct(p.id);
       var didPublish = await publishToEtsy(p.id);
       if (didPublish) {
         console.log('✓ Published to Etsy:', p.id);
@@ -480,6 +515,7 @@ async function run() {
         var imageId   = await uploadToPrintify(base64Img);
         var productId = await createProduct(imageId, listing);
 
+        await selectMockupsForProduct(productId);
         var didPublish = await publishToEtsy(productId);
         if (didPublish) {
           console.log('✓ Listing live on Etsy! Product ID:', productId);
