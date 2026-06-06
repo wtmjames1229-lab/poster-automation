@@ -228,7 +228,7 @@ async function createProduct(imageId, listing) {
   var print_areas = VERTICAL_VARIANTS.map(function(v) {
     return {
       variant_ids: [v.id],
-      placeholders: [{ position: "front", images: [{ id: imageId, x: 0.5, y: 0.5, scale: 1, angle: 0 }] }]
+      placeholders: [{ position: "front", images: [{ id: imageId, x: 0.5, y: 0.5, scale: 1, angle: 0, print_area_width: v.w, print_area_height: v.h }] }]
     };
   });
   var res = await fetch("https://api.printify.com/v1/shops/" + SHOP_ID + "/products.json", {
