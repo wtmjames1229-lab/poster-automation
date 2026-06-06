@@ -119,26 +119,16 @@ async function cropToVertical(base64Data) {
   var metadata = await sharp(inputBuffer).metadata();
   var width = metadata.width;
   var height = metadata.height;
-  var targetRatio = 4 / 5;
-  var currentRatio = width / height;
-  var cropWidth, cropHeight, left, top;
-  if (currentRatio > targetRatio) {
-    cropHeight = height;
-    cropWidth = Math.floor(height * targetRatio);
-    left = Math.floor((width - cropWidth) / 2);
-    top = 0;
-  } else {
-    cropWidth = width;
-    cropHeight = Math.floor(width / targetRatio);
-    left = 0;
-    top = Math.floor((height - cropHeight) / 2);
-  }
+  // Expand (pad) to 4:5 ratio by adding white space top/bottom - do NOT crop
+  var targetHeight = Math.ceil(width * 5 / 4);
+  var padTop = Math.floor((targetHeight - height) / 2);
+  var padBottom = targetHeight - height - padTop;
   var outputBuffer = await sharp(inputBuffer)
-    .extract({ left: left, top: top, width: cropWidth, height: cropHeight })
+    .extend({ top: padTop, bottom: padBottom, left: 0, right: 0, background: { r: 255, g: 255, b: 255, alpha: 1 } })
     .resize(4000, 5000)
     .png()
     .toBuffer();
-  console.log("Image cropped to 4:5 (" + width + "x" + height + " -> 4000x5000)");
+  console.log("Image padded to 4:5 (" + width + "x" + height + " -> " + width + "x" + targetHeight + " -> 4000x5000)");
   return outputBuffer.toString("base64");
 }
 
