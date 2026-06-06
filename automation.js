@@ -255,8 +255,6 @@ var getProduct = shop.getProduct;
 
 async function selectMockupsForProduct(productId) {
   console.log("Selecting mockups for product " + productId + "...");
-  // Wait for Printify to generate mockup images
-  await new Promise(function(r) { setTimeout(r, 15000); });
   var getRes = await fetch(
     "https://api.printify.com/v1/shops/" + SHOP_ID + "/products/" + productId + ".json",
     { headers: { "Authorization": "Bearer " + PRINTIFY_API_KEY } }
@@ -287,6 +285,7 @@ async function selectMockupsForProduct(productId) {
   }
 }
 
+
 async function publishToEtsy(productId) {
   var product = await getProduct(productId);
   if (isPublishedToEtsy(product)) {
@@ -300,6 +299,7 @@ async function publishToEtsy(productId) {
 
   console.log("Waiting 90s for product images to fully process...");
   await new Promise(function(r) { setTimeout(r, 90000); });
+  await selectMockupsForProduct(productId);
   console.log("Publishing to Etsy...");
   var body = JSON.stringify({
     title: true, description: true, images: true, variants: true,
@@ -409,7 +409,6 @@ async function processUnpublishedDrafts(drafts, maxCount, adsEnable) {
     console.log('Product:', p.id);
     console.log('Title:', (p.title || '').substring(0, 60));
     try {
-      await selectMockupsForProduct(p.id);
       var didPublish = await publishToEtsy(p.id);
       if (didPublish) {
         console.log('✓ Published to Etsy:', p.id);
@@ -515,7 +514,6 @@ async function run() {
         var imageId   = await uploadToPrintify(base64Img);
         var productId = await createProduct(imageId, listing);
 
-        await selectMockupsForProduct(productId);
         var didPublish = await publishToEtsy(productId);
         if (didPublish) {
           console.log('✓ Listing live on Etsy! Product ID:', productId);
