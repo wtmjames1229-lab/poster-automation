@@ -184,8 +184,8 @@ async function generateImage(prompt) {
       method: "POST",
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify({
-        contents: [{ parts: [{ text: prompt + " Generate as a tall vertical portrait poster artwork in 2:3 aspect ratio, taller than wide. Fill the entire frame edge to edge with no white borders, no margins, no shadows, no drop shadows, no perspective distortion, completely flat design. Suitable for canvas wall art print. No text, no words, no letters." }] }],
-        generationConfig: { responseModalities: ["IMAGE", "TEXT"] }
+        contents: [{ parts: [{ text: prompt + " Generate as a tall vertical portrait poster artwork in 4:5 aspect ratio, taller than wide. Fill the entire frame edge to edge with no white borders, no margins, no shadows, no drop shadows, no perspective distortion, completely flat design. Suitable for canvas wall art print. No text, no words, no letters." }] }],
+        generationConfig: { responseModalities: ["IMAGE", "TEXT"], aspectRatio: "4:5" }
       })
     }
   );
