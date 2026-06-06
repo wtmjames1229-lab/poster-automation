@@ -225,10 +225,12 @@ async function createProduct(imageId, listing) {
   var variants = VERTICAL_VARIANTS.map(function(v) {
     return { id: v.id, is_enabled: true, price: v.price };
   });
-  var print_areas = [{
-    variant_ids: VERTICAL_VARIANTS.map(function(v) { return v.id; }),
-    placeholders: [{ position: "front", images: [{ id: imageId, x: 0.5, y: 0.5, scale: 1, angle: 0 }] }]
-  }];
+  var print_areas = VERTICAL_VARIANTS.map(function(v) {
+    return {
+      variant_ids: [v.id],
+      placeholders: [{ position: "front", images: [{ id: imageId, x: 0.5, y: 0.5, scale: 1, angle: 0, print_area_width: v.w, print_area_height: v.h }] }]
+    };
+  });
   var res = await fetch("https://api.printify.com/v1/shops/" + SHOP_ID + "/products.json", {
     method: "POST",
     headers: { "Authorization": "Bearer " + PRINTIFY_API_KEY, "Content-Type": "application/json" },
@@ -253,68 +255,6 @@ var isCanvasProduct = shop.isCanvasProduct;
 var fetchAllShopProducts = shop.fetchAllShopProducts;
 var getProduct = shop.getProduct;
 
-async function selectMockupsForProduct(productId) {
-  const userId = process.env.PRINTIFY_USER_ID || '19310315';
-  const sessionToken = process.env.PRINTIFY_SESSION_TOKEN;
-
-  if (!sessionToken) {
-    console.log("PRINTIFY_SESSION_TOKEN not set — skipping mockup selection.");
-    console.log("To fix 'Publishing error': add PRINTIFY_SESSION_TOKEN secret.");
-    console.log("  1. Open browser devtools on printify.com, go to Network tab");
-    console.log("  2. Find any /api/v1/users/ request, copy the Authorization header value");
-    console.log("  3. Add it as PRINTIFY_SESSION_TOKEN GitHub secret");
-    return;
-  }
-
-  console.log("Selecting mockups for product " + productId + " (user " + userId + ")...");
-
-  // Get available mockups from internal Printify API
-  var mapRes = await fetch(
-    "https://printify.com/api/v1/users/" + userId + "/shops/" + SHOP_ID + "/products/" + productId + "/generated-mockups-map",
-    { headers: { "Authorization": sessionToken, "Content-Type": "application/json" } }
-  );
-  var mapData = await mapRes.json();
-  console.log("Mockups map status:", mapRes.status);
-    console.log("Mockup map data (first 500):", JSON.stringify(mapData).substring(0, 500));
-
-  if (mapRes.status !== 200 || mapData.error) {
-    console.log("Could not get mockup map:", JSON.stringify(mapData).substring(0, 100));
-    return;
-  }
-
-  // Collect mockup IDs (select up to 5)
-  var mockupIds = [];
-  Object.values(mapData).forEach(function(group) {
-    if (Array.isArray(group)) {
-      group.forEach(function(m) {
-        if (m && m.id && mockupIds.indexOf(m.id) === -1 && mockupIds.length < 5) {
-          mockupIds.push(m.id);
-        }
-      });
-    }
-  });
-
-  if (mockupIds.length === 0) {
-    console.log("No mockup IDs found in map");
-    return;
-  }
-
-  console.log("Selecting " + mockupIds.length + " mockup(s)...");
-  var putRes = await fetch(
-    "https://printify.com/api/v1/users/" + userId + "/shops/" + SHOP_ID + "/products/" + productId + "/selected-mockups",
-    {
-      method: "PUT",
-      headers: { "Authorization": sessionToken, "Content-Type": "application/json" },
-      body: JSON.stringify({ ids: mockupIds })
-    }
-  );
-  console.log("Mockup selection status:", putRes.status);
-  if (putRes.status === 204 || putRes.status === 200) {
-    console.log("Mockups selected successfully for " + productId);
-  }
-}
-
-
 async function publishToEtsy(productId) {
   var product = await getProduct(productId);
   if (isPublishedToEtsy(product)) {
@@ -326,9 +266,8 @@ async function publishToEtsy(productId) {
     return false;
   }
 
-  console.log("Waiting 90s for product images to fully process...");
-  await new Promise(function(r) { setTimeout(r, 90000); });
-  await selectMockupsForProduct(productId);
+  console.log("Waiting 45s for product images to fully process...");
+  await new Promise(function(r) { setTimeout(r, 45000); });
   console.log("Publishing to Etsy...");
   var body = JSON.stringify({
     title: true, description: true, images: true, variants: true,
