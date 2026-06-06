@@ -275,6 +275,7 @@ async function selectMockupsForProduct(productId) {
   );
   var mapData = await mapRes.json();
   console.log("Mockups map status:", mapRes.status);
+    console.log("Mockup map data (first 500):", JSON.stringify(mapData).substring(0, 500));
 
   if (mapRes.status !== 200 || mapData.error) {
     console.log("Could not get mockup map:", JSON.stringify(mapData).substring(0, 100));
