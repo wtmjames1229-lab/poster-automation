@@ -119,7 +119,7 @@ async function cropToVertical(base64Data) {
   var metadata = await sharp(inputBuffer).metadata();
   var width = metadata.width;
   var height = metadata.height;
-  var targetRatio = 2 / 3;
+  var targetRatio = 4 / 5;
   var currentRatio = width / height;
   var cropWidth, cropHeight, left, top;
   if (currentRatio > targetRatio) {
