@@ -225,12 +225,10 @@ async function createProduct(imageId, listing) {
   var variants = VERTICAL_VARIANTS.map(function(v) {
     return { id: v.id, is_enabled: true, price: v.price };
   });
-  var print_areas = VERTICAL_VARIANTS.map(function(v) {
-    return {
-      variant_ids: [v.id],
-      placeholders: [{ position: "front", images: [{ id: imageId, x: 0.5, y: 0.5, scale: 1, angle: 0, print_area_width: v.w, print_area_height: v.h }] }]
-    };
-  });
+  var print_areas = [{
+    variant_ids: VERTICAL_VARIANTS.map(function(v) { return v.id; }),
+    placeholders: [{ position: "front", images: [{ id: imageId, x: 0.5, y: 0.5, scale: 1, angle: 0 }] }]
+  }];
   var res = await fetch("https://api.printify.com/v1/shops/" + SHOP_ID + "/products.json", {
     method: "POST",
     headers: { "Authorization": "Bearer " + PRINTIFY_API_KEY, "Content-Type": "application/json" },
