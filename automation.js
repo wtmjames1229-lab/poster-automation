@@ -135,10 +135,10 @@ async function cropToVertical(base64Data) {
   }
   var outputBuffer = await sharp(inputBuffer)
     .extract({ left: left, top: top, width: cropWidth, height: cropHeight })
-    .resize(3000, 4500)
+    .resize(4000, 5000)
     .png()
     .toBuffer();
-  console.log("Image cropped to 2:3 (" + width + "x" + height + " -> 3000x4500)");
+  console.log("Image cropped to 4:5 (" + width + "x" + height + " -> 4000x5000)");
   return outputBuffer.toString("base64");
 }
 
