@@ -194,7 +194,7 @@ async function generateImage(prompt) {
   var imagePart = parts && parts.find(function(p) { return p.inlineData; });
   if (!imagePart) throw new Error("Image generation failed: " + JSON.stringify(data));
   console.log("Image generated successfully");
-  return imagePart.inlineData.data;
+  return await cropToVertical(imagePart.inlineData.data);
 }
 
 async function uploadToPrintify(base64Data) {
