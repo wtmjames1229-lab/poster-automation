@@ -254,21 +254,69 @@ var fetchAllShopProducts = shop.fetchAllShopProducts;
 var getProduct = shop.getProduct;
 
 async function selectMockupsForProduct(productId) {
-  console.log("Selecting mockups for product " + productId + "...");
+  const userId = process.env.PRINTIFY_USER_ID || '19310315';
+  console.log("Selecting mockups for product " + productId + " (user " + userId + ")...");
+
+  // Try internal Printify API (printify.com/api/v1) with Bearer token
+  // This uses the user-scoped mockup endpoint
+  try {
+    var mapRes = await fetch(
+      "https://printify.com/api/v1/users/" + userId + "/shops/" + SHOP_ID + "/products/" + productId + "/generated-mockups-map",
+      { headers: { "Authorization": "Bearer " + PRINTIFY_API_KEY, "Content-Type": "application/json" } }
+    );
+    var mapData = await mapRes.json();
+    console.log("Generated mockups map status:", mapRes.status, "keys:", Object.keys(mapData || {}).join(',').substring(0, 100));
+
+    if (mapRes.status === 200 && mapData && !mapData.error) {
+      // Extract mockup IDs from the map
+      // The map is keyed by variant/camera combinations; select the first 5
+      var mockupIds = [];
+      Object.values(mapData).forEach(function(variantMockups) {
+        if (Array.isArray(variantMockups)) {
+          variantMockups.forEach(function(m) {
+            if (m && m.id && mockupIds.indexOf(m.id) === -1 && mockupIds.length < 5) {
+              mockupIds.push(m.id);
+            }
+          });
+        }
+      });
+
+      if (mockupIds.length > 0) {
+        console.log("Selecting " + mockupIds.length + " mockup(s):", mockupIds.join(','));
+        var putRes = await fetch(
+          "https://printify.com/api/v1/users/" + userId + "/shops/" + SHOP_ID + "/products/" + productId + "/selected-mockups",
+          {
+            method: "PUT",
+            headers: { "Authorization": "Bearer " + PRINTIFY_API_KEY, "Content-Type": "application/json" },
+            body: JSON.stringify({ ids: mockupIds })
+          }
+        );
+        console.log("Selected mockups response status:", putRes.status);
+        if (putRes.status === 204 || putRes.status === 200) {
+          console.log("Mockups selected successfully!");
+          return;
+        }
+      }
+    }
+  } catch (e) {
+    console.log("Internal API attempt failed:", e.message);
+  }
+
+  // Fallback: try public API to get existing images
   var getRes = await fetch(
     "https://api.printify.com/v1/shops/" + SHOP_ID + "/products/" + productId + ".json",
     { headers: { "Authorization": "Bearer " + PRINTIFY_API_KEY } }
   );
   var product = await getRes.json();
-  if (!product.images || product.images.length === 0) {
-    console.log("No images found on product, skipping mockup selection");
+  var images = product.images || [];
+  if (images.length === 0) {
+    console.log("No images found via public API either, skipping mockup selection");
     return;
   }
-  // Set is_selected_for_publishing: true on all images (includes mockups)
-  var updatedImages = product.images.map(function(img) {
+  var updatedImages = images.map(function(img) {
     return Object.assign({}, img, { is_selected_for_publishing: true });
   });
-  console.log("Setting " + updatedImages.length + " image(s) as selected for publishing...");
+  console.log("Setting " + updatedImages.length + " public image(s) as selected for publishing...");
   var putRes = await fetch(
     "https://api.printify.com/v1/shops/" + SHOP_ID + "/products/" + productId + ".json",
     {
@@ -279,9 +327,7 @@ async function selectMockupsForProduct(productId) {
   );
   var putData = await putRes.json();
   if (putData.id) {
-    console.log("Mockups selected successfully for product " + productId);
-  } else {
-    console.log("Mockup selection response:", JSON.stringify(putData).substring(0, 200));
+    console.log("Public API mockup selection done for product " + productId);
   }
 }
 
