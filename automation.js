@@ -82,13 +82,14 @@ const PROMPTS = [
   // ... (rest of prompts are same as original - truncated for brevity)
 ];
 
+const ALL_VARIANTS = [96924,96925,96926,96927,96928,96929,96930,96931,96932,96933,96934,96935,96936,96937,96938,96939,96940,96941,96942,96943,96944,96945,96946,96947,96948,96949,96950,96951,96952,96953,96954,96956,96957,96958];
 const VERTICAL_VARIANTS = [
-  { id: 2974, w: 2365, h: 2955,  price: 5500  }, // 8x10  $55
-  { id: 4277, w: 2955, h: 3546,  price: 7000  }, // 10x12 $70
-  { id: 2970, w: 4727, h: 5920,  price: 10000 }, // 16x20 $100
-  { id: 3611, w: 5920, h: 7101,  price: 13000 }, // 20x24 $130
-  { id: 3161, w: 7101, h: 8884,  price: 17000 }, // 24x30 $170
-  { id: 3549, w: 8858, h: 11811, price: 24000 }, // 30x40 $240
+  { id: 96926, w: 2365, h: 2955,  price: 5500  }, // 8x10  $55
+  { id: 96930, w: 2955, h: 3546,  price: 7000  }, // 10x12 $70
+  { id: 96944, w: 4727, h: 5920,  price: 10000 }, // 16x20 $100
+  { id: 96946, w: 5920, h: 7101,  price: 13000 }, // 20x24 $130
+  { id: 96956, w: 7101, h: 8884,  price: 17000 }, // 24x30 $170
+  { id: 96958, w: 8858, h: 11811, price: 24000 }, // 30x40 $240
 ];
 
 function pickPrompts() {
@@ -223,8 +224,11 @@ async function uploadToPrintify(base64Data) {
 
 async function createProduct(imageId, listing) {
   console.log("Creating Printify product...");
-  var variants = VERTICAL_VARIANTS.map(function(v) {
-    return { id: v.id, is_enabled: true, price: v.price };
+  var enabledIds = new Set(VERTICAL_VARIANTS.map(function(v) { return v.id; }));
+  var priceMap = {};
+  VERTICAL_VARIANTS.forEach(function(v) { priceMap[v.id] = v.price; });
+  var variants = ALL_VARIANTS.map(function(id) {
+    return { id: id, is_enabled: enabledIds.has(id), price: enabledIds.has(id) ? priceMap[id] : 500 };
   });
   var print_areas = [{
         variant_ids: VERTICAL_VARIANTS.map(function(v) { return v.id; }),
