@@ -269,26 +269,47 @@ async function publishToEtsy(productId) {
     return false;
   }
 
-  console.log("Waiting 90s for product images to fully process...");
-  await new Promise(function(r) { setTimeout(r, 90000); });
   console.log("Publishing to Etsy...");
   var body = JSON.stringify({
     title: true, description: true, images: true, variants: true,
     tags: true, keyFeatures: true, shipping_template: true
   });
-  for (var attempt = 1; attempt <= 3; attempt++) {
+
+  var attempt = 1;
+  var triggerOk = false;
+  while (attempt <= 3 && !triggerOk) {
     console.log("Publish attempt " + attempt + "...");
     var res = await fetch(
       "https://api.printify.com/v1/shops/" + SHOP_ID + "/products/" + productId + "/publish.json",
       { method: "POST", headers: { "Authorization": "Bearer " + PRINTIFY_API_KEY, "Content-Type": "application/json" }, body: body }
     );
-    var statusCode = res.status;
-    var text = await res.text();
-    console.log("Publish response (status " + statusCode + "):", text);
-    if (statusCode === 200 || statusCode === 204) { console.log("Publish succeeded!"); return true; }
-    if (attempt < 3) await new Promise(function(r) { setTimeout(r, 20000); });
+    var resText = await res.text();
+    console.log("Publish response (status " + res.status + "): " + resText);
+    if (res.status === 200) {
+      triggerOk = true;
+    } else {
+      if (attempt < 3) await new Promise(function(r) { setTimeout(r, 20000); });
+      attempt++;
+    }
   }
-  return false;
+  if (!triggerOk) throw new Error("Publish trigger failed after 3 attempts");
+
+  console.log("Publish triggered. Polling for Etsy status...");
+  for (var i = 0; i < 20; i++) {
+    await new Promise(function(r) { setTimeout(r, 10000); });
+    var p = await getProduct(productId);
+    var status = p.publishing_status;
+    var externalId = p.external && p.external.id;
+    console.log("Poll " + (i+1) + "/20: status=" + status + " external.id=" + (externalId || "none"));
+    if (status === "succeeded" || externalId) {
+      console.log("Publish succeeded!");
+      return true;
+    }
+    if (status === "failed") {
+      throw new Error("Publishing failed: " + (p.publishing_error || "unknown"));
+    }
+  }
+  throw new Error("Publish timed out after 200s");
 }
 
 // ─── NEW: Toggle offsite ads after publishing ─────────────────────────────────
