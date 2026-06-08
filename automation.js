@@ -272,7 +272,7 @@ async function publishToEtsy(productId) {
   console.log("Publishing to Etsy...");
   var body = JSON.stringify({
     title: true, description: true, images: true, variants: true,
-    tags: true, keyFeatures: true, shipping_template: true
+    tags: true, keyFeatures: false, shipping_template: false
   });
 
   var attempt = 1;
@@ -294,22 +294,25 @@ async function publishToEtsy(productId) {
   }
   if (!triggerOk) throw new Error("Publish trigger failed after 3 attempts");
 
-  console.log("Publish triggered. Polling for Etsy status...");
-  for (var i = 0; i < 20; i++) {
-    await new Promise(function(r) { setTimeout(r, 10000); });
+  console.log("Publish triggered. Polling for Etsy listing ID...");
+  for (var i = 0; i < 24; i++) {
+    await new Promise(function(r) { setTimeout(r, 15000); });
     var p = await getProduct(productId);
-    var status = p.publishing_status;
     var externalId = p.external && p.external.id;
-    console.log("Poll " + (i+1) + "/20: status=" + status + " external.id=" + (externalId || "none"));
-    if (status === "succeeded" || externalId) {
-      console.log("Publish succeeded!");
+    var status = p.publishing_status;
+    console.log("Poll " + (i+1) + "/24: external.id=" + (externalId || "none") + " status=" + (status || "not set") + " locked=" + p.is_locked);
+    if (externalId) {
+      console.log("Publish succeeded! Etsy listing ID: " + externalId);
       return true;
     }
     if (status === "failed") {
-      throw new Error("Publishing failed: " + (p.publishing_error || "unknown"));
+      throw new Error("Publishing failed (status=failed)");
+    }
+    if (i >= 3 && !p.is_locked && !externalId) {
+      throw new Error("Publishing failed: product unlocked but no Etsy listing ID after " + ((i+1)*15) + "s");
     }
   }
-  throw new Error("Publish timed out after 200s");
+  throw new Error("Publish timed out: no Etsy listing ID after 6 min");
 }
 
 // ─── NEW: Toggle offsite ads after publishing ─────────────────────────────────
