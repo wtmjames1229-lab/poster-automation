@@ -138,7 +138,7 @@ async function cropToVertical(base64Data) {
   var outputBuffer = await sharp(inputBuffer)
     .extract({ left: left, top: top, width: cropWidth, height: cropHeight })
     .resize(4000, 5000)
-    .png()
+    .jpeg({ quality: 85 })
     .toBuffer();
   console.log("Image cropped to 4:5 (" + width + "x" + height + " -> 4000x5000)");
   return outputBuffer.toString("base64");
@@ -509,7 +509,8 @@ async function run() {
         var imageId   = await uploadToPrintify(base64Img);
         var productId = await createProduct(imageId, listing);
 
-        var didPublish = await publishToEtsy(productId);
+        var didPublish = await new Promise(function(r) { setTimeout(r, 15000); }); // wait 15s before publish
+    await publishToEtsy(productId);
         if (didPublish) {
           console.log('✓ Listing live on Etsy! Product ID:', productId);
         }
