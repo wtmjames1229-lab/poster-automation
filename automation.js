@@ -137,8 +137,8 @@ async function cropToVertical(base64Data) {
   }
   var outputBuffer = await sharp(inputBuffer)
     .extract({ left: left, top: top, width: cropWidth, height: cropHeight })
-    .resize(4000, 5000)
-    .jpeg({ quality: 85 })
+    .resize(2000, 2500)
+    .jpeg({ quality: 90 })
     .toBuffer();
   console.log("Image cropped to 4:5 (" + width + "x" + height + " -> 4000x5000)");
   return outputBuffer.toString("base64");
@@ -201,7 +201,9 @@ async function generateImage(prompt) {
       })
     }
   );
-  var data = await res.json();
+  var rawText2 = await res.text();
+  var data;
+  try { data = JSON.parse(rawText2); } catch(e) { throw new Error("Image generation failed (non-JSON, status " + res.status + "): " + rawText2.substring(0, 200)); }
   var parts = data && data.candidates && data.candidates[0] && data.candidates[0].content && data.candidates[0].content.parts;
   var imagePart = parts && parts.find(function(p) { return p.inlineData; });
   if (!imagePart) throw new Error("Image generation failed: " + JSON.stringify(data));
@@ -214,9 +216,11 @@ async function uploadToPrintify(base64Data) {
   var res = await fetch("https://api.printify.com/v1/uploads/images.json", {
     method: "POST",
     headers: { "Authorization": "Bearer " + PRINTIFY_API_KEY, "Content-Type": "application/json" },
-    body: JSON.stringify({ file_name: "canvas_" + Date.now() + ".png", contents: base64Data })
+    body: JSON.stringify({ file_name: "canvas_" + Date.now() + ".jpg", contents: base64Data })
   });
-  var data = await res.json();
+  var rawText = await res.text();
+  var data;
+  try { data = JSON.parse(rawText); } catch(e) { throw new Error("Upload failed (non-JSON response, status " + res.status + "): " + rawText.substring(0, 200)); }
   if (!data.id) throw new Error("Upload failed: " + JSON.stringify(data));
   console.log("Uploaded, image ID:", data.id);
   return data.id;
@@ -308,9 +312,7 @@ async function publishToEtsy(productId) {
     if (status === "failed") {
       throw new Error("Publishing failed (status=failed)");
     }
-    if (i >= 3 && !p.is_locked && !externalId) {
-      throw new Error("Publishing failed: product unlocked but no Etsy listing ID after " + ((i+1)*15) + "s");
-    }
+    // Note: don't bail out early just because product is unlocked — Etsy sync can take 2+ min
   }
   throw new Error("Publish timed out: no Etsy listing ID after 6 min");
 }
