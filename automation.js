@@ -338,7 +338,7 @@ async function publishToEtsy(productId) {
   console.log("Publishing to Etsy...");
     var body = JSON.stringify({
           title: true, description: true, images: true, variants: true,
-          tags: true, keyFeatures: false, shipping_template: false
+          tags: true, keyFeatures: false, shipping_template: true
     });
 
   var attempt = 1;
