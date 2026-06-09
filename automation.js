@@ -1,16 +1,7 @@
 // POD Automation Pipeline - Snoopy Canvas
-// 5 listings per day, all old style clean illustrations
+// 5 listings per day
 // Gemini → Printify → Etsy → Offsite Ads Toggle
 // Run with: node automation.js
-//
-// Already on Etsy? Skips publish and only toggles offsite ads (Printify API: external.id).
-// Unpublished canvas drafts are published first; new listings fill remaining daily slots.
-//
-// ─── Offsite ads control ─────────────────────────────────────────────────────
-// The etsy-offsite-ads package is a VPS-only feature (Playwright browser automation).
-// It is not available in GitHub Actions — the script skips it gracefully.
-// To use it locally: npm run ads:on / npm run ads:off
-// ─────────────────────────────────────────────────────────────────────────────
 require('dotenv').config();
 const shop = require('./printifyShop');
 const NB_API_KEY = process.env.NB_API_KEY;
@@ -23,1030 +14,1045 @@ const DAILY_NEW_LISTINGS = parseInt(process.env.DAILY_NEW_LISTINGS || '5', 10);
 const SKIP_NEW_LISTINGS = process.env.SKIP_NEW_LISTINGS === 'true';
 const TOGGLE_ALL_ETSY_PUBLISHED = process.env.TOGGLE_ALL_ETSY_PUBLISHED !== 'false';
 
-// Lazy-load the ads module — only available on VPS with Playwright installed
 let offsiteAdsModule = null;
 function getOffsiteAdsModule() {
     if (!offsiteAdsModule) {
-          try {
-                  offsiteAdsModule = require('./etsy-offsite-ads/src');
-          } catch (e) {
-                  offsiteAdsModule = false;
-          }
+        try { offsiteAdsModule = require('./etsy-offsite-ads/src'); }
+        catch (e) { offsiteAdsModule = false; }
     }
     return offsiteAdsModule;
 }
 
 const PROMPTS = [
-  "Cartoon Snoopy surfing a giant wave at Mavericks Beach California, hyper-realistic crashing ocean spray background, POSTER_TITLE:'GIANT WAVE AT MAVERICKS'",
-  "Cartoon Snoopy on the Golden Gate Bridge San Francisco, hyper-realistic fog rolling over bay, POSTER_TITLE:'GOLDEN GATE BRIDGE SAN'",
-  "Cartoon Snoopy hiking Half Dome Yosemite, hyper-realistic granite cliff and valley below, POSTER_TITLE:'HALF DOME YOSEMITE'",
-  "Cartoon Snoopy at the Grand Canyon rim at sunrise, hyper-realistic canyon layers in golden light, POSTER_TITLE:'GRAND CANYON RIM AT'",
-  "Cartoon Snoopy on Venice Beach boardwalk Los Angeles, hyper-realistic palm trees and skaters, POSTER_TITLE:'VENICE BEACH BOARDWALK LOS'",
-  "Cartoon Snoopy in Times Square New York at night, hyper-realistic neon billboards and crowds, POSTER_TITLE:'TIMES SQUARE NEW YORK'",
-  "Cartoon Snoopy on the Brooklyn Bridge, hyper-realistic Manhattan skyline at dusk, POSTER_TITLE:'BROOKLYN BRIDGE'",
-  "Cartoon Snoopy at Yellowstone geyser eruption, hyper-realistic steam and rainbow mist, POSTER_TITLE:'YELLOWSTONE GEYSER ERUPTION'",
-  "Cartoon Snoopy at Monument Valley Arizona, hyper-realistic red sandstone buttes at sunset, POSTER_TITLE:'MONUMENT VALLEY ARIZONA'",
-  "Cartoon Snoopy in the French Quarter New Orleans, hyper-realistic wrought iron balconies and jazz street, POSTER_TITLE:'FRENCH QUARTER NEW ORLEANS'",
-  "Cartoon Snoopy at Multnomah Falls Oregon, hyper-realistic waterfall and lush green moss, POSTER_TITLE:'MULTNOMAH FALLS OREGON'",
-  "Cartoon Snoopy in the streets of Chicago with hyper-realistic skyline reflection in the river, POSTER_TITLE:'CHICAGO'",
-  "Cartoon Snoopy on Miami South Beach with hyper-realistic turquoise water and art deco hotels, POSTER_TITLE:'MIAMI SOUTH BEACH'",
-  "Cartoon Snoopy at Antelope Canyon Arizona, hyper-realistic swirling sandstone light beams, POSTER_TITLE:'ANTELOPE CANYON ARIZONA'",
-  "Cartoon Snoopy at Crater Lake Oregon, hyper-realistic deep blue water and volcanic rim, POSTER_TITLE:'CRATER LAKE OREGON'",
-  "Cartoon Snoopy in the Redwood Forest California, hyper-realistic towering ancient trees, POSTER_TITLE:'REDWOOD FOREST CALIFORNIA'",
-  "Cartoon Snoopy at the Las Vegas Strip at night, hyper-realistic neon casino lights and fountains, POSTER_TITLE:'LAS VEGAS STRIP AT'",
-  "Cartoon Snoopy at Niagara Falls, hyper-realistic thundering water and rainbow mist, POSTER_TITLE:'NIAGARA FALLS'",
-  "Cartoon Snoopy at the Outer Banks North Carolina, hyper-realistic lighthouse and wild horses, POSTER_TITLE:'OUTER BANKS NORTH CAROLINA'",
-  "Cartoon Snoopy at Glacier National Park Montana, hyper-realistic turquoise lake and snow peaks, POSTER_TITLE:'GLACIER NATIONAL PARK MONTANA'",
-  "Cartoon Snoopy on Route 66 desert highway, hyper-realistic endless road and red mesas, POSTER_TITLE:'ROUTE 66 DESERT HIGHWAY'",
-  "Cartoon Snoopy at Joshua Tree National Park, hyper-realistic twisted trees and Milky Way sky, POSTER_TITLE:'JOSHUA TREE NATIONAL PARK'",
-  "Cartoon Snoopy at Waimea Bay Hawaii surfing, hyper-realistic tropical waves and cliffs, POSTER_TITLE:'WAIMEA BAY HAWAII SURFING'",
-  "Cartoon Snoopy at the Smoky Mountains Tennessee, hyper-realistic autumn mist and forest, POSTER_TITLE:'SMOKY MOUNTAINS TENNESSEE'",
-  "Cartoon Snoopy in Savannah Georgia with hyper-realistic Spanish moss and cobblestone streets, POSTER_TITLE:'SAVANNAH GEORGIA'",
-  "Cartoon Snoopy at Sedona Arizona red rocks, hyper-realistic rusty cliffs and clear blue sky, POSTER_TITLE:'SEDONA ARIZONA RED ROCKS'",
-  "Cartoon Snoopy at the Seattle Space Needle, hyper-realistic Puget Sound and Mount Rainier background, POSTER_TITLE:'SEATTLE SPACE NEEDLE'",
-  "Cartoon Snoopy at Portland Oregon food cart pod, hyper-realistic rainy street and string lights, POSTER_TITLE:'PORTLAND OREGON FOOD CART'",
-  "Cartoon Snoopy at Acadia National Park Maine, hyper-realistic rocky coast and lighthouse, POSTER_TITLE:'ACADIA NATIONAL PARK MAINE'",
-  "Cartoon Snoopy at the San Antonio Riverwalk, hyper-realistic lantern-lit waterway and cypress trees, POSTER_TITLE:'SAN ANTONIO RIVERWALK'",
-  "Cartoon Snoopy at the Eiffel Tower Paris, hyper-realistic city of lights at golden hour, POSTER_TITLE:'EIFFEL TOWER PARIS'",
-  "Cartoon Snoopy on the Amalfi Coast Italy, hyper-realistic cliffside villages and turquoise sea, POSTER_TITLE:'AMALFI COAST ITALY'",
-  "Cartoon Snoopy in Santorini Greece, hyper-realistic white buildings and blue dome churches at sunset, POSTER_TITLE:'SANTORINI GREECE'",
-  "Cartoon Snoopy at the Colosseum Rome, hyper-realistic ancient stone and dramatic sky, POSTER_TITLE:'COLOSSEUM ROME'",
-  "Cartoon Snoopy on the canals of Venice Italy, hyper-realistic gondolas and palazzo reflections, POSTER_TITLE:'CANALS OF VENICE ITALY'",
-  "Cartoon Snoopy at the Acropolis Athens, hyper-realistic ancient ruins and Mediterranean sky, POSTER_TITLE:'ACROPOLIS ATHENS'",
-  "Cartoon Snoopy in the streets of Barcelona, hyper-realistic Gaudi architecture and mosaic tiles, POSTER_TITLE:'STREETS OF BARCELONA'",
-  "Cartoon Snoopy at the Cliffs of Moher Ireland, hyper-realistic wild Atlantic waves and green cliffs, POSTER_TITLE:'CLIFFS OF MOHER IRELAND'",
-  "Cartoon Snoopy in the Scottish Highlands, hyper-realistic purple heather moors and misty mountains, POSTER_TITLE:'SCOTTISH HIGHLANDS'",
-  "Cartoon Snoopy at the Palace of Westminster London, hyper-realistic Big Ben and Thames at twilight, POSTER_TITLE:'PALACE OF WESTMINSTER LONDON'",
-  "Cartoon Snoopy on the Charles Bridge Prague, hyper-realistic gothic spires and river mist, POSTER_TITLE:'CHARLES BRIDGE PRAGUE'",
-  "Cartoon Snoopy in the tulip fields of Netherlands, hyper-realistic rows of colored flowers and windmill, POSTER_TITLE:'TULIP FIELDS OF NETHERLANDS'",
-  "Cartoon Snoopy at the Swiss Alps Matterhorn, hyper-realistic snow peak and alpine meadow, POSTER_TITLE:'SWISS ALPS MATTERHORN'",
-  "Cartoon Snoopy in Vienna Austria, hyper-realistic baroque palace and horse-drawn carriage, POSTER_TITLE:'VIENNA AUSTRIA'",
-  "Cartoon Snoopy on the beaches of Ibiza Spain, hyper-realistic crystal water and white village, POSTER_TITLE:'BEACHES OF IBIZA SPAIN'",
-  "Cartoon Snoopy at Neuschwanstein Castle Germany, hyper-realistic fairytale castle in autumn forest, POSTER_TITLE:'NEUSCHWANSTEIN CASTLE GERMANY'",
-  "Cartoon Snoopy at the Sagrada Familia Barcelona, hyper-realistic soaring spires and stone carvings, POSTER_TITLE:'SAGRADA FAMILIA BARCELONA'",
-  "Cartoon Snoopy in the Dolomites Italy, hyper-realistic jagged limestone peaks and wildflowers, POSTER_TITLE:'DOLOMITES ITALY'",
-  "Cartoon Snoopy at Lake Bled Slovenia, hyper-realistic island church and emerald water, POSTER_TITLE:'LAKE BLED SLOVENIA'",
-  "Cartoon Snoopy in Dubrovnik Croatia, hyper-realistic medieval walls and Adriatic sea, POSTER_TITLE:'DUBROVNIK CROATIA'",
-  "Cartoon Snoopy at the Alhambra Granada Spain, hyper-realistic Moorish arches and reflecting pools, POSTER_TITLE:'ALHAMBRA GRANADA SPAIN'",
-  "Cartoon Snoopy in Cinque Terre Italy, hyper-realistic colorful cliffside villages and sea, POSTER_TITLE:'CINQUE TERRE ITALY'",
-  "Cartoon Snoopy at the Northern Lights Iceland, hyper-realistic green aurora over black volcanic sand, POSTER_TITLE:'NORTHERN LIGHTS ICELAND'",
-  "Cartoon Snoopy at the Blue Lagoon Iceland, hyper-realistic steaming milky blue geothermal pool, POSTER_TITLE:'BLUE LAGOON ICELAND'",
-  "Cartoon Snoopy in Hallstatt Austria, hyper-realistic lakeside alpine village at dawn, POSTER_TITLE:'HALLSTATT AUSTRIA'",
-  "Cartoon Snoopy at Stonehenge England, hyper-realistic ancient monoliths and dramatic storm sky, POSTER_TITLE:'STONEHENGE ENGLAND'",
-  "Cartoon Snoopy in the Bavarian Christmas market Germany, hyper-realistic snow and glowing stalls, POSTER_TITLE:'BAVARIAN CHRISTMAS MARKET GERMANY'",
-  "Cartoon Snoopy at the Trevi Fountain Rome, hyper-realistic baroque stone and splashing water, POSTER_TITLE:'TREVI FOUNTAIN ROME'",
-  "Cartoon Snoopy in Bruges Belgium, hyper-realistic medieval canals and guild houses in autumn, POSTER_TITLE:'BRUGES BELGIUM'",
-  "Cartoon Snoopy at the Fjords of Norway, hyper-realistic vertical cliff walls and mirror water, POSTER_TITLE:'FJORDS OF NORWAY'",
-  "Cartoon Snoopy at Mount Fuji Japan, hyper-realistic snow-capped volcano and cherry blossom forest, POSTER_TITLE:'MOUNT FUJI JAPAN'",
-  "Cartoon Snoopy in the bamboo forest Arashiyama Japan, hyper-realistic towering green stalks and filtered light, POSTER_TITLE:'BAMBOO FOREST ARASHIYAMA JAPAN'",
-  "Cartoon Snoopy at the Shibuya Crossing Tokyo, hyper-realistic neon night and crossing crowds, POSTER_TITLE:'SHIBUYA CROSSING TOKYO'",
-  "Cartoon Snoopy at the Great Wall of China, hyper-realistic ancient watchtowers and mountain ridgeline, POSTER_TITLE:'GREAT WALL OF CHINA'",
-  "Cartoon Snoopy in the floating markets Bangkok Thailand, hyper-realistic boats and tropical colors, POSTER_TITLE:'FLOATING MARKETS BANGKOK THAILAND'",
-  "Cartoon Snoopy at Angkor Wat Cambodia, hyper-realistic ancient temple and sunrise reflection, POSTER_TITLE:'ANGKOR WAT CAMBODIA'",
-  "Cartoon Snoopy at Ha Long Bay Vietnam, hyper-realistic limestone karsts rising from emerald sea, POSTER_TITLE:'HA LONG BAY VIETNAM'",
-  "Cartoon Snoopy at the Taj Mahal India, hyper-realistic white marble at golden hour, POSTER_TITLE:'TAJ MAHAL INDIA'",
-  "Cartoon Snoopy in the rice terraces of Bali Indonesia, hyper-realistic green stepped paddies and mist, POSTER_TITLE:'RICE TERRACES OF BALI'",
-  "Cartoon Snoopy at the temples of Bagan Myanmar, hyper-realistic thousands of pagodas and hot air balloons, POSTER_TITLE:'TEMPLES OF BAGAN MYANMAR'",
-  "Cartoon Snoopy at the Marina Bay Sands Singapore, hyper-realistic infinity pool and city skyline at night, POSTER_TITLE:'MARINA BAY SANDS SINGAPORE'",
-  "Cartoon Snoopy in Kyoto geisha district Japan, hyper-realistic lantern-lit alley and wooden machiya, POSTER_TITLE:'KYOTO GEISHA DISTRICT JAPAN'",
-  "Cartoon Snoopy at Phi Phi Island Thailand, hyper-realistic turquoise lagoon and limestone cliffs, POSTER_TITLE:'PHI PHI ISLAND THAILAND'",
-  "Cartoon Snoopy at the Guilin karst mountains China, hyper-realistic river and misty limestone peaks, POSTER_TITLE:'GUILIN KARST MOUNTAINS CHINA'",
-  "Cartoon Snoopy at Zhangjiajie floating mountains China, hyper-realistic cloud-wrapped sandstone pillars, POSTER_TITLE:'ZHANGJIAJIE FLOATING MOUNTAINS CHINA'",
-  "Cartoon Snoopy in Hong Kong Victoria Harbour, hyper-realistic skyscraper light show at night, POSTER_TITLE:'HONG KONG VICTORIA HARBOUR'",
-  "Cartoon Snoopy at the Lotus Temple New Delhi, hyper-realistic white marble petals and reflecting pool, POSTER_TITLE:'LOTUS TEMPLE NEW DELHI'",
-  "Cartoon Snoopy in the streets of Seoul Korea, hyper-realistic neon food stalls and night market, POSTER_TITLE:'STREETS OF SEOUL KOREA'",
-  "Cartoon Snoopy at the Petronas Towers Kuala Lumpur, hyper-realistic gleaming towers and storm sky, POSTER_TITLE:'PETRONAS TOWERS KUALA LUMPUR'",
-  "Cartoon Snoopy at the Dead Sea Jordan, hyper-realistic salt crust and hazy mountains beyond, POSTER_TITLE:'DEAD SEA JORDAN'",
-  "Cartoon Snoopy at Machu Picchu Peru, hyper-realistic cloud-wrapped Inca ruins and mountain peaks, POSTER_TITLE:'MACHU PICCHU PERU'",
-  "Cartoon Snoopy at Iguazu Falls Brazil Argentina, hyper-realistic thundering jungle waterfalls, POSTER_TITLE:'IGUAZU FALLS BRAZIL ARGENTINA'",
-  "Cartoon Snoopy at the Amazon Rainforest, hyper-realistic dense jungle canopy and river below, POSTER_TITLE:'AMAZON RAINFOREST'",
-  "Cartoon Snoopy at the Salar de Uyuni Bolivia, hyper-realistic endless salt flat sky reflection, POSTER_TITLE:'SALAR DE UYUNI BOLIVIA'",
-  "Cartoon Snoopy at Rio Carnival, hyper-realistic colorful floats and dancers at night, POSTER_TITLE:'RIO CARNIVAL'",
-  "Cartoon Snoopy at the Galapagos Islands, hyper-realistic wildlife and volcanic landscape, POSTER_TITLE:'GALAPAGOS ISLANDS'",
-  "Cartoon Snoopy at Patagonia Torres del Paine Chile, hyper-realistic granite spires and electric blue lake, POSTER_TITLE:'PATAGONIA TORRES DEL PAINE'",
-  "Cartoon Snoopy at Angel Falls Venezuela, hyper-realistic world's tallest waterfall in jungle, POSTER_TITLE:'ANGEL FALLS VENEZUELA'",
-  "Cartoon Snoopy at the Easter Island Moai statues, hyper-realistic ancient stone faces and moody sky, POSTER_TITLE:'EASTER ISLAND MOAI STATUES'",
-  "Cartoon Snoopy in Buenos Aires Argentina, hyper-realistic colorful La Boca neighborhood street, POSTER_TITLE:'BUENOS AIRES ARGENTINA'",
-  "Cartoon Snoopy on safari in the Serengeti Tanzania, hyper-realistic wildebeest migration and savanna, POSTER_TITLE:'SAFARI IN THE SERENGETI'",
-  "Cartoon Snoopy at Victoria Falls Zimbabwe, hyper-realistic rainbow mist and Zambezi River, POSTER_TITLE:'VICTORIA FALLS ZIMBABWE'",
-  "Cartoon Snoopy in the Sahara Desert sand dunes, hyper-realistic golden dunes and star-filled sky, POSTER_TITLE:'SAHARA DESERT SAND DUNES'",
-  "Cartoon Snoopy at Kilimanjaro summit Tanzania, hyper-realistic glaciers and clouds below, POSTER_TITLE:'KILIMANJARO SUMMIT TANZANIA'",
-  "Cartoon Snoopy at the Pyramids of Giza Egypt, hyper-realistic ancient pyramids and camel silhouettes, POSTER_TITLE:'PYRAMIDS OF GIZA EGYPT'",
-  "Cartoon Snoopy on a Masai Mara hot air balloon Kenya, hyper-realistic sunrise savanna and elephants, POSTER_TITLE:'MASAI MARA HOT AIR'",
-  "Cartoon Snoopy at the Okavango Delta Botswana, hyper-realistic waterways and wildlife, POSTER_TITLE:'OKAVANGO DELTA BOTSWANA'",
-  "Cartoon Snoopy at Cape Town Table Mountain, hyper-realistic flat-topped mountain and ocean below, POSTER_TITLE:'CAPE TOWN TABLE MOUNTAIN'",
-  "Cartoon Snoopy in the Moroccan Medina Marrakech, hyper-realistic souks and mosaic architecture, POSTER_TITLE:'MOROCCAN MEDINA MARRAKECH'",
-  "Cartoon Snoopy at the Namib Desert Sossusvlei, hyper-realistic orange sand dunes and dead trees, POSTER_TITLE:'NAMIB DESERT SOSSUSVLEI'",
-  "Cartoon Snoopy at the Great Barrier Reef Australia, hyper-realistic coral and tropical fish underwater, POSTER_TITLE:'GREAT BARRIER REEF AUSTRALIA'",
-  "Cartoon Snoopy at Uluru Australia at sunset, hyper-realistic glowing red sandstone monolith, POSTER_TITLE:'ULURU AUSTRALIA AT SUNSET'",
-  "Cartoon Snoopy at the Twelve Apostles Victoria Australia, hyper-realistic limestone stacks and surf, POSTER_TITLE:'TWELVE APOSTLES VICTORIA AUSTRALIA'",
-  "Cartoon Snoopy at Sydney Opera House, hyper-realistic harbor and sails gleaming at twilight, POSTER_TITLE:'SYDNEY OPERA HOUSE'",
-  "Cartoon Snoopy in the New Zealand Fiordlands Milford Sound, hyper-realistic mirrored fjord and waterfalls, POSTER_TITLE:'NEW ZEALAND FIORDLANDS MILFORD'",
-  "Cartoon Snoopy at the Whitsunday Islands Australia, hyper-realistic pure white sand and turquoise sea, POSTER_TITLE:'WHITSUNDAY ISLANDS AUSTRALIA'",
-  "Cartoon Snoopy on Bora Bora French Polynesia, hyper-realistic overwater bungalows and lagoon, POSTER_TITLE:'BORA BORA FRENCH POLYNESIA'",
-  "Cartoon Snoopy in the Lord of the Rings landscapes New Zealand, hyper-realistic rolling green hills, POSTER_TITLE:'LORD OF THE RINGS'",
-  "Cartoon Snoopy at the Waitomo Glowworm Caves New Zealand, hyper-realistic underground starry ceiling, POSTER_TITLE:'WAITOMO GLOWWORM CAVES NEW'",
-  "Cartoon Snoopy at Bondi Beach Sydney Australia, hyper-realistic waves and golden light, POSTER_TITLE:'BONDI BEACH SYDNEY AUSTRALIA'",
-  "Cartoon Snoopy in the Napa Valley vineyards California, hyper-realistic golden rows and mountains, POSTER_TITLE:'NAPA VALLEY VINEYARDS CALIFORNIA'",
-  "Cartoon Snoopy at Horseshoe Bend Arizona, hyper-realistic turquoise river bend and sandstone, POSTER_TITLE:'HORSESHOE BEND ARIZONA'",
-  "Cartoon Snoopy in the Appalachian Trail autumn, hyper-realistic fiery forest and mountain fog, POSTER_TITLE:'APPALACHIAN TRAIL AUTUMN'",
-  "Cartoon Snoopy at the Badlands South Dakota, hyper-realistic alien rock formations and stormy sky, POSTER_TITLE:'BADLANDS SOUTH DAKOTA'",
-  "Cartoon Snoopy at Cape Cod Massachusetts, hyper-realistic shingled cottages and beach roses, POSTER_TITLE:'CAPE COD MASSACHUSETTS'",
-  "Cartoon Snoopy at the Bayou in Louisiana, hyper-realistic cypress trees and Spanish moss at dusk, POSTER_TITLE:'BAYOU IN LOUISIANA'",
-  "Cartoon Snoopy at Zion Canyon Utah, hyper-realistic towering red canyon walls and river below, POSTER_TITLE:'ZION CANYON UTAH'",
-  "Cartoon Snoopy in the Great Smoky Mountains in bloom, hyper-realistic pink rhododendron and mist, POSTER_TITLE:'GREAT SMOKY MOUNTAINS IN'",
-  "Cartoon Snoopy at Bryce Canyon Utah, hyper-realistic orange hoodoo spires and blue sky, POSTER_TITLE:'BRYCE CANYON UTAH'",
-  "Cartoon Snoopy at the Florida Everglades, hyper-realistic sawgrass and dramatic purple sunset, POSTER_TITLE:'FLORIDA EVERGLADES'",
-  "Cartoon Snoopy surfing Pipeline North Shore Hawaii, hyper-realistic barrel wave and reef, POSTER_TITLE:'PIPELINE NORTH SHORE HAWAII'",
-  "Cartoon Snoopy at the Arenal Volcano Costa Rica, hyper-realistic smoking volcano and rainforest, POSTER_TITLE:'ARENAL VOLCANO COSTA RICA'",
-  "Cartoon Snoopy at Lake Tahoe California, hyper-realistic crystal clear alpine lake and snow pines, POSTER_TITLE:'LAKE TAHOE CALIFORNIA'",
-  "Cartoon Snoopy in the Colorado Rocky Mountains, hyper-realistic wildflower meadows and 14er peaks, POSTER_TITLE:'COLORADO ROCKY MOUNTAINS'",
-  "Cartoon Snoopy at the Oregon Coast tidal pools, hyper-realistic sea stacks and crashing waves, POSTER_TITLE:'OREGON COAST TIDAL POOLS'",
-  "Cartoon Snoopy in Glacier Bay Alaska, hyper-realistic calving glacier and orca in cold sea, POSTER_TITLE:'GLACIER BAY ALASKA'",
-  "Cartoon Snoopy at Denali Alaska, hyper-realistic massive peak above tundra and aurora, POSTER_TITLE:'DENALI ALASKA'",
-  "Cartoon Snoopy at the Texas Hill Country bluebonnets, hyper-realistic wildflower meadow and oak, POSTER_TITLE:'TEXAS HILL COUNTRY BLUEBONNETS'",
-  "Cartoon Snoopy at Great Sand Dunes Colorado, hyper-realistic massive dunes and mountain backdrop, POSTER_TITLE:'GREAT SAND DUNES COLORADO'",
-  "Cartoon Snoopy at Point Reyes National Seashore California, hyper-realistic lighthouse and foggy cliffs, POSTER_TITLE:'POINT REYES NATIONAL SEASHORE'",
-  "Cartoon Snoopy at the Lofoten Islands Norway, hyper-realistic red fishing huts and fjord mountains, POSTER_TITLE:'LOFOTEN ISLANDS NORWAY'",
-  "Cartoon Snoopy in Cappadocia Turkey, hyper-realistic hundred hot air balloons over fairy chimneys, POSTER_TITLE:'CAPPADOCIA TURKEY'",
-  "Cartoon Snoopy at Plitvice Lakes Croatia, hyper-realistic turquoise cascading pools and waterfalls, POSTER_TITLE:'PLITVICE LAKES CROATIA'",
-  "Cartoon Snoopy at the Giant's Causeway Northern Ireland, hyper-realistic hexagonal basalt columns and sea, POSTER_TITLE:'GIANT'S CAUSEWAY NORTHERN IRELAND'",
-  "Cartoon Snoopy in the Cotswolds England, hyper-realistic honey stone cottages and garden flowers, POSTER_TITLE:'COTSWOLDS ENGLAND'",
-  "Cartoon Snoopy at the Fairy Pools Isle of Skye Scotland, hyper-realistic crystal pools and dramatic sky, POSTER_TITLE:'FAIRY POOLS ISLE OF'",
-  "Cartoon Snoopy at the Meteora monasteries Greece, hyper-realistic clifftop monasteries and valley below, POSTER_TITLE:'METEORA MONASTERIES GREECE'",
-  "Cartoon Snoopy in Positano Italy, hyper-realistic pastel cliffside town and sparkling sea, POSTER_TITLE:'POSITANO ITALY'",
-  "Cartoon Snoopy at the Banff National Park Canada, hyper-realistic turquoise lake and snow mountains, POSTER_TITLE:'BANFF NATIONAL PARK CANADA'",
-  "Cartoon Snoopy at Lake Louise Canada, hyper-realistic glacial teal water and chateau, POSTER_TITLE:'LAKE LOUISE CANADA'",
-  "Cartoon Snoopy at the Canadian Rockies Icefields Parkway, hyper-realistic glacier and jade lake, POSTER_TITLE:'CANADIAN ROCKIES ICEFIELDS PARKWAY'",
-  "Cartoon Snoopy in Havana Cuba, hyper-realistic vintage cars and colorful colonial buildings, POSTER_TITLE:'HAVANA CUBA'",
-  "Cartoon Snoopy at the geysers of Iceland Geysir, hyper-realistic erupting column and rainbow, POSTER_TITLE:'GEYSERS OF ICELAND GEYSIR'",
-  "Cartoon Snoopy at the Faroe Islands cliffs, hyper-realistic green turf houses and wild Atlantic, POSTER_TITLE:'FAROE ISLANDS CLIFFS'",
-  "Cartoon Snoopy at Tiger's Nest Bhutan monastery, hyper-realistic cliffside temple and pine forest, POSTER_TITLE:'TIGER'S NEST BHUTAN MONASTERY'",
-  "Cartoon Snoopy at the Maldives underwater restaurant, hyper-realistic coral reef fish through glass, POSTER_TITLE:'MALDIVES UNDERWATER RESTAURANT'",
-  "Cartoon Snoopy at Paro Valley Bhutan, hyper-realistic prayer flags and Himalayan peaks, POSTER_TITLE:'PARO VALLEY BHUTAN'",
-  "Cartoon Snoopy at the ancient city of Petra Jordan, hyper-realistic rose-red carved canyon treasury, POSTER_TITLE:'ANCIENT CITY OF PETRA'",
-  "Cartoon Snoopy at Capri Island Italy, hyper-realistic Blue Grotto sea cave and motorboats, POSTER_TITLE:'CAPRI ISLAND ITALY'",
-  "Cartoon Snoopy at the Lavender Fields Provence France, hyper-realistic purple rows and stone farmhouse, POSTER_TITLE:'LAVENDER FIELDS PROVENCE FRANCE'",
-  "Cartoon Snoopy in Iceland's black sand beach Reynisfjara, hyper-realistic basalt columns and wild sea, POSTER_TITLE:'ICELAND'S BLACK SAND BEACH'",
-  "Cartoon Snoopy at the Amazon River Brazil, hyper-realistic pink dolphins and dense jungle, POSTER_TITLE:'AMAZON RIVER BRAZIL'",
-  "Cartoon Snoopy at Waitangi New Zealand, hyper-realistic Maori carved meeting house and coastline, POSTER_TITLE:'WAITANGI NEW ZEALAND'",
-  "Cartoon Snoopy at the temples of Hampi India, hyper-realistic boulder landscape and ancient ruins, POSTER_TITLE:'TEMPLES OF HAMPI INDIA'",
-  "Cartoon Snoopy at Rann of Kutch India, hyper-realistic white salt desert and full moon, POSTER_TITLE:'RANN OF KUTCH INDIA'",
-  "Cartoon Snoopy at the Kerala backwaters India, hyper-realistic houseboat and coconut palms, POSTER_TITLE:'KERALA BACKWATERS INDIA'",
-  "Cartoon Snoopy at Mount Bromo Indonesia, hyper-realistic volcanic crater and sea of clouds, POSTER_TITLE:'MOUNT BROMO INDONESIA'",
-  "Cartoon Snoopy at Cocos Island Costa Rica, hyper-realistic hammerhead shark school underwater, POSTER_TITLE:'COCOS ISLAND COSTA RICA'",
-  "Cartoon Snoopy at the Pantanal Brazil, hyper-realistic jaguars and flooded grassland, POSTER_TITLE:'PANTANAL BRAZIL'",
-  "Cartoon Snoopy at Rainbow Mountain Peru, hyper-realistic colorful mineral stripes and alpacas, POSTER_TITLE:'RAINBOW MOUNTAIN PERU'",
-  "Cartoon Snoopy in the Tokyo ramen alley, hyper-realistic steamy bowls and neon lanterns, POSTER_TITLE:'TOKYO RAMEN ALLEY'",
-  "Cartoon Snoopy at a Brooklyn rooftop party, hyper-realistic Manhattan skyline at sunset, POSTER_TITLE:'BROOKLYN ROOFTOP PARTY'",
-  "Cartoon Snoopy in a London underground station, hyper-realistic curved tunnel and crowds, POSTER_TITLE:'LONDON UNDERGROUND STATION'",
-  "Cartoon Snoopy at a Paris bookstall on the Seine, hyper-realistic riverside and Notre Dame, POSTER_TITLE:'PARIS BOOKSTALL ON THE'",
-  "Cartoon Snoopy in a Marrakech rooftop at dusk, hyper-realistic terracotta city and minarets, POSTER_TITLE:'MARRAKECH ROOFTOP AT DUSK'",
-  "Cartoon Snoopy at a Hong Kong night market, hyper-realistic street food stalls and neon, POSTER_TITLE:'HONG KONG NIGHT MARKET'",
-  "Cartoon Snoopy in a rainy Tokyo alley at night, hyper-realistic reflective puddles and lanterns, POSTER_TITLE:'RAINY TOKYO ALLEY AT'",
-  "Cartoon Snoopy at a Nashville honky-tonk, hyper-realistic neon signs and boot-scootin crowd, POSTER_TITLE:'NASHVILLE HONKY-TONK'",
-  "Cartoon Snoopy at a New Orleans jazz club doorway, hyper-realistic French Quarter at night, POSTER_TITLE:'NEW ORLEANS JAZZ CLUB'",
-  "Cartoon Snoopy in a Copenhagen bike lane, hyper-realistic colorful harbor buildings, POSTER_TITLE:'COPENHAGEN BIKE LANE'",
-  "Cartoon Snoopy at a Sydney harbor ferry, hyper-realistic Opera House and gleaming water, POSTER_TITLE:'SYDNEY HARBOR FERRY'",
-  "Cartoon Snoopy in the medina of Fez Morocco, hyper-realistic ancient leather tanneries, POSTER_TITLE:'MEDINA OF FEZ MOROCCO'",
-  "Cartoon Snoopy at a Mexico City lucha libre arena, hyper-realistic wrestlers and roaring crowd, POSTER_TITLE:'MEXICO CITY LUCHA LIBRE'",
-  "Cartoon Snoopy in a Kyoto tea house garden, hyper-realistic moss garden and bamboo fence, POSTER_TITLE:'KYOTO TEA HOUSE GARDEN'",
-  "Cartoon Snoopy at a Lisbon tram stop, hyper-realistic steep cobblestone hill and azulejo tiles, POSTER_TITLE:'LISBON TRAM STOP'",
-  "Cartoon Snoopy in a Buenos Aires tango venue, hyper-realistic dancers and candlelit cafe, POSTER_TITLE:'BUENOS AIRES TANGO VENUE'",
-  "Cartoon Snoopy at a Mumbai street food market, hyper-realistic colorful chaos and spices, POSTER_TITLE:'MUMBAI STREET FOOD MARKET'",
-  "Cartoon Snoopy in the souks of Tunis, hyper-realistic arched passages and hanging lanterns, POSTER_TITLE:'SOUKS OF TUNIS'",
-  "Cartoon Snoopy at a Jakarta night market, hyper-realistic tropical street food and motorcycles, POSTER_TITLE:'JAKARTA NIGHT MARKET'",
-  "Cartoon Snoopy in the Shibuya neon rain Tokyo, hyper-realistic umbrella sea and crossing lights, POSTER_TITLE:'SHIBUYA NEON RAIN TOKYO'",
-  "Cartoon Snoopy at the Amazon canopy treetops, hyper-realistic macaw birds and jungle below, POSTER_TITLE:'AMAZON CANOPY TREETOPS'",
-  "Cartoon Snoopy in an Antarctic ice cave, hyper-realistic electric blue ice walls and penguins, POSTER_TITLE:'ANTARCTIC ICE CAVE'",
-  "Cartoon Snoopy at the Mariana Trench surface, hyper-realistic storm clouds and endless ocean, POSTER_TITLE:'MARIANA TRENCH SURFACE'",
-  "Cartoon Snoopy on the summit of Everest base camp, hyper-realistic prayer flags and Himalayan dawn, POSTER_TITLE:'SUMMIT OF EVEREST BASE'",
-  "Cartoon Snoopy in Death Valley salt flats, hyper-realistic cracked earth and heat shimmer, POSTER_TITLE:'DEATH VALLEY SALT FLATS'",
-  "Cartoon Snoopy at the edge of an active lava flow Hawaii, hyper-realistic glowing molten rock, POSTER_TITLE:'EDGE OF AN ACTIVE'",
-  "Cartoon Snoopy in a bioluminescent bay Puerto Rico, hyper-realistic glowing blue water at night, POSTER_TITLE:'BIOLUMINESCENT BAY PUERTO RICO'",
-  "Cartoon Snoopy at the Bonneville Salt Flats Utah, hyper-realistic endless white plain and mountains, POSTER_TITLE:'BONNEVILLE SALT FLATS UTAH'",
-  "Cartoon Snoopy in a Sequoia forest California, hyper-realistic massive trunks and cathedral light, POSTER_TITLE:'SEQUOIA FOREST CALIFORNIA'",
-  "Cartoon Snoopy at the volcanic shoreline Big Island Hawaii, hyper-realistic lava entering the sea, POSTER_TITLE:'VOLCANIC SHORELINE BIG ISLAND'",
-  "Cartoon Snoopy kitesurfing in Tarifa Spain, hyper-realistic wind and Gibraltar Strait, POSTER_TITLE:'TARIFA SPAIN'",
-  "Cartoon Snoopy paragliding over Interlaken Switzerland, hyper-realistic Alpine valley below, POSTER_TITLE:'INTERLAKEN'",
-  "Cartoon Snoopy bungee jumping at Victoria Falls, hyper-realistic aerial view of gorge and mist, POSTER_TITLE:'VICTORIA FALLS'",
-  "Cartoon Snoopy whitewater rafting Colorado River, hyper-realistic canyon walls and churning water, POSTER_TITLE:'COLORADO RIVER'",
-  "Cartoon Snoopy ice climbing in Alaska, hyper-realistic blue ice wall and glacial valley, POSTER_TITLE:'ALASKA'",
-  "Cartoon Snoopy freediving in Silfra fissure Iceland, hyper-realistic crystal water between continents, POSTER_TITLE:'SILFRA ICELAND'",
-  "Cartoon Snoopy sandboarding at Huacachina Peru, hyper-realistic desert oasis dunes and sunset, POSTER_TITLE:'HUACACHINA PERU'",
-  "Cartoon Snoopy zip-lining in Costa Rica rainforest, hyper-realistic jungle canopy and waterfall, POSTER_TITLE:'COSTA RICA'",
-  "Cartoon Snoopy cliff diving at Acapulco Mexico, hyper-realistic dramatic cliff and Pacific sea, POSTER_TITLE:'ACAPULCO'",
-  "Cartoon Snoopy skiing in Hokkaido Japan powder, hyper-realistic birch forest and deep snow, POSTER_TITLE:'HOKKAIDO JAPAN'",
-  "Cartoon Snoopy on Hana Highway Maui Hawaii, hyper-realistic jungle waterfalls and coastal cliffs, POSTER_TITLE:'HANA HIGHWAY MAUI HAWAII'",
-  "Cartoon Snoopy on the Pacific Coast Highway California, hyper-realistic ocean cliffs and convertible, POSTER_TITLE:'PACIFIC COAST HIGHWAY CALIFORNIA'",
-  "Cartoon Snoopy on the Great Ocean Road Australia, hyper-realistic limestone sea stacks and surf, POSTER_TITLE:'GREAT OCEAN ROAD AUSTRALIA'",
-  "Cartoon Snoopy on the Transfagarasan Highway Romania, hyper-realistic mountain switchbacks and mist, POSTER_TITLE:'TRANSFAGARASAN HIGHWAY ROMANIA'",
-  "Cartoon Snoopy on the Ring Road Iceland, hyper-realistic lava fields and green hills, POSTER_TITLE:'RING ROAD ICELAND'",
-  "Cartoon Snoopy on the Cabot Trail Nova Scotia, hyper-realistic autumn cliffs and ocean, POSTER_TITLE:'CABOT TRAIL NOVA SCOTIA'",
-  "Cartoon Snoopy on the Trollstigen Norway mountain road, hyper-realistic hairpin turns and waterfall, POSTER_TITLE:'TROLLSTIGEN NORWAY MOUNTAIN ROAD'",
-  "Cartoon Snoopy on the Death Road Bolivia, hyper-realistic cliff edge jungle road and clouds, POSTER_TITLE:'DEATH ROAD BOLIVIA'",
-  "Cartoon Snoopy on the Million Dollar Highway Colorado, hyper-realistic dramatic mountain pass, POSTER_TITLE:'MILLION DOLLAR HIGHWAY COLORADO'",
-  "Cartoon Snoopy on the Ruta 40 Patagonia Argentina, hyper-realistic endless steppe and volcanic peaks, POSTER_TITLE:'RUTA 40 PATAGONIA ARGENTINA'",
-  "Cartoon Snoopy at the Maldives sandbank, hyper-realistic circular sandbar and crystal lagoon, POSTER_TITLE:'MALDIVES SANDBANK'",
-  "Cartoon Snoopy at Pink Beach Bermuda, hyper-realistic rose-pink sand and aqua water, POSTER_TITLE:'PINK BEACH BERMUDA'",
-  "Cartoon Snoopy at Navagio Shipwreck Beach Greece, hyper-realistic rusted wreck and limestone cliffs, POSTER_TITLE:'NAVAGIO SHIPWRECK BEACH GREECE'",
-  "Cartoon Snoopy at Glass Beach Fort Bragg California, hyper-realistic sea glass covered shore, POSTER_TITLE:'GLASS BEACH FORT BRAGG'",
-  "Cartoon Snoopy at Pamukkale Turkey, hyper-realistic white calcium terraces and thermal pools, POSTER_TITLE:'PAMUKKALE TURKEY'",
-  "Cartoon Snoopy at Seven Mile Beach Cayman Islands, hyper-realistic powder sand and sunset sky, POSTER_TITLE:'SEVEN MILE BEACH CAYMAN'",
-  "Cartoon Snoopy at the Flaming Cliffs Mongolia, hyper-realistic red-orange desert and open sky, POSTER_TITLE:'FLAMING CLIFFS MONGOLIA'",
-  "Cartoon Snoopy at Marble Caves Chile, hyper-realistic swirling marble walls over turquoise water, POSTER_TITLE:'MARBLE CAVES CHILE'",
-  "Cartoon Snoopy at the Blue Eye Spring Albania, hyper-realistic electric blue natural spring, POSTER_TITLE:'BLUE EYE SPRING ALBANIA'",
-  "Cartoon Snoopy at Kelingking Beach Bali, hyper-realistic hidden cove and dramatic cliff, POSTER_TITLE:'KELINGKING BEACH BALI'",
-  "Cartoon Snoopy at the Himalayas Annapurna Base Camp Nepal, hyper-realistic snow amphitheater, POSTER_TITLE:'HIMALAYAS ANNAPURNA BASE CAMP'",
-  "Cartoon Snoopy at the Atlas Mountains Morocco, hyper-realistic Berber village and snowy peaks, POSTER_TITLE:'ATLAS MOUNTAINS MOROCCO'",
-  "Cartoon Snoopy at the Drakensberg Mountains South Africa, hyper-realistic sandstone escarpment, POSTER_TITLE:'DRAKENSBERG MOUNTAINS SOUTH AFRICA'",
-  "Cartoon Snoopy at the Tatras Mountains Poland Slovakia, hyper-realistic alpine lake and peaks, POSTER_TITLE:'TATRAS MOUNTAINS POLAND SLOVAKIA'",
-  "Cartoon Snoopy at Rila Lakes Bulgaria, hyper-realistic glacier lakes at different elevations, POSTER_TITLE:'RILA LAKES BULGARIA'",
-  "Cartoon Snoopy at the Altai Mountains Mongolia, hyper-realistic nomadic landscape and eagle, POSTER_TITLE:'ALTAI MOUNTAINS MONGOLIA'",
-  "Cartoon Snoopy at the Caucasus Mountains Georgia, hyper-realistic medieval tower village and peaks, POSTER_TITLE:'CAUCASUS MOUNTAINS GEORGIA'",
-  "Cartoon Snoopy at Mount Cook New Zealand, hyper-realistic mirror lake and snow peak at dawn, POSTER_TITLE:'MOUNT COOK NEW ZEALAND'",
-  "Cartoon Snoopy at the Simien Mountains Ethiopia, hyper-realistic escarpment and gelada baboons, POSTER_TITLE:'SIMIEN MOUNTAINS ETHIOPIA'",
-  "Cartoon Snoopy at Huangshan Yellow Mountains China, hyper-realistic pine trees on mist-shrouded peaks, POSTER_TITLE:'HUANGSHAN YELLOW MOUNTAINS CHINA'",
-  "Cartoon Snoopy at the Azores Portugal volcanic lakes, hyper-realistic twin crater lakes and green hills, POSTER_TITLE:'AZORES PORTUGAL VOLCANIC LAKES'",
-  "Cartoon Snoopy at Svalbard Norway Arctic, hyper-realistic polar bear and icy wilderness, POSTER_TITLE:'SVALBARD NORWAY ARCTIC'",
-  "Cartoon Snoopy at Reunion Island Indian Ocean, hyper-realistic volcanic beach and cirque cliffs, POSTER_TITLE:'REUNION ISLAND INDIAN OCEAN'",
-  "Cartoon Snoopy at Fernando de Noronha Brazil, hyper-realistic pristine bay and sea turtles, POSTER_TITLE:'FERNANDO DE NORONHA BRAZIL'",
-  "Cartoon Snoopy at Socotra Island Yemen, hyper-realistic dragon blood trees and alien landscape, POSTER_TITLE:'SOCOTRA ISLAND YEMEN'",
-  "Cartoon Snoopy at the Faroe Islands Gasadalur waterfall, hyper-realistic waterfall into ocean, POSTER_TITLE:'FAROE ISLANDS GASADALUR WATERFALL'",
-  "Cartoon Snoopy at Lombok Indonesia, hyper-realistic perfect cone volcano and rice paddies, POSTER_TITLE:'LOMBOK INDONESIA'",
-  "Cartoon Snoopy at Flores Island Indonesia, hyper-realistic colored volcanic crater lakes, POSTER_TITLE:'FLORES ISLAND INDONESIA'",
-  "Cartoon Snoopy at Palawan Philippines, hyper-realistic underground river and jungle limestone, POSTER_TITLE:'PALAWAN PHILIPPINES'",
-  "Cartoon Snoopy at Vanuatu volcanic island, hyper-realistic active lava lake inside crater, POSTER_TITLE:'VANUATU VOLCANIC ISLAND'",
-  "Cartoon Snoopy at the Kennedy Space Center launch, hyper-realistic rocket blastoff and smoke, POSTER_TITLE:'KENNEDY SPACE CENTER LAUNCH'",
-  "Cartoon Snoopy at CERN Geneva particle accelerator, hyper-realistic underground tunnel rings, POSTER_TITLE:'CERN GENEVA PARTICLE ACCELERATOR'",
-  "Cartoon Snoopy at the McDonald Observatory Texas, hyper-realistic telescope dome and star field, POSTER_TITLE:'MCDONALD OBSERVATORY TEXAS'",
-  "Cartoon Snoopy in Iceland at midnight sun, hyper-realistic golden horizon at midnight, POSTER_TITLE:'ICELAND AT MIDNIGHT SUN'",
-  "Cartoon Snoopy at the Namibian star party, hyper-realistic darkest sky Milky Way and dunes, POSTER_TITLE:'NAMIBIAN STAR PARTY'",
-  "Cartoon Snoopy at the Atacama Desert observatory Chile, hyper-realistic clearest sky on Earth, POSTER_TITLE:'ATACAMA DESERT OBSERVATORY CHILE'",
-  "Cartoon Snoopy at the Northern Lights Tromsø Norway, hyper-realistic dancing green and purple aurora, POSTER_TITLE:'NORTHERN LIGHTS TROMSØ NORWAY'",
-  "Cartoon Snoopy at the Southern Lights Antarctica, hyper-realistic shimmering aurora australis, POSTER_TITLE:'SOUTHERN LIGHTS ANTARCTICA'",
-  "Cartoon Snoopy at a solar eclipse viewpoint, hyper-realistic corona and totality darkness, POSTER_TITLE:'SOLAR ECLIPSE VIEWPOINT'",
-  "Cartoon Snoopy at the Perseid meteor shower, hyper-realistic streaks across mountain night sky, POSTER_TITLE:'PERSEID METEOR SHOWER'",
-  "Snoopy standing on an empty crosswalk at sunrise, Beatles Abbey Road style, full cartoon character, iconic and timeless",
-  "Snoopy floating underwater reaching for a dollar bill on a fishhook, Nevermind style album cover art, cartoon character in hyper-real water",
-  "Snoopy silhouette against a prism rainbow light beam, Dark Side of the Moon style album cover, cartoon on black background",
-  "Snoopy in a desert with a bone microphone stand at sunset, vintage rock album cover composition, cartoon character photorealistic landscape",
-  "Snoopy and Woodstock on a rooftop concert at golden hour, Let It Be album cover style, warm light and brick buildings",
-  "Snoopy holding a red umbrella in a geometric color field, Umbrella album cover inspired, bold flat graphic with cartoon character",
-  "Snoopy in a glitter suit in a smoky spotlight, classic soul album cover style, 1970s warm tones and velvet curtain",
-  "Snoopy as a punk rock cartoon in front of a Union Jack, vintage British invasion album cover style",
-  "Snoopy lying on a zebra crossing from above bird's eye view, classic rock iconic album cover composition",
-  "Snoopy and Woodstock on a dark misty road, atmospheric indie folk album cover, cartoon figures tiny against vast landscape",
-  "Snoopy in a tuxedo against a galaxy background, classic jazz album cover style, elegant and cosmic",
-  "Snoopy spinning vinyl record in a cool bedroom, lofi hip hop album cover aesthetic, warm golden lamp light",
-  "Snoopy in a tie-dye shirt in a field of flowers, psychedelic 1960s album cover style, swirling colors",
-  "Snoopy on a diving board above a rooftop pool at night, alternative indie album cover style, moody and cinematic",
-  "Snoopy in a field of grain at magic hour, americana folk album cover style, golden dust and open sky",
-  "Snoopy playing saxophone in a foggy city alley, cool jazz album cover, 1950s noir atmosphere",
-  "Snoopy as DJ on turntables in a club, hip hop album cover style, dramatic lights and smoke",
-  "Snoopy in front of a wall of amplifiers, heavy rock album cover style, bold color contrast",
-  "Snoopy under a streetlamp in the rain, R&B soul album cover, neon reflections and blue mood",
-  "Snoopy in outer space with stars behind, ambient electronic album cover style, dreamy and surreal",
-  "Snoopy and Woodstock in a diner booth at 3am, indie pop album cover, lonely beautiful atmosphere",
-  "Snoopy surfing a massive wave in a Hawaiian shirt, beach boys summer album cover style",
-  "Snoopy on a vintage train platform with steam, folk Americana album cover, sepia tones and nostalgia",
-  "Snoopy in neon pink against all black background, modern pop album cover style, minimal and striking",
-  "Snoopy on a piano bench in an empty concert hall, classical crossover album cover, grand and solitary",
-  "Snoopy in a field at night with a glowing radio, country album cover style, stars and fireflies",
-  "Snoopy in a vintage car on a desert highway, roots rock album cover, warm afternoon light",
-  "Snoopy in a crowded arena with one spotlight, stadium rock album cover, epic and dramatic",
-  "Snoopy wearing headphones in a recording booth, urban contemporary album cover, studio glass reflection",
-  "Snoopy and Woodstock in silhouette against a blood orange sunset, instrumental jazz album cover",
-  "Snoopy with a boombox on a New York stoop, old school hip hop album cover, summer street style",
-  "Snoopy in a white room with one red tulip, minimalist post-modern album cover",
-  "Snoopy and Woodstock as a duo on a park bench in autumn, acoustic indie album cover",
-  "Snoopy in black and white with a spotlight, classic film noir jazz album cover",
-  "Snoopy at a grand piano in a burning building, dramatic art rock album cover",
-  "Snoopy in overalls in a cotton field, delta blues album cover, sepia warm tones",
-  "Snoopy in a spaceship cockpit, synth-wave album cover, purple and cyan neon",
-  "Snoopy on a fire escape at sunset, urban pop punk album cover",
-  "Snoopy in a record store flipping through vinyl, indie alternative album cover",
-  "Snoopy at a drive-in movie screen in the rain, dream pop album cover, cinematic and wistful",
-  "Snoopy on a pier at dawn with a fishing rod guitar, Americana album cover, misty blues",
-  "Snoopy in front of a neon barbershop sign, neo-soul album cover, warm city night",
-  "Snoopy in a meadow at magic hour with a kite, indie folk album cover, golden and pastoral",
-  "Snoopy standing on a mountaintop with arms spread, triumphant rock anthem album cover",
+  // ── 500 ACTIVITY: cartoon Snoopy doing an activity, hyper-realistic background ──
+  "Cartoon Snoopy riding a massive barrel wave surfing, hyper-realistic ocean spray and deep blue water",
+  "Cartoon Snoopy shredding a halfpipe on a skateboard, hyper-realistic concrete skatepark",
+  "Cartoon Snoopy doing a powder run down a steep ski slope, hyper-realistic snow-dusted pine forest",
+  "Cartoon Snoopy riding a longboard at sunset on a coastal road, hyper-realistic Pacific cliffs",
+  "Cartoon Snoopy kitesurfing over crystal water, hyper-realistic turquoise tropical lagoon",
+  "Cartoon Snoopy paragliding above green valleys, hyper-realistic Alpine scenery below",
+  "Cartoon Snoopy bouldering on a granite rock face, hyper-realistic Yosemite granite walls",
+  "Cartoon Snoopy free diving in a coral reef, hyper-realistic tropical fish and coral",
+  "Cartoon Snoopy doing a backflip on a wakeboard, hyper-realistic lake spray and summer sky",
+  "Cartoon Snoopy mountain biking a red dirt singletrack, hyper-realistic canyon landscape",
+  "Cartoon Snoopy kayaking through a glowing sea cave, hyper-realistic turquoise water",
+  "Cartoon Snoopy ice skating on a frozen alpine lake, hyper-realistic mountain reflection",
+  "Cartoon Snoopy fly fishing at sunrise on a glassy river, hyper-realistic mist and forest",
+  "Cartoon Snoopy doing yoga at sunrise on a sea cliff, hyper-realistic ocean horizon",
+  "Cartoon Snoopy running a marathon through autumn city streets, hyper-realistic fall foliage",
+  "Cartoon Snoopy rock climbing a sea cliff at dusk, hyper-realistic crashing waves below",
+  "Cartoon Snoopy zip-lining through a jungle canopy, hyper-realistic tropical rainforest",
+  "Cartoon Snoopy snowboarding through deep powder in a mountain bowl, hyper-realistic snow",
+  "Cartoon Snoopy windsurfing in a bay, hyper-realistic whitecaps and coastal cliffs",
+  "Cartoon Snoopy doing BMX tricks in a concrete bowl, hyper-realistic urban skatepark",
+  "Cartoon Snoopy horseback riding through a wildflower meadow, hyper-realistic mountain backdrop",
+  "Cartoon Snoopy kayak surfing a river wave, hyper-realistic whitewater and canyon walls",
+  "Cartoon Snoopy cliff jumping into a pristine lake, hyper-realistic turquoise water below",
+  "Cartoon Snoopy doing aerial tricks off a snowboard kicker, hyper-realistic mountain pipe",
+  "Cartoon Snoopy paddleboarding at golden hour, hyper-realistic glassy lake and sunset",
+  "Cartoon Snoopy riding a motocross bike over a jump, hyper-realistic red dirt track",
+  "Cartoon Snoopy doing a handstand on a longboard surfboard, hyper-realistic perfect beach break",
+  "Cartoon Snoopy trail running through a redwood forest, hyper-realistic ancient towering trees",
+  "Cartoon Snoopy playing beach volleyball at tropical sunset, hyper-realistic golden beach",
+  "Cartoon Snoopy doing open water swimming, hyper-realistic ocean swells and blue sky",
+  "Cartoon Snoopy playing drums on a concert stage, hyper-realistic roaring crowd and stage lights",
+  "Cartoon Snoopy playing electric guitar in a spotlight, hyper-realistic smoky club interior",
+  "Cartoon Snoopy conducting an orchestra, hyper-realistic grand concert hall balconies",
+  "Cartoon Snoopy spinning records as a DJ, hyper-realistic nightclub neon and fog",
+  "Cartoon Snoopy playing saxophone on a Harlem street corner, hyper-realistic New York brownstones",
+  "Cartoon Snoopy playing piano in a jazz club, hyper-realistic warm amber light and bourbon",
+  "Cartoon Snoopy playing bass in a rock band, hyper-realistic sold-out arena and pyrotechnics",
+  "Cartoon Snoopy playing violin in a Paris park, hyper-realistic garden in bloom",
+  "Cartoon Snoopy beatboxing on a Brooklyn stoop, hyper-realistic urban summer street",
+  "Cartoon Snoopy playing acoustic guitar by a campfire, hyper-realistic starry forest",
+  "Cartoon Snoopy painting a massive city mural, hyper-realistic urban brick wall and scaffold",
+  "Cartoon Snoopy sculpting marble in an Italian studio, hyper-realistic Renaissance workshop",
+  "Cartoon Snoopy taking street photography in Tokyo rain, hyper-realistic neon reflections",
+  "Cartoon Snoopy throwing pottery on a wheel, hyper-realistic sunlit ceramics studio",
+  "Cartoon Snoopy painting plein air in Tuscany, hyper-realistic rolling vineyard landscape",
+  "Cartoon Snoopy doing graffiti art in a tunnel, hyper-realistic colorful spray-paint walls",
+  "Cartoon Snoopy drawing manga in a Tokyo cafe, hyper-realistic cozy Japanese coffee shop",
+  "Cartoon Snoopy weaving on a loom in a workshop, hyper-realistic colorful textile studio",
+  "Cartoon Snoopy doing glassblowing in a Venice furnace, hyper-realistic molten glass glow",
+  "Cartoon Snoopy silk-screening posters in a studio, hyper-realistic ink and press workshop",
+  "Cartoon Snoopy cooking at a professional stove, hyper-realistic Michelin-star kitchen",
+  "Cartoon Snoopy making fresh pasta by hand, hyper-realistic Italian countryside kitchen",
+  "Cartoon Snoopy flipping burgers at a backyard BBQ, hyper-realistic summer cookout and smoke",
+  "Cartoon Snoopy decorating a cake with precision, hyper-realistic patisserie interior",
+  "Cartoon Snoopy shaking cocktails at a speakeasy bar, hyper-realistic 1920s interior",
+  "Cartoon Snoopy brewing pour-over coffee at a specialty bar, hyper-realistic beautiful cafe",
+  "Cartoon Snoopy making ramen in a tiny Tokyo kitchen, hyper-realistic steam and broth",
+  "Cartoon Snoopy grilling at a Brazilian churrascaria, hyper-realistic open fire and coals",
+  "Cartoon Snoopy rolling sushi at an omakase counter, hyper-realistic Japanese restaurant",
+  "Cartoon Snoopy baking sourdough in a stone oven, hyper-realistic artisan bakery at dawn",
+  "Cartoon Snoopy tending beehives in a wildflower meadow, hyper-realistic golden afternoon",
+  "Cartoon Snoopy planting a garden in spring, hyper-realistic cottage garden in full bloom",
+  "Cartoon Snoopy picking coffee on a mountain farm, hyper-realistic Colombian highland mist",
+  "Cartoon Snoopy harvesting grapes in Bordeaux, hyper-realistic vineyard golden hour",
+  "Cartoon Snoopy fly fishing in a Montana river, hyper-realistic crystal water and mountains",
+  "Cartoon Snoopy foraging mushrooms in a misty forest, hyper-realistic Pacific Northwest",
+  "Cartoon Snoopy beachcombing at low tide, hyper-realistic rocky Maine coastline",
+  "Cartoon Snoopy birdwatching in a tropical wetland, hyper-realistic flamingos and reeds",
+  "Cartoon Snoopy stargazing through a telescope, hyper-realistic Milky Way and dark sky desert",
+  "Cartoon Snoopy tending a rooftop garden, hyper-realistic city skyline at dusk behind",
+  "Cartoon Snoopy reading a book under a cherry blossom tree, hyper-realistic Japan spring",
+  "Cartoon Snoopy writing in a journal at a Paris sidewalk cafe, hyper-realistic Seine background",
+  "Cartoon Snoopy meditating on a rocky ocean cliff, hyper-realistic sunrise and sea mist",
+  "Cartoon Snoopy doing tai chi in a bamboo forest, hyper-realistic misty morning light",
+  "Cartoon Snoopy reading in a cozy library, hyper-realistic floor-to-ceiling books and firelight",
+  "Cartoon Snoopy studying maps in a base camp tent, hyper-realistic Himalayan glacier backdrop",
+  "Cartoon Snoopy building a sandcastle on a deserted tropical island, hyper-realistic perfect lagoon",
+  "Cartoon Snoopy napping in a hammock between palms, hyper-realistic Caribbean beach and sea",
+  "Cartoon Snoopy hiking to a mountain summit at golden hour, hyper-realistic panoramic view",
+  "Cartoon Snoopy camping under the northern lights, hyper-realistic aurora and snow wilderness",
+  "Cartoon Snoopy roasting marshmallows at a lakeside fire, hyper-realistic Milky Way reflection",
+  "Cartoon Snoopy snowshoeing through a pine forest, hyper-realistic winter silence and frost",
+  "Cartoon Snoopy watching a storm from a lighthouse, hyper-realistic dramatic waves and clouds",
+  "Cartoon Snoopy picking wildflowers in an alpine meadow, hyper-realistic Swiss mountains",
+  "Cartoon Snoopy sketching in the Louvre, hyper-realistic grand gallery and masterpiece behind",
+  "Cartoon Snoopy doing archery in a forest clearing, hyper-realistic morning light through trees",
+  "Cartoon Snoopy driving a vintage convertible on PCH, hyper-realistic California coast",
+  "Cartoon Snoopy riding a motorcycle through red rock canyon country, hyper-realistic mesas",
+  "Cartoon Snoopy on a steam train through the Rockies, hyper-realistic mountain gorge",
+  "Cartoon Snoopy sailing a tall ship in open ocean, hyper-realistic full canvas and sea",
+  "Cartoon Snoopy rowing crew on a river at dawn, hyper-realistic misty boathouse scene",
+  "Cartoon Snoopy whitewater rafting in a gorge, hyper-realistic Class 5 rapids and canyon",
+  "Cartoon Snoopy canoeing in wilderness waters, hyper-realistic northern lake reflection",
+  "Cartoon Snoopy dog sledding across the tundra, hyper-realistic Arctic ice and aurora",
+  "Cartoon Snoopy hot air ballooning over fairy chimney landscape, hyper-realistic aerial view",
+  "Cartoon Snoopy riding a gondola at golden hour, hyper-realistic canal and palazzo reflection",
+  "Cartoon Snoopy cycling through tulip fields, hyper-realistic rows of vivid color and windmill",
+  "Cartoon Snoopy on a camel at Sahara desert dunes, hyper-realistic golden dunes and stars",
+  "Cartoon Snoopy doing a cartwheel on a Caribbean beach, hyper-realistic turquoise water",
+  "Cartoon Snoopy hula dancing at a Hawaiian sunset luau, hyper-realistic tropical beach",
+  "Cartoon Snoopy doing flamenco in a Moorish courtyard, hyper-realistic fountain and tiles",
+  "Cartoon Snoopy breakdancing on a NYC plaza, hyper-realistic urban summer street scene",
+  "Cartoon Snoopy doing ballet in a foggy forest clearing, hyper-realistic morning light",
+  "Cartoon Snoopy tango dancing in a Buenos Aires alley, hyper-realistic cobblestone and lanterns",
+  "Cartoon Snoopy doing parkour across city rooftops, hyper-realistic London skyline at dusk",
+  "Cartoon Snoopy learning judo in a Japanese dojo, hyper-realistic cherry blossom courtyard",
+  "Cartoon Snoopy boxing in a vintage gym, hyper-realistic leather heavy bags and ring glow",
+  "Cartoon Snoopy doing capoeira on a Bahia beach, hyper-realistic Brazil sunset",
+  "Cartoon Snoopy fencing in a French academy, hyper-realistic ornate hall and épées",
+  "Cartoon Snoopy swimming butterfly in an outdoor pool, hyper-realistic mountain backdrop",
+  "Cartoon Snoopy pole vaulting at an Olympic stadium, hyper-realistic track and stadium lights",
+  "Cartoon Snoopy shooting hoops at a Venice Beach court, hyper-realistic palm trees and crowd",
+  "Cartoon Snoopy pitching at a baseball stadium, hyper-realistic diamond and green outfield",
+  "Cartoon Snoopy kicking a field goal at night, hyper-realistic football stadium lights",
+  "Cartoon Snoopy taking a penalty kick at a World Cup, hyper-realistic sold-out stadium",
+  "Cartoon Snoopy spiking a volleyball at Ipanema beach, hyper-realistic Brazil sunset",
+  "Cartoon Snoopy playing ice hockey in a packed arena, hyper-realistic ice and crowd energy",
+  "Cartoon Snoopy serving an ace at Wimbledon, hyper-realistic grass court and white crowd",
+  "Cartoon Snoopy doing a slam dunk, hyper-realistic NBA arena and roaring crowd",
+  "Cartoon Snoopy rowing a single scull at sunrise, hyper-realistic river fog and boathouse",
+  "Cartoon Snoopy riding a bicycle downhill in the Alps, hyper-realistic mountain rain and mist",
+  "Cartoon Snoopy abseiling a jungle waterfall, hyper-realistic gorge and tropical mist",
+  "Cartoon Snoopy canyoneering through a slot canyon, hyper-realistic swirling red sandstone",
+  "Cartoon Snoopy sandboarding on massive desert dunes, hyper-realistic Peru desert oasis",
+  "Cartoon Snoopy freediving toward a sunken wreck, hyper-realistic clear blue depths",
+  "Cartoon Snoopy cave diving with a headlamp, hyper-realistic underground crystal cave",
+  "Cartoon Snoopy base jumping from a Dolomite cliff, hyper-realistic aerial mountain view",
+  "Cartoon Snoopy wingsuit flying over a Norwegian fjord, hyper-realistic vertical cliff wall",
+  "Cartoon Snoopy building a snow cave in Alaska backcountry, hyper-realistic blizzard",
+  "Cartoon Snoopy ice fishing on a frozen Minnesota lake, hyper-realistic blue ice and pine",
+  "Cartoon Snoopy doing sunrise salutation on a ship deck, hyper-realistic open ocean horizon",
+  "Cartoon Snoopy operating a food truck at a night market, hyper-realistic vibrant street scene",
+  "Cartoon Snoopy welding in a steel fabrication shop, hyper-realistic sparks and industrial",
+  "Cartoon Snoopy woodworking in a timber barn, hyper-realistic sawdust and morning sun",
+  "Cartoon Snoopy restoring a vintage car engine in a garage, hyper-realistic classic workshop",
+  "Cartoon Snoopy operating a large format camera at a landscape, hyper-realistic scenic view",
+  "Cartoon Snoopy directing a film on a movie set, hyper-realistic cinematic studio production",
+  "Cartoon Snoopy performing stand-up comedy, hyper-realistic brick-walled comedy club",
+  "Cartoon Snoopy reading poetry at an open mic, hyper-realistic candlelit underground venue",
+  "Cartoon Snoopy selling art at a Paris riverside stall, hyper-realistic Seine and bridges",
+  "Cartoon Snoopy teaching surfing on a beach, hyper-realistic tropical perfect wave",
+  "Cartoon Snoopy coaching little league, hyper-realistic American small town baseball field",
+  "Cartoon Snoopy working as a park ranger, hyper-realistic national park valley at golden hour",
+  "Cartoon Snoopy operating a lighthouse in a storm, hyper-realistic Maine coastline at night",
+  "Cartoon Snoopy piloting a biplane over farmland, hyper-realistic patchwork fields below",
+  "Cartoon Snoopy captaining a schooner in open sea, hyper-realistic Atlantic storm sky",
+  "Cartoon Snoopy driving a vintage steam locomotive, hyper-realistic mountain rail and gorge",
+  "Cartoon Snoopy guiding a river expedition raft, hyper-realistic jungle Amazon river",
+  "Cartoon Snoopy working a fishing trawler at dawn, hyper-realistic North Atlantic grey sea",
+  "Cartoon Snoopy tending vines at a hillside winery, hyper-realistic Tuscany autumn harvest",
+  "Cartoon Snoopy riding a bull at a rodeo, hyper-realistic Texas arena and dusty crowd",
+  "Cartoon Snoopy roping a calf at a ranch, hyper-realistic open range at sunset",
+  "Cartoon Snoopy sheepherding in New Zealand hills, hyper-realistic green hills and flock",
+  "Cartoon Snoopy picking apples in a New England orchard, hyper-realistic perfect October day",
+  "Cartoon Snoopy plowing a rice paddy with a water buffalo, hyper-realistic Bali terraces",
+  "Cartoon Snoopy ice carving at a winter festival, hyper-realistic Quebec ice sculptures",
+  "Cartoon Snoopy building an igloo in the Arctic, hyper-realistic ice and aurora sky",
+  "Cartoon Snoopy blacksmithing at a glowing forge, hyper-realistic medieval-style smithy",
+  "Cartoon Snoopy coopering barrels in a bourbon distillery, hyper-realistic Kentucky rickhouse",
+  "Cartoon Snoopy brewing craft beer in a microbrewery, hyper-realistic copper tanks and hops",
+  "Cartoon Snoopy distilling whisky in a Scottish highlands distillery, hyper-realistic misty glen",
+  "Cartoon Snoopy roasting coffee beans in an Ethiopian highland farm, hyper-realistic sunrise",
+  "Cartoon Snoopy picking tea on a Sri Lanka hillside, hyper-realistic mist and emerald slopes",
+  "Cartoon Snoopy making olive oil in an ancient Cretan grove, hyper-realistic stone press",
+  "Cartoon Snoopy spinning silk at a traditional Kyoto loom, hyper-realistic light and thread",
+  "Cartoon Snoopy making cheese in an alpine dairy, hyper-realistic Swiss meadow and cowbells",
+  "Cartoon Snoopy tapping maple syrup in Vermont snow, hyper-realistic sugar bush and steam",
+  "Cartoon Snoopy diving for pearls in a Polynesian lagoon, hyper-realistic underwater light",
+  "Cartoon Snoopy spearfishing in crystal clear Mediterranean water, hyper-realistic rocky seabed",
+  "Cartoon Snoopy tracking wildlife in the Serengeti, hyper-realistic savanna and lions",
+  "Cartoon Snoopy training sled dogs in Alaska snow, hyper-realistic huskies and pine forest",
+  "Cartoon Snoopy mushing through a blizzard, hyper-realistic whiteout and headlamp beam",
+  "Cartoon Snoopy doing luge on an Olympic bobsled track, hyper-realistic ice tunnel and speed",
+  "Cartoon Snoopy speed skating at a championship oval, hyper-realistic Olympic ice arena",
+  "Cartoon Snoopy competing in a biathlon in snow, hyper-realistic Nordic winter landscape",
+  "Cartoon Snoopy ski jumping at a Nordic center, hyper-realistic snowy valley crowd below",
+  "Cartoon Snoopy doing a floor gymnastics routine, hyper-realistic Olympic arena and beam",
+  "Cartoon Snoopy shooting clay pigeons in the English countryside, hyper-realistic green field",
+  "Cartoon Snoopy rowing a dragon boat at a harbor festival, hyper-realistic Hong Kong water",
+  "Cartoon Snoopy competing in Highland Games, hyper-realistic Scottish heather field",
+  "Cartoon Snoopy doing a polar plunge in the winter ocean, hyper-realistic cold beach crowd",
+  "Cartoon Snoopy skydiving over a patchwork countryside, hyper-realistic aerial view",
+  "Cartoon Snoopy falconing in the Arabian desert, hyper-realistic peregrine and sand dunes",
+  "Cartoon Snoopy photographing rare wildlife in the Amazon, hyper-realistic jungle and bird",
+  "Cartoon Snoopy doing astrophotography in the Atacama desert, hyper-realistic galaxy",
+  "Cartoon Snoopy doing sand art on a beach, hyper-realistic mandala and breaking wave",
+  "Cartoon Snoopy constructing a snow sculpture at a winter carnival, hyper-realistic ice fest",
+  "Cartoon Snoopy making a kite and flying it on a coastal headland, hyper-realistic strong wind",
+  "Cartoon Snoopy fossil hunting on a sea cliff, hyper-realistic limestone layers and coast",
+  "Cartoon Snoopy geocaching in a Pacific Northwest old growth forest, hyper-realistic mist",
+  "Cartoon Snoopy doing a polar ski expedition, hyper-realistic Antarctic white expanse",
+  "Cartoon Snoopy doing deep sea ROV work, hyper-realistic bioluminescent abyss",
+  "Cartoon Snoopy planting mangroves on a tropical restoration shore, hyper-realistic project",
+  "Cartoon Snoopy releasing sea turtle hatchlings at night, hyper-realistic moonlit beach",
+  "Cartoon Snoopy busking with a violin on a cobblestone street, hyper-realistic European square",
+  "Cartoon Snoopy playing steel drums on a Caribbean beach, hyper-realistic tropical sunset",
+  "Cartoon Snoopy playing bagpipes on a Scottish moor, hyper-realistic heather and highland mist",
+  "Cartoon Snoopy playing didgeridoo in the Australian outback, hyper-realistic red rock and sky",
+  "Cartoon Snoopy playing sitar in a Rajasthan palace courtyard, hyper-realistic ornate India",
+  "Cartoon Snoopy playing kora in a West African village, hyper-realistic sunset and baobab",
+  "Cartoon Snoopy riding a giant wave in Portugal, hyper-realistic 50-foot wave and cliff",
+  "Cartoon Snoopy surfing in the Maldives, hyper-realistic overwater bungalows and crystal sea",
+  "Cartoon Snoopy longboard surfing at a tropical point break, hyper-realistic perfect nose ride",
+  "Cartoon Snoopy surfing a perfect Fiji barrel, hyper-realistic coral reef and emerald water",
+  "Cartoon Snoopy dawn patrol surfing in cold Maine, hyper-realistic foggy shore and pink sky",
+  "Cartoon Snoopy surfing an urban river wave, hyper-realistic city bridge and riparian scene",
+  "Cartoon Snoopy night surfing with glowing board, hyper-realistic phosphorescent ocean",
+  "Cartoon Snoopy tandem surfing with Woodstock, hyper-realistic Waikiki blue water and Diamond Head",
+  "Cartoon Snoopy racing a stock car at Daytona, hyper-realistic oval track and grandstand",
+  "Cartoon Snoopy drag racing a hot rod, hyper-realistic strip and burnout smoke",
+  "Cartoon Snoopy rally racing through a forest stage, hyper-realistic mud and pine trees",
+  "Cartoon Snoopy riding a dirt bike through sand dunes, hyper-realistic Baja desert",
+  "Cartoon Snoopy competing in obstacle course racing, hyper-realistic mud and cargo nets",
+  "Cartoon Snoopy doing an ultramarathon at night, hyper-realistic mountain headlamp trail",
+  "Cartoon Snoopy competing in a cyclocross race, hyper-realistic muddy autumn field",
+  "Cartoon Snoopy doing velodrome track cycling, hyper-realistic banked wooden track",
+  "Cartoon Snoopy doing indoor climbing on an overhang, hyper-realistic modern climbing gym",
+  "Cartoon Snoopy competing in slacklining over a gorge, hyper-realistic valley below",
+  "Cartoon Snoopy doing acrobatics in a silk rigging, hyper-realistic big top circus tent",
+  "Cartoon Snoopy juggling fire on a beach at night, hyper-realistic ocean fire reflection",
+  "Cartoon Snoopy competing in ultimate frisbee, hyper-realistic college campus summer",
+  "Cartoon Snoopy playing disc golf in a redwood forest, hyper-realistic coastal California",
+  "Cartoon Snoopy competing in a chess tournament, hyper-realistic grand European hotel ballroom",
+  "Cartoon Snoopy playing competitive ping pong, hyper-realistic Olympic table tennis venue",
+  "Cartoon Snoopy doing competitive eating ramen, hyper-realistic Tokyo noodle championship",
+  "Cartoon Snoopy entering a sandcastle contest, hyper-realistic California beach and judges",
+  "Cartoon Snoopy doing timber sports log rolling, hyper-realistic Canadian lumberjack games",
+  "Cartoon Snoopy building a gingerbread house competitively, hyper-realistic Christmas kitchen",
+  "Cartoon Snoopy doing competitive origami, hyper-realistic traditional Japanese paper studio",
+  "Cartoon Snoopy competing in a chowder cook-off, hyper-realistic New England harbor",
+  "Cartoon Snoopy doing competitive flower arranging at Chelsea, hyper-realistic flower show tent",
+  "Cartoon Snoopy bonsai trimming in a Kyoto garden, hyper-realistic ancient tree and rock",
+  "Cartoon Snoopy topiary sculpting in a formal English garden, hyper-realistic estate grounds",
+  "Cartoon Snoopy tapping maple syrup in a Vermont sugar shack, hyper-realistic steam and snow",
+  "Cartoon Snoopy doing competitive wood splitting, hyper-realistic Scandinavian homestead",
+  "Cartoon Snoopy shearing sheep in New Zealand, hyper-realistic farm and wool shed",
+  "Cartoon Snoopy duck herding with a border collie, hyper-realistic Scottish farm trial",
+  "Cartoon Snoopy doing a scarecrow building contest, hyper-realistic English autumn village",
+  "Cartoon Snoopy competing in a pumpkin carving championship, hyper-realistic October night",
+  "Cartoon Snoopy in a watermelon seed spitting contest, hyper-realistic summer picnic",
+  "Cartoon Snoopy competing in a three-legged race, hyper-realistic backyard summer party",
+  "Cartoon Snoopy in a tug of war over mud, hyper-realistic country fair field",
+  "Cartoon Snoopy competing in a pinata smashing, hyper-realistic Mexican fiesta celebration",
+  "Cartoon Snoopy in a limbo contest on a beach, hyper-realistic Caribbean party at sunset",
+  "Cartoon Snoopy competing in synchronized swimming, hyper-realistic Olympic pool routine",
+  "Cartoon Snoopy doing a dance battle in a ring, hyper-realistic urban hip-hop arena",
+  "Cartoon Snoopy competing in extreme ironing on a cliff, hyper-realistic ridiculous extreme sport",
+  "Cartoon Snoopy racing soap box derby cars, hyper-realistic neighborhood hill and crowd",
+  "Cartoon Snoopy competing in a chili pepper eating contest, hyper-realistic state fair",
+  "Cartoon Snoopy in a haggis hurling competition, hyper-realistic Scottish Highland Games",
+  "Cartoon Snoopy doing cheese rolling at Cooper Hill, hyper-realistic English hillside chaos",
+  "Cartoon Snoopy competing in bog snorkeling, hyper-realistic Welsh peat bog and crowd",
+  "Cartoon Snoopy competing in a cardboard boat race, hyper-realistic campus lake and sinking",
+  "Cartoon Snoopy building a snow fort in a blizzard, hyper-realistic neighborhood winter",
+  "Cartoon Snoopy competing in a water balloon toss, hyper-realistic summer backyard",
+  "Cartoon Snoopy fishing for rubber ducks at a Japanese summer matsuri, hyper-realistic fair",
+  "Cartoon Snoopy doing ring toss at a boardwalk, hyper-realistic retro New Jersey shore",
+  "Cartoon Snoopy riding the bumper cars at a fair, hyper-realistic neon funfair at night",
+  "Cartoon Snoopy on the highest drop of a roller coaster, hyper-realistic amusement park",
+  "Cartoon Snoopy riding a vintage carousel, hyper-realistic lit carousel horses at night",
+  "Cartoon Snoopy winning at a claw machine, hyper-realistic retro game room neon",
+  "Cartoon Snoopy playing pinball at a vintage parlor, hyper-realistic 1970s arcade glow",
+  "Cartoon Snoopy racing soap box derby cars down a hill, hyper-realistic wooden ramp and crowd",
+  "Cartoon Snoopy riding a zip line over a jungle river, hyper-realistic Costa Rica canopy",
+  "Cartoon Snoopy doing stand-up paddleboarding in a mangrove, hyper-realistic tropical lagoon",
+  "Cartoon Snoopy catching fireflies in mason jars at dusk, hyper-realistic Tennessee meadow",
+  "Cartoon Snoopy on a sunset sailboat cruise, hyper-realistic calm bay and warm sky",
+  "Cartoon Snoopy harvesting honey from a cliffside beehive, hyper-realistic Nepal mountain",
+  "Cartoon Snoopy competing in a triathlon swim start, hyper-realistic open water chaos",
+  "Cartoon Snoopy doing open water marathon swimming, hyper-realistic grey Channel sea",
+  "Cartoon Snoopy doing a polar expedition on cross-country skis, hyper-realistic white expanse",
+  "Cartoon Snoopy operating a weather balloon release, hyper-realistic cloud-streaked sky",
+  "Cartoon Snoopy tagging a great white shark, hyper-realistic research boat and ocean",
+  "Cartoon Snoopy performing an air guitar solo, hyper-realistic stadium crowd going wild",
+  "Cartoon Snoopy doing competitive yo-yo tricks on a stage, hyper-realistic performance",
+  "Cartoon Snoopy winning a stuffed animal at a fairground, hyper-realistic fairground lights",
+  "Cartoon Snoopy on a merry-go-round at a vintage fair, hyper-realistic lit carousel at night",
+  "Cartoon Snoopy building a raft and floating down a calm river, hyper-realistic summer",
+  "Cartoon Snoopy on a snowy toboggan hill shrieking with joy, hyper-realistic winter neighborhood",
+  "Cartoon Snoopy watching an airshow from the grass, hyper-realistic jets and blue sky",
+  "Cartoon Snoopy competing in a triathlon cycling leg, hyper-realistic coastal road race",
+  "Cartoon Snoopy doing a sunrise swim in a lake, hyper-realistic golden mist and forest",
+  "Cartoon Snoopy flying a kite on a windy beach, hyper-realistic high surf and dramatic sky",
+  "Cartoon Snoopy making a snow angel in fresh powder, hyper-realistic quiet winter morning",
+  "Cartoon Snoopy skipping stones on a glassy mountain lake, hyper-realistic reflection",
+  "Cartoon Snoopy on a paddleboat on a lily pond, hyper-realistic garden lake and reflection",
+  "Cartoon Snoopy doing a cannonball off a dock, hyper-realistic summer lake splash",
+  "Cartoon Snoopy winning a pie eating contest, hyper-realistic state fair and crowd",
+  "Cartoon Snoopy competing in a log cabin build race, hyper-realistic frontier wilderness",
+  "Cartoon Snoopy doing competitive stone stacking, hyper-realistic Sedona red rocks",
+  "Cartoon Snoopy in a bobbing for apples contest, hyper-realistic Halloween barn party",
+  "Cartoon Snoopy at a sack race on a village green, hyper-realistic English summer fete",
+  "Cartoon Snoopy doing the limbo at a Caribbean beach party, hyper-realistic tropical sunset",
+  "Cartoon Snoopy competing in a flash mob dance battle, hyper-realistic Times Square crowd",
+  "Cartoon Snoopy wrestling in a sumo ring, hyper-realistic Japanese tournament dohyo",
+  "Cartoon Snoopy doing underwater hockey, hyper-realistic pool-bottom action scene",
+  "Cartoon Snoopy competing in nettle eating at a pub garden, hyper-realistic quirky British",
+  "Cartoon Snoopy worm charming in a Devon field, hyper-realistic green English countryside",
+  "Cartoon Snoopy doing a pillow fight flash mob, hyper-realistic city square and feathers",
+  "Cartoon Snoopy competing in wife carrying race, hyper-realistic Finnish forest obstacle",
+  "Cartoon Snoopy building a gingerbread house, hyper-realistic cozy holiday kitchen",
+  "Cartoon Snoopy competing in a pumpkin regatta, hyper-realistic New England river",
+  "Cartoon Snoopy at a square dance in a barn, hyper-realistic country fairy lights",
+  "Cartoon Snoopy spinning a lasso at a Wyoming ranch, hyper-realistic big sky",
+  "Cartoon Snoopy at a rodeo mechanical bull, hyper-realistic Texas dance hall neon",
+  "Cartoon Snoopy doing a rain dance in a desert thunderstorm, hyper-realistic lightning",
+  "Cartoon Snoopy in a competitive eating ramen contest, hyper-realistic Tokyo championship",
+  "Cartoon Snoopy playing chess in a park, hyper-realistic Washington Square autumn",
+  "Cartoon Snoopy doing a marathon victory lap, hyper-realistic finish line and crowd roar",
+  "Cartoon Snoopy paddling a dragon boat at sunrise, hyper-realistic misty harbor",
+  "Cartoon Snoopy competing in a regatta sailboat race, hyper-realistic ocean racing",
+  "Cartoon Snoopy doing speed kayaking in rapids, hyper-realistic river canyon",
+  "Cartoon Snoopy on a zipline over a waterfall, hyper-realistic jungle and mist",
+  "Cartoon Snoopy at a summer camp swimming hole, hyper-realistic rope swing and forest",
+  "Cartoon Snoopy doing a bouldering competition, hyper-realistic outdoor rock festival",
+  "Cartoon Snoopy launching a model rocket, hyper-realistic open field and blue sky",
+  "Cartoon Snoopy doing a Science Fair project, hyper-realistic school gym and volcano",
+  "Cartoon Snoopy building a treehouse, hyper-realistic oak tree and summer backyard",
+  "Cartoon Snoopy at a lemonade stand on a sunny afternoon, hyper-realistic neighborhood",
+  "Cartoon Snoopy running a 5K charity race, hyper-realistic park path and autumn",
+  "Cartoon Snoopy doing a polar bear swim at New Year, hyper-realistic icy beach and crowd",
+  "Cartoon Snoopy competing in a kayak polo match, hyper-realistic outdoor water court",
+  "Cartoon Snoopy doing competitive speed knitting, hyper-realistic English cottage contest",
+  "Cartoon Snoopy competing in a grow the biggest pumpkin contest, hyper-realistic farm",
+  "Cartoon Snoopy doing a hula hoop marathon, hyper-realistic retro American summer",
+  "Cartoon Snoopy in a pie throwing contest, hyper-realistic British village fete",
+  "Cartoon Snoopy at a balloon animal making competition, hyper-realistic circus tent",
+  "Cartoon Snoopy competing in a best sandcastle contest, hyper-realistic beach judges",
+  "Cartoon Snoopy doing a talent show magic act, hyper-realistic school auditorium",
+  "Cartoon Snoopy at a dog show winning every ribbon, hyper-realistic county show ring",
+  "Cartoon Snoopy at a go-kart racing track, hyper-realistic outdoor circuit and crowd",
+  "Cartoon Snoopy racing a toy boat in a fountain, hyper-realistic Paris jardin",
+  "Cartoon Snoopy at a paper airplane competition, hyper-realistic gymnasium and throw",
+  "Cartoon Snoopy doing a backwards spelling bee, hyper-realistic school competition",
+  "Cartoon Snoopy at a state science olympiad, hyper-realistic university gymnasium",
+
+  // ── 200 ALBUM COVER STYLE ──
+  "Snoopy walking barefoot on a famous crosswalk at dawn, Abbey Road style album cover, warm morning light",
+  "Snoopy floating underwater reaching for a dollar bill, Nevermind style album cover art, hyper-realistic water",
+  "Snoopy holding a vinyl record up to a prism light beam, Dark Side style album cover, black background",
+  "Snoopy silhouetted against a burning desert sky holding a guitar, iconic rock album cover composition",
+  "Snoopy on a rooftop at golden hour with a microphone stand, Let It Be style album cover, warm brick",
+  "Snoopy in a glitter pantsuit in a smoky spotlight, 1970s soul album cover, velvet curtain and warm light",
+  "Snoopy reflected in a rain puddle on a neon city street, moody indie album cover, blue and amber",
+  "Snoopy holding a lantern at the entrance of a dark forest, folk horror album cover, atmospheric",
+  "Snoopy spinning on a rooftop DJ setup at sunset, hip-hop golden era album cover, sun flare and city",
+  "Snoopy in a tuxedo at a grand piano under a single spotlight, classic jazz album cover, elegant",
+  "Snoopy in tie-dye in a field of poppies, psychedelic 1960s album cover, swirling colors",
+  "Snoopy on a desert highway with a harmonica, americana blues album cover, open road and dust",
+  "Snoopy in front of amplifier stacks with smoke, arena rock album cover, stage fog and red light",
+  "Snoopy running through a corn field at night, indie dream pop album cover, moonlight and mystery",
+  "Snoopy with a boombox on a Brooklyn stoop, old-school hip-hop album cover, summer haze",
+  "Snoopy at a recording studio mixing desk, producer album cover, warm console glow and coffee",
+  "Snoopy on a cliff edge in a windswept coat, post-rock album cover, dramatic grey ocean below",
+  "Snoopy in a diner at 3am with a notebook, singer-songwriter album cover, noir light and vinyl booth",
+  "Snoopy under a streetlamp in falling snow, R&B winter album cover, blue night and soft glow",
+  "Snoopy in a field of sunflowers at magic hour, country pop album cover, golden and warm",
+  "Snoopy on a beach at dawn with a ukulele, indie folk album cover, salt air and morning pink sky",
+  "Snoopy in a crowded train with headphones, city indie album cover, real world blurred around him",
+  "Snoopy with paint-splattered hands in a studio, art pop album cover, vivid color and creative chaos",
+  "Snoopy on a fire escape reading a letter, urban folk album cover, warm city evening glow",
+  "Snoopy in a Hawaiian shirt at a tiki bar, exotica lounge album cover, 1950s tropical kitsch",
+  "Snoopy on a cargo ship in fog, ambient electronic album cover, industrial and oceanic mood",
+  "Snoopy on a rooftop at night with fireworks, celebration pop album cover, joy and neon sky",
+  "Snoopy in a jazz club alone after hours, late night jazz album cover, smoke and dim amber",
+  "Snoopy at a vintage typewriter by a rainy window, literary indie album cover, moody and cerebral",
   "Snoopy in a submarine porthole, quirky indie pop album cover, whimsical underwater world",
-  "Snoopy at a typewriter by a rain-streaked window, literary indie album cover, moody and cerebral",
-  "Snoopy in a retro swimsuit by a motel pool, surf pop album cover, 1960s California vibes",
-  "Snoopy and Woodstock on a tandem bicycle in Paris, chanson album cover, charming and cinematic",
-  "Snoopy playing banjo on a porch at dusk, bluegrass album cover, southern light and cicadas",
-  "Snoopy in a neon-soaked arcade at night, chiptune album cover, pixel glow and nostalgia",
-  "Snoopy on a beach bonfire at night, acoustic summer album cover, warm flames and dark sea",
-  "Snoopy in a vintage fighter pilot jacket, rock and roll album cover, cool and rebellious",
-  "Snoopy under a sakura cherry blossom tree, ambient Japan album cover, pale pink petals",
-  "Snoopy with a polaroid camera in a forest, indie photography album cover, film grain aesthetic",
-  "Snoopy in a boxing ring with title belt, rap album cover, triumphant spotlight moment",
-  "Snoopy at a rooftop concert in rainy NYC, post-punk album cover, dark and cinematic",
-  "Snoopy in a convertible on Route 66, classic rock road trip album cover",
-  "Snoopy holding a lantern in a dark forest, folk horror album cover, atmospheric and mysterious",
-  "Snoopy on a pier in the mist, post-rock instrumental album cover, lonely and beautiful",
-  "Snoopy as a 1950s teen idol in a poodle skirt era photo, doo-wop album cover",
-  "Snoopy at a harvest festival stage, alt-country album cover, autumn lights and crowd",
-  "Snoopy in a library at midnight with a candle, chamber pop album cover, warm and intimate",
-  "Snoopy on a raft in a glassy lake, ambient folk album cover, perfect reflection and silence",
-  "Snoopy in a crowded subway car, city indie album cover, real people blurred around cartoon",
-  "Snoopy in a throne room, prog rock album cover, ornate and over-the-top regal",
-  "Snoopy in a field of poppies, psychedelic indie album cover, soft focus and dreamlike",
-  "Snoopy and Woodstock on a park bench with snow falling, quiet winter album cover",
-  "Snoopy with a cape silhouetted against a full moon, gothic rock album cover",
-  "Snoopy on a rooftop at dawn drinking coffee, lo-fi album cover, hazy morning warmth",
-  "Snoopy in a vintage diner with a milkshake, doo-wop retro album cover, checkerboard floor",
-  "Snoopy and Woodstock in a canoe at sunrise, new age relaxation album cover",
-  "Snoopy on a cliff edge during a storm, dramatic metal album cover, lightning and sea",
-  "Snoopy in an abandoned warehouse with sun beams, post-punk revival album cover",
-  "Snoopy on a hammock between palm trees, reggae album cover, lazy afternoon gold",
-  "Snoopy at a street piano in a park, beautiful moment indie album cover",
+  "Snoopy walking through a spice market, world music album cover, vivid textiles and color",
+  "Snoopy in a boxing ring with a microphone, rap album cover, triumphant spotlight moment",
+  "Snoopy at a grand piano in an empty opera house, classical crossover album cover, solitary",
+  "Snoopy in a Berlin club at 4am, techno album cover, strobe light and dark energy",
+  "Snoopy on a London rooftop in rain, britpop album cover, grey sky and chimney pots",
+  "Snoopy in a cozy Scottish pub by the fire, folk album cover, warm ale and fiddle night",
+  "Snoopy on a Copenhagen bike in spring rain, Scandinavian pop album cover, melancholy clean",
+  "Snoopy at a New Orleans second line parade, jazz funeral album cover, bittersweet parade",
+  "Snoopy on a Kyoto riverbank at night, Japanese city pop album cover, neon water reflection",
+  "Snoopy in front of a Detroit muscle car at dusk, Motown soul album cover, golden powerful",
+  "Snoopy in a field at midnight with a glowing radio, country outlaw album cover, stars",
+  "Snoopy at a Santa Monica pier at sunset, California indie album cover, warm lens flare",
+  "Snoopy on a rooftop in Havana, Latin jazz album cover, crumbling colonial beauty and rum",
+  "Snoopy in a Buenos Aires tango milonga, Latin album cover, candlelit and passionate",
+  "Snoopy in a Barcelona flamenco bar, Spanish album cover, red and shadows and heel clicks",
+  "Snoopy on a ferry in the Greek islands, Mediterranean folk album cover, white and blue and light",
+  "Snoopy in a Rio de Janeiro favela at Carnival, bossa nova album cover, vibrant and alive",
+  "Snoopy at a Lagos night club, Afrobeats album cover, heat and color and rhythm",
+  "Snoopy on a Cape Town beach at dawn, African soul album cover, light through coastal fog",
+  "Snoopy in a Stockholm winter recording studio, Scandinavian folk album cover, candlelight",
+  "Snoopy at a Nashville honky-tonk stage, outlaw country album cover, neon and sawdust",
+  "Snoopy in a Detroit warehouse party, electronic music album cover, industrial decay and laser",
+  "Snoopy on a Chicago elevated train, city soul album cover, urban steel and golden light",
+  "Snoopy at a Memphis Beale Street blues club, delta blues album cover, weathered and soulful",
+  "Snoopy in a New Orleans Bywater courtyard, ambient jazz album cover, ferns and old brick",
+  "Snoopy in a Miami Vice pastel sunset, synth-pop album cover, neon pink and ocean",
+  "Snoopy on a Seattle ferry in the rain, grunge era album cover, grey and honest",
+  "Snoopy in a Phoenix desert rave under the stars, electronic desert album cover, bass and night",
+  "Snoopy at a Las Vegas penthouse at dawn, pop excess album cover, glamour and aftermath",
+  "Snoopy at a Brooklyn house party, indie rock album cover, warm lamp light and joy",
+  "Snoopy in a Tokyo record shop, city pop album cover, vinyl bins and neon and evening",
+  "Snoopy on a Seoul rooftop at sunset, K-indie album cover, hazy golden and urban",
+  "Snoopy in a Mumbai monsoon, Bollywood fusion album cover, rain and color and rhythm",
+  "Snoopy at a Nairobi street festival, East African pop album cover, energy and color",
+  "Snoopy in a Jamaica cane field at dusk, reggae album cover, golden light and roots",
+  "Snoopy on a Trinidad Carnival float, soca album cover, feathers and color and heat",
+  "Snoopy on a Paris rooftop at magic hour, chanson album cover, chimneys and romance",
+  "Snoopy at a Berlin underground gallery opening, art pop album cover, cold white and concept",
+  "Snoopy at a Tokyo karaoke booth, J-pop album cover, neon pink and microphone",
+  "Snoopy on a Hong Kong night tram, Cantopop album cover, neon city and motion blur",
+  "Snoopy at a São Paulo funk baile, Brazilian funk album cover, light and sweat and bass",
+  "Snoopy on a Medellin metro cable car, Latin urban album cover, vertical cityscape",
+  "Snoopy at a Santiago open air concert, Andean folk album cover, mountain and guitar",
+  "Snoopy at a Havana son cubano club, son album cover, trumpet and warm amber",
+  "Snoopy at a Reykjavik lava field concert, Icelandic indie album cover, isolated and ethereal",
+  "Snoopy in an Irish pub after hours, folk ballad album cover, pints and fiddle and tears",
+  "Snoopy on a Welsh mountain at dawn, post-rock album cover, light through cloud and mist",
+  "Snoopy at a Prague cellar jazz club, European jazz album cover, stone vault and candlelight",
+  "Snoopy at a Vienna palace ballroom, waltz album cover, crystal chandeliers and silk gowns",
+  "Snoopy in a Budapest ruin bar, Eastern European indie album cover, decay and neon beauty",
+  "Snoopy on an Amalfi Coast terrace, Italian pop album cover, lemons and sea and blazing sun",
+  "Snoopy in a Granada cave flamenco venue, Gitano album cover, raw and passionate and old",
+  "Snoopy at a Lisbon fado house, fado album cover, fadista in black and melancholy light",
+  "Snoopy in a Porto wine cellar, acoustic album cover, barrels and candlelight and solitude",
+  "Snoopy on a Bosphorus sunset cruise, Turkish pop album cover, orange sky and water",
+  "Snoopy in an Athens nightclub at dawn, Greek pop album cover, Mediterranean chaos and joy",
+  "Snoopy at a Helsinki waterfront midsummer, Nordic folk album cover, midnight sun and lake",
+  "Snoopy at a Glastonbury festival dawn, British festival album cover, muddy and magical",
+  "Snoopy in a Edinburgh castle courtyard, Scottish epic album cover, stone and bagpipe mist",
+  "Snoopy at a Cannes film festival party, French pop album cover, Riviera glamour and night",
+  "Snoopy at an Ibiza sunset terrace, balearic electronic album cover, orange sky and peace",
+  "Snoopy in a Madrid flamenco bar at 2am, nuevo flamenco album cover, raw and percussive",
+  "Snoopy at a Venice Biennale opening night, art music album cover, vaporetto and palazzo",
+  "Snoopy on a Milan rooftop after fashion week, Italian cool album cover, chic and moody",
+  "Snoopy in an Amsterdam canal houseboat at night, Dutch indie album cover, cozy rainy warm",
+  "Snoopy on a Luxembourg hillside at dusk, euro indie album cover, quiet green and moody",
+  "Snoopy in a Santorini sunset caldera, Greek island album cover, blue dome and orange sky",
+  "Snoopy at a Mykonos beach club at dusk, Greek electronic album cover, white and gold",
+  "Snoopy on a Sardinia beach bonfire, Italian folk album cover, stars and sea and accordion",
+  "Snoopy at a Tuscany farmhouse dinner table, Italian acoustic album cover, lanterns and cypress",
+  "Snoopy in a Rome piazza at midnight, Italian indie album cover, fountain and cool stone",
+  "Snoopy in a Montmartre artist cafe, Parisian folk album cover, sketches and rain",
+  "Snoopy at a Seine riverbank sunset jam session, acoustic Paris album cover, gold light",
+  "Snoopy in a Brittany coastal village, Breton folk album cover, sea wind and stone chapel",
+  "Snoopy in Guadeloupe Carnival, zouk album cover, tropical heat and color and rhythm",
+  "Snoopy at a Martinique beach rum shack, biguine album cover, warm evening and steel pan",
+  "Snoopy at a Senegal beach sound system, mbalax album cover, Dakar coast and sabar drum",
+  "Snoopy in a Bamako night club, Mali blues album cover, Sahel dust and electric kora",
+  "Snoopy at an Accra beach party, highlife album cover, palm trees and electric guitar",
+  "Snoopy in a Kinshasa rumba club, Congo rumba album cover, ornate suits and accordion",
+  "Snoopy at an Addis Ababa jazz cafe, Ethiopian jazz album cover, pentatonic and blue smoke",
+  "Snoopy at a Tunis medina rooftop, North African folk album cover, ancient city and oud",
+  "Snoopy in a Cairo tea house, Egyptian folk album cover, mashrabiya light and qanun",
+  "Snoopy in a Fez medina at dusk, Sufi music album cover, minarets and call to prayer",
+  "Snoopy at a Casablanca jazz club, Maghrebi jazz album cover, art deco and saxophone",
+  "Snoopy at a Ouarzazate desert concert, Gnawa album cover, iron castanets and trance",
+  "Snoopy at a Beirut basement party, Lebanese electronic album cover, ruins and rave energy",
+  "Snoopy on a Tel Aviv beach at sunset, Israeli pop album cover, Mediterranean and hope",
+  "Snoopy at an Istanbul music bar, Turkish rock album cover, electric bağlama and crowd",
+  "Snoopy on a Bosphorus rooftop party, Ottoman electronica album cover, mosque domes and bass",
+  "Snoopy at a Varanasi ghat at dawn, Indian classical album cover, sunrise and tabla",
+  "Snoopy in a Mumbai film studio recording session, Bollywood album cover, orchestral and color",
+  "Snoopy at a Jaipur Holi celebration, Indian folk album cover, color powder and drums",
+  "Snoopy in a Kathmandu monastery courtyard, Himalayan ambient album cover, prayer flags",
+  "Snoopy at a Bangkok jazz club, Thai jazz album cover, tuk-tuk outside and cool interior",
+  "Snoopy at a Saigon rooftop bar, Vietnamese indie album cover, motorbikes below and haze",
+  "Snoopy in a Hanoi Old Quarter cafe, Vietnamese folk album cover, cyclo and paper lanterns",
+  "Snoopy at a Phnom Penh riverside concert, Cambodian pop album cover, golden temple",
+  "Snoopy at a Luang Prabang monk procession, Lao ambient album cover, saffron and mist",
+  "Snoopy at a Kuala Lumpur night market, Malaysian pop album cover, satay smoke and towers",
+  "Snoopy in a Singapore hawker center, Singaporean pop album cover, neon and steam and mix",
+  "Snoopy at a Bali rice field meditation, Indonesian ambient album cover, sacred and green",
+  "Snoopy at a Manila street party, Filipino pop album cover, jeepney art and tropical energy",
+  "Snoopy in a Taipei night market, Taiwanese indie album cover, skewer steam and neon sign",
+  "Snoopy at a Seoul Han River picnic, K-indie album cover, golden hour and urban haze",
+  "Snoopy in an Osaka street food alley, J-pop album cover, glowing lanterns and steam",
+  "Snoopy at a Fukuoka beach sunset, Japanese summer album cover, sea and sparkler",
+  "Snoopy in a Sapporo snow festival, Japanese winter album cover, ice sculpture and silence",
+  "Snoopy at an Okinawa beach bar, Okinawan folk album cover, sanshin and turquoise sea",
+  "Snoopy in front of a Detroit muscle car at dusk, soul album cover, golden and powerful",
+  "Snoopy on a Mississippi Delta porch at dusk, blues album cover, screen door and cicadas",
+  "Snoopy at a Chicago South Side blues club, album cover, neon sign and rain outside",
+  "Snoopy at a Harlem jazz loft session, bebop album cover, fire escape and gold light",
+  "Snoopy backstage at a stadium with a guitar, rock memoir album cover, raw and authentic",
+  "Snoopy at a campfire with a guitar under desert stars, folk storytelling album cover",
   "Snoopy in a darkroom developing photos, alternative rock album cover, red light glow",
-  "Snoopy on a rooftop in Tokyo at night, city pop album cover, neon and rain",
-  "Snoopy in a cozy cabin with snow outside, folk Christmas album cover",
-  "Snoopy backstage with a guitar, rock memoir album cover, raw and authentic",
-  "Snoopy and Woodstock at a soul music festival crowd, Motown style album cover",
-  "Snoopy on a London double-decker bus top, britpop album cover, grey sky and chimney pots",
-  "Snoopy in a marching band uniform, funk brass album cover, vibrant and energetic",
-  "Snoopy at a Hawaiian slack key guitar show, tropical folk album cover",
-  "Snoopy in front of stained glass window with guitar, gospel soul album cover",
-  "Snoopy at a jazz festival outdoor stage at dusk, cool blue jazz album cover",
-  "Snoopy reading a map in a foreign city at night, travel folk album cover",
-  "Snoopy on a tram in Lisbon with a guitar case, fado album cover, melancholy and beautiful",
-  "Snoopy in a Berlin club at 4am, techno electronic album cover, dark and pulsing",
-  "Snoopy and Woodstock flying a biplane over clouds, orchestral adventure album cover",
-  "Snoopy on a fire lookout tower in a forest, folk isolation album cover",
-  "Snoopy in a New Orleans second line parade, jazz funeral album cover, bittersweet and vibrant",
-  "Snoopy dancing at a house party, indie pop album cover, warm lamp light and joy",
-  "Snoopy at a campfire under a starry sky with guitar, folk storytelling album cover",
-  "Snoopy in a vintage Detroit muscle car, Motown soul album cover, warm and powerful",
-  "Snoopy on an empty stage alone with a microphone, farewell tour album cover, emotional and iconic",
-  "Snoopy in a boxing gym with a tape recorder, hip hop classic album cover",
+  "Snoopy on a rooftop in Tokyo rain at night, city pop album cover, neon and puddles",
+  "Snoopy in a cozy Vermont cabin with snow outside, folk winter album cover, warm amber",
+  "Snoopy at a rooftop cinema under summer stars, indie film album cover, warm and dreamy",
+  "Snoopy in a vintage Detroit muscle car on a sunset road, soul album cover, horizon",
+  "Snoopy at a New York Carnegie Hall stage door, classical album cover, elegant and alone",
+  "Snoopy at a New Orleans balcony overlooking Mardi Gras, jazz album cover, bead and light",
+  "Snoopy on a Paris Metro platform at midnight, chanson album cover, cigarette and solitude",
+  "Snoopy at a Key West sunset bar, tropical rock album cover, sailboat and cocktail",
+  "Snoopy on a rooftop in San Francisco fog, indie album cover, Bay Bridge lights and grey",
+  "Snoopy in a dive bar with a pool table, classic rock album cover, cigarette smoke and neon",
+  "Snoopy at a record release party rooftop, pop album cover, confetti and city skyline",
   "Snoopy in a field during a lightning storm, indie drama album cover, electrifying and moody",
-  "Snoopy and Woodstock doing a curtain call on a grand stage, show tune album cover",
-  "Snoopy as a heroic action figure on a dramatic movie poster, bold composition, epic lighting, character above title treatment, retro 1970s style",
-  "Snoopy as an astronaut on a retro NASA-style space mission poster, bold red and white design, propaganda poster art style",
-  "Snoopy as a 1940s wartime recruitment poster, bold graphic flat design, patriotic colors, vintage printing texture",
-  "Snoopy on a vintage WPA National Parks style travel poster, bold color blocks, art deco typography, classic American poster art",
-  "Snoopy as a superhero on a golden age comic book cover poster, primary colors, halftone dots, bold action lines",
-  "Snoopy on a retro circus poster, ornate Victorian typography, vintage illustration, ringmaster pose, bright canvas",
-  "Snoopy on a vintage boxing match poster, old school fight night design, worn paper texture, red and black",
-  "Snoopy on a 1960s vintage concert poster, psychedelic swirling letters, Fillmore West style art, vivid poster design",
-  "Snoopy on an art deco travel poster for Paris 1930s, gold and black geometric design, Cassandre style",
-  "Snoopy as a retro sci-fi movie hero poster, 1950s pulp science fiction style, rocket ships and aliens",
-  "Snoopy on a vintage rodeo cowboy poster, western style lettering, rope border, sunset colors",
-  "Snoopy as a vintage detective noir movie poster, black silhouette, rain and shadow, classic film poster style",
-  "Snoopy on a vintage surf competition poster, 1960s beach design, woodblock print style, ocean wave",
-  "Snoopy on a Soviet constructivist propaganda poster style, bold geometry, red and black, modernist typography",
-  "Snoopy as a silent film movie star poster, 1920s illustrated movie house style, ornate frame and star design",
-  "Snoopy on a vintage baseball pennant poster, classic stadium illustration, bold serif type, primary colors",
-  "Snoopy on a jazz club poster from 1950s, bebop style graphic, smoky noir illustration, coffee stained paper",
-  "Snoopy as a vintage aviator poster, 1930s air show design, pilot goggles and biplane, adventurous spirit",
-  "Snoopy on a retro drive-in movie poster, 1950s Americana design, pink and teal palette, starry night",
-  "Snoopy as a vintage wrestling championship poster, old school professional wrestling design, bold colors and lightning",
-  "Snoopy on a vintage Americana county fair poster, ferris wheel and bunting, classic mid-century design",
-  "Snoopy as a retro fitness brand poster, 1970s workout design, bold groovy typography, dynamic pose",
-  "Snoopy on a vintage winter Olympics poster, 1928 style illustration, art deco type, mountain landscape",
-  "Snoopy on a retro car racing poster, 1960s Formula race design, checkered flag and speed lines",
-  "Snoopy as a vintage pirate adventure movie poster, 1950s swashbuckler style, treasure map and galleons",
-  "Snoopy on a psychedelic 1968 poster, Haight-Ashbury style, melting lettering, rainbow swirls",
-  "Snoopy as a 1980s action movie character poster, airbrushed painting style, fire and sunglasses",
-  "Snoopy on a retro Hawaiian tourism poster, 1940s illustration style, tropical flowers and surf",
-  "Snoopy as a vintage strongman circus poster, exaggerated muscle pose, classic Victorian illustration",
-  "Snoopy on a vintage roller derby poster, 1970s female empowerment style, bold graphic and stars",
-  "Snoopy as a retro samurai movie poster, Japanese woodblock print influenced, bold ink strokes",
-  "Snoopy on a 1930s ocean liner travel poster, art deco ocean waves, Cassandre style luxury liner",
-  "Snoopy as a classic 1970s kung fu movie poster, hand-painted style, action pose and chopstick title treatment",
-  "Snoopy on a vintage motorcycle rally poster, Route 66 style, hot rod flames and chrome",
-  "Snoopy as a retro safari adventure poster, 1950s African expedition style, sepia and bold colors",
-  "Snoopy on a vintage ski resort poster, 1930s alpine illustration, bold primary colors and elegant type",
-  "Snoopy as a classic western movie poster, frontier sunset, wanted poster style, sepia dusty tones",
-  "Snoopy on a retro amusement park poster, 1920s Coney Island style, ornate rides and neon",
-  "Snoopy as a 1970s blaxploitation movie character poster, airbrushed funky style, afro and platform shoes",
-  "Snoopy on a vintage propaganda health poster, 1940s government design, cheerful bold illustration",
-  "Snoopy as a retro video game character arcade cabinet art, 1980s pixel style inspired, joystick and quarters",
-  "Snoopy on a vintage Japanese travel poster for Mount Fuji, 1930s woodblock print style, minimalist elegance",
-  "Snoopy as a 1960s spy movie poster, James Bond influenced composition, silhouette and gun barrel",
-  "Snoopy on a vintage New York World Fair poster, 1939 modernist design, trylon and perisphere",
-  "Snoopy as a retro space race era astronaut poster, 1960s NASA design, American flag and rocket",
-  "Snoopy on a vintage Russian ballet poster, 1920s Ballets Russes style, Nijinsky inspired graphic",
-  "Snoopy as a classic 1950s monster movie poster, B-movie horror style, scream text and giant shadow",
-  "Snoopy on a retro music hall poster, Victorian era illustrated entertainment bill, ornate typography",
-  "Snoopy as a 1980s breakdance crew poster, electric boogaloo style, cardboard floor and boom box",
-  "Snoopy on a vintage riverboat gambling poster, Mississippi Delta style, steamboat and playing cards",
-  "Snoopy as a retro superhero team poster, 1970s Saturday morning cartoon style, heroic lineup",
-  "Snoopy on a vintage Mardi Gras parade poster, New Orleans 1950s style, mask and beads and jazz",
-  "Snoopy as a classic Roman gladiator movie poster, sword and sandal epic style, arena and crowds",
-  "Snoopy on a vintage Alaskan frontier poster, 1900s gold rush style, wilderness and adventure",
-  "Snoopy as a retro kung fu dojo poster, 1970s martial arts school style, flying kick and brush lettering",
-  "Snoopy on a vintage Italian Vespa scooter poster, 1950s La Dolce Vita style, Mediterranean sun and style",
-  "Snoopy as a 1920s jazz age poster, Harlem Renaissance style, bold graphic and speakeasy glamour",
-  "Snoopy on a vintage Havana nightclub poster, 1950s Cuban golden age design, mambo dancer and neon",
-  "Snoopy as a classic French cinema poster, nouvelle vague style, black and white photo tinted, artsy",
-  "Snoopy on a vintage surfboard shaper poster, California 1960s style, Endless Summer inspired design",
-  "Snoopy as a retro pinball machine marquee art, 1970s illustration style, neon tubes and chrome balls",
-  "Snoopy on a vintage deep sea diving expedition poster, 1930s illustration, dive helmet and undersea world",
-  "Snoopy as a classic Venetian carnival poster, 1950s Italian illustration style, masks and gondolas",
-  "Snoopy on a vintage hot springs resort poster, 1920s spa style, art nouveau flowers and thermal pools",
-  "Snoopy as a retro robot science fair poster, 1950s atomic age design, chrome robot and test tubes",
-  "Snoopy on a vintage Chicago blues club poster, 1950s hand-lettered style, dark and soulful",
-  "Snoopy as a classic bullfighting poster, Corrida de Toros style, bold Spanish poster art, matador grace",
-  "Snoopy on a vintage Swiss travel poster, 1930s alpine elegance, geometric simplicity, cog railway",
-  "Snoopy as a retro Hawaiian Poi bowl festival poster, traditional luau style, tiki torch and hula",
-  "Snoopy on a vintage zeppelin travel poster, 1930s Hindenburg era design, art deco and skies",
-  "Snoopy as a classic Mack Sennett silent comedy poster, 1920s slapstick style, pie and pratfall",
-  "Snoopy on a vintage Australian outback adventure poster, 1940s colonial style, kangaroo and red dust",
-  "Snoopy as a retro disco king poster, 1970s Studio 54 style, mirror ball and gold sequins",
-  "Snoopy on a vintage Cape Cod lobster shack poster, 1950s New England style, buoys and boats",
-  "Snoopy as a classic Mexican Day of the Dead poster, Calavera art style, marigolds and sugar skulls",
-  "Snoopy on a vintage Antarctic expedition poster, 1910s Shackleton era style, ice ship and brave souls",
-  "Snoopy as a retro Olympic athlete poster, 1936 Berlin Games style modernist illustration",
-  "Snoopy on a vintage folk festival poster, 1960s Newport Folk style, hand-printed and earthy",
-  "Snoopy as a classic kung fu school tournament poster, 1980s Hong Kong martial arts cinema style",
-  "Snoopy on a vintage Bourbon Street jazz poster, 1940s New Orleans illustrated style, trumpet and glow",
-  "Snoopy as a retro hot rod dragster poster, 1960s Kustom Kulture style, Ed Roth influenced cartoon",
-  "Snoopy on a vintage Turkish bath hammam poster, 1920s Ottoman revival style, geometric tile art",
-  "Snoopy as a classic Harlem Globetrotters tour poster, 1950s basketball exhibition style",
-  "Snoopy on a vintage Polynesian voyager poster, wayfinding stars and ocean, traditional motifs",
-  "Snoopy as a retro ice cream parlor poster, 1950s soda fountain style, pastel colors and cherry on top",
-  "Snoopy on a vintage Malibu beach lifeguard poster, California 1960s style, red cross and waves",
-  "Snoopy as a classic Italian Renaissance faire poster, courtly illustration style, mandolin and jousting",
-  "Snoopy on a vintage Key West sunset festival poster, Florida Keys style, conch shell and sailboat",
-  "Snoopy as a retro Tokyo subway safety poster, 1970s Japanese graphic style, polite instruction art",
-  "Snoopy on a vintage New England fall foliage tour poster, 1950s road map style, covered bridges",
-  "Snoopy as a classic Spanish flamenco poster, Andalusian illustration style, red dress and castanets",
-  "Snoopy on a vintage San Francisco cable car poster, 1940s city tourism design, Alcatraz and bay",
-  "Snoopy as a retro midnight movie double feature poster, 1970s grindhouse style, scream queen camp",
-  "Snoopy on a vintage Cairo bazaar poster, 1920s orientalist travel art style, spice market colors",
-  "Snoopy as a classic vaudeville playbill poster, 1900s theatrical billing style, curtain and footlights",
-  "Snoopy on a vintage Costa Rica coffee plantation poster, mid-century Latin American graphic design",
-  "Snoopy as a retro stock car race poster, 1950s Southern track style, dirt oval and bleachers",
-  "Snoopy on a vintage Big Sur poetry festival poster, 1960s Beat Generation style, ink sketch and coffee",
-  "Snoopy and Woodstock in a spring meadow with cherry blossoms falling in golden sunlight",
-  "Snoopy and Woodstock watching summer thunderstorm from a covered porch with lemonade",
-  "Snoopy and Woodstock jumping in enormous autumn leaf piles, orange and red tones",
-  "Snoopy and Woodstock building an elaborate igloo in a blizzard with tiny windows lit inside",
-  "Snoopy and Woodstock under a triple rainbow after a spring shower",
-  "Snoopy and Woodstock catching snowflakes on their tongues in a midnight winter garden",
-  "Snoopy and Woodstock in a field of wildflowers on a breezy golden afternoon",
-  "Snoopy and Woodstock watching lightning over a stormy Pacific ocean from sea cliffs",
-  "Snoopy and Woodstock sitting on a wooden fence during perfect golden hour light",
-  "Snoopy and Woodstock in a foggy morning redwood forest",
-  "Snoopy and Woodstock chasing tumbleweeds across an Arizona desert at sunset",
-  "Snoopy and Woodstock watching a supercell storm from a safe Kansas hilltop",
-  "Snoopy and Woodstock in a monsoon rain, dancing in rivers of warm water",
-  "Snoopy and Woodstock in a winter frost forest, every icy branch glowing blue",
-  "Snoopy and Woodstock watching a brilliant aurora borealis in snowy Lapland tundra",
-  "Snoopy and Woodstock on a rooftop in a summer heat wave eating colorful popsicles",
-  "Snoopy and Woodstock watching a breathtaking double rainbow over a green valley",
-  "Snoopy and Woodstock in a massive snow fort during a neighborhood blizzard battle",
-  "Snoopy and Woodstock watching shooting stars from a sleeping bag on a hilltop meadow",
-  "Snoopy and Woodstock in a foggy autumn pumpkin patch at golden hour",
-  "Snoopy and Woodstock in a 1950s diner, neon signs, cherry red stools and milkshakes",
-  "Snoopy and Woodstock as 1960s hippies in a psychedelic festival flower field",
-  "Snoopy and Woodstock in a 1970s disco club with mirror balls, platforms and flares",
-  "Snoopy and Woodstock in a 1980s arcade, pixel games glowing green and orange",
-  "Snoopy and Woodstock at a vintage 1950s drive-in movie, making popcorn in a Chevy",
-  "Snoopy and Woodstock in retro Googie space age style diners and rocket ships",
-  "Snoopy and Woodstock as vintage travel poster tourists with old-fashioned luggage",
-  "Snoopy and Woodstock in a sepia-toned Wild West saloon with piano and swinging doors",
-  "Snoopy and Woodstock in a vintage traveling circus poster style with bright colors",
-  "Snoopy and Woodstock in a 1920s art deco Manhattan skyline at night",
-  "Snoopy and Woodstock in a vintage Automat restaurant with little glass windows",
-  "Snoopy and Woodstock at a 1940s USO dance hall with big band orchestra",
-  "Snoopy and Woodstock in a vintage soda fountain counter with penny candy jars",
-  "Snoopy and Woodstock building a classic soapbox derby racer in a 1950s garage",
-  "Snoopy and Woodstock at a vintage county fair with tilt-a-whirl and cotton candy",
-  "Snoopy and Woodstock decorating a massive outdoor Christmas tree with colored lights",
-  "Snoopy and Woodstock in elaborate Halloween costumes trick or treating at night",
-  "Snoopy and Woodstock watching Fourth of July fireworks over a harbor",
-  "Snoopy and Woodstock celebrating New Years Eve with a giant confetti ball drop",
-  "Snoopy and Woodstock on Easter morning hunting eggs in a dewy garden",
-  "Snoopy and Woodstock at a lavish Thanksgiving table with family and autumn decorations",
-  "Snoopy and Woodstock celebrating Valentines Day in Paris with hearts everywhere",
-  "Snoopy and Woodstock at a surprise birthday party with balloons and sparkle cake",
-  "Snoopy and Woodstock at a summer neighborhood barbecue with fireflies at dusk",
-  "Snoopy and Woodstock in full St Patricks Day green at a Dublin pub parade",
-  "Snoopy and Woodstock at a Chinese New Year parade with dragon and fireworks",
-  "Snoopy and Woodstock at a Diwali festival with a thousand oil lamps glowing",
-  "Snoopy and Woodstock at a Day of the Dead celebration with marigolds and altars",
-  "Snoopy and Woodstock at a Japanese Obon festival with paper lanterns on the river",
-  "Snoopy and Woodstock celebrating Hanukkah with a glowing menorah and latkes",
-  "Snoopy and Woodstock fishing at a glassy mountain lake at perfect sunrise",
-  "Snoopy and Woodstock on a camping trip under a Milky Way sky by the fire",
-  "Snoopy and Woodstock hiking through a misty mountain trail above the clouds",
-  "Snoopy and Woodstock on a secluded beach watching a watercolor sunset",
-  "Snoopy and Woodstock in an endless sunflower field in perfect summer",
-  "Snoopy and Woodstock stargazing in a wildflower meadow on a moonless night",
-  "Snoopy and Woodstock on a farm at dawn with roosters and morning mist",
-  "Snoopy and Woodstock picking apples in a golden autumn orchard",
-  "Snoopy and Woodstock in a secret garden full of climbing roses in bloom",
-  "Snoopy and Woodstock by a luminous waterfall in a lush Costa Rica jungle",
-  "Snoopy and Woodstock watching a pod of whales from a sea cliff",
-  "Snoopy and Woodstock in a lavender field at peak bloom, purple horizon",
-  "Snoopy and Woodstock rafting through a slot canyon river",
-  "Snoopy and Woodstock discovering a hidden waterfall in a bamboo forest",
-  "Snoopy and Woodstock watching a volcano glow at night from a safe distance",
-  "Snoopy and Woodstock birdwatching in a misty tropical forest at dawn",
-  "Snoopy and Woodstock kayaking on a bioluminescent bay at night",
-  "Snoopy and Woodstock in a butterfly sanctuary surrounded by monarchs",
-  "Snoopy and Woodstock watching a spectacular storm roll over the ocean",
-  "Snoopy and Woodstock in a cave with glowworms overhead like stars",
-  "Snoopy and Woodstock playing jazz instruments in a smoky New Orleans club",
-  "Snoopy and Woodstock at a modern art museum having opinions about abstract painting",
-  "Snoopy and Woodstock dancing ballet on a grand stage with spotlight",
-  "Snoopy and Woodstock performing in a stadium rock concert with pyrotechnics",
-  "Snoopy and Woodstock painting a giant city mural together at sunset",
-  "Snoopy and Woodstock at a Carnegie Hall piano recital dressed in formal wear",
-  "Snoopy and Woodstock at a massive outdoor music festival crowd at golden hour",
-  "Snoopy and Woodstock doing street art with spray cans in a brick alley",
-  "Snoopy and Woodstock at a country music festival with guitars and hay bales",
-  "Snoopy and Woodstock in a full symphony orchestra pit playing instruments",
-  "Snoopy and Woodstock writing songs in a cozy recording studio",
-  "Snoopy and Woodstock at a jazz club late night jam session",
-  "Snoopy and Woodstock doing beatbox battle on a city plaza",
-  "Snoopy and Woodstock at a vinyl record store listening to an album together",
-  "Snoopy and Woodstock in a mariachi band at a fiesta",
-  "Snoopy and Woodstock surfing perfect barrels in a tropical surf spot",
-  "Snoopy and Woodstock skateboarding in a professional halfpipe competition",
-  "Snoopy and Woodstock playing baseball in a packed old stadium at twilight",
-  "Snoopy and Woodstock skiing fresh powder down a Colorado mountain",
-  "Snoopy and Woodstock on a sunrise hot air balloon ride over a valley",
-  "Snoopy and Woodstock scuba diving in a vibrant coral reef with sea turtles",
-  "Snoopy and Woodstock playing tennis at a classic grass court club",
-  "Snoopy and Woodstock on a cross-country motorcycle road trip",
-  "Snoopy and Woodstock rock climbing a dramatic sea cliff face at sunset",
-  "Snoopy and Woodstock playing soccer in a World Cup stadium",
-  "Snoopy and Woodstock doing yoga on a peaceful mountain sunrise deck",
-  "Snoopy and Woodstock winning a sailing race in a regatta",
-  "Snoopy and Woodstock ice skating at Rockefeller Center at Christmas",
-  "Snoopy and Woodstock at the Olympics opening ceremony as athletes",
-  "Snoopy and Woodstock playing beach volleyball at sunset on a tropical beach",
-  "Snoopy and Woodstock at a classic American ice cream parlor with elaborate sundaes",
-  "Snoopy and Woodstock at an upscale Tokyo omakase sushi counter",
-  "Snoopy and Woodstock having a perfect picnic with lemonade in a park",
-  "Snoopy and Woodstock baking elaborate holiday cookies in a warm kitchen",
-  "Snoopy and Woodstock at a perfect Neapolitan pizza restaurant in Naples",
-  "Snoopy and Woodstock at a Parisian sidewalk cafe with coffee and croissants",
-  "Snoopy and Woodstock roasting marshmallows over a crackling campfire at night",
-  "Snoopy and Woodstock at a Mexican street food market with tacos al pastor",
-  "Snoopy and Woodstock making handmade pasta in an Italian grandmother's kitchen",
-  "Snoopy and Woodstock at a state fair eating cotton candy and funnel cake",
-  "Snoopy and Woodstock at a New England lobster shack on the harbor",
-  "Snoopy and Woodstock at a Korean BBQ restaurant cooking tabletop meat",
-  "Snoopy and Woodstock at a New Orleans beignet cafe covered in powdered sugar",
-  "Snoopy and Woodstock making s'mores on a mountain camping trip",
-  "Snoopy and Woodstock at a backyard crawfish boil in Louisiana",
-  "Snoopy and Woodstock in a cozy reading nook with books and tea on a rainy day",
-  "Snoopy and Woodstock in a bookshop cafe on a winter evening",
-  "Snoopy and Woodstock decorating their home for the holidays with lights and garlands",
-  "Snoopy and Woodstock having a pajama movie marathon with popcorn",
-  "Snoopy and Woodstock in a greenhouse tending to tropical plants on a cloudy day",
-  "Snoopy and Woodstock in a vintage library among tall rolling ladders",
-  "Snoopy and Woodstock making homemade jam in a farmhouse kitchen in summer",
-  "Snoopy and Woodstock in an art studio surrounded by paintings and brushes",
-  "Snoopy and Woodstock building a blanket fort with candles and storybooks",
-  "Snoopy and Woodstock in a cozy cabin while a snowstorm rages outside",
-  "Snoopy and Woodstock in an enchanted mushroom forest with glowing fairy lights",
-  "Snoopy and Woodstock in a sky city of floating islands and rainbow bridges",
-  "Snoopy and Woodstock discovering an undersea kingdom with glowing sea creatures",
-  "Snoopy and Woodstock in a magical library where books fly and whisper",
-  "Snoopy and Woodstock in a cloud palace above a mountain range",
-  "Snoopy and Woodstock exploring a secret garden of impossible giant flowers",
-  "Snoopy and Woodstock on a galaxy train journey through colorful nebulas",
-  "Snoopy and Woodstock in a winter wonderland palace made of ice and crystal",
-  "Snoopy and Woodstock in a treehouse city in a giant ancient forest",
-  "Snoopy and Woodstock meeting friendly dragons in a mountain cave of treasure",
-  "Snoopy and Woodstock floating through a beautiful nebula in space",
-  "Snoopy and Woodstock planting a flag on the Moon at Earth rise",
-  "Snoopy and Woodstock flying a spacecraft through an asteroid field",
-  "Snoopy and Woodstock watching two suns set on an alien desert planet",
-  "Snoopy and Woodstock in a space station window watching Earth below",
-  "Snoopy and Woodstock at a ringed gas giant planet floating in the cosmos",
-  "Snoopy and Woodstock on a comet tail zooming through the solar system",
-  "Snoopy and Woodstock inside a black hole swirling light phenomenon",
-  "Snoopy and Woodstock at the edge of the universe looking into infinity",
-  "Snoopy and Woodstock in a retro rocket ship heading toward a red Mars",
-  "Snoopy and Woodstock befriending a baby elephant on an African savanna",
-  "Snoopy and Woodstock having tea with a family of pandas in bamboo forest",
-  "Snoopy and Woodstock riding sea turtles through a coral garden underwater",
-  "Snoopy and Woodstock running with wild horses across an open prairie",
-  "Snoopy and Woodstock in an arctic scene with polar bear cubs and snow",
-  "Snoopy and Woodstock watching orcas leap from a rocky Pacific shore",
-  "Snoopy and Woodstock in a monarch butterfly migration, millions of wings",
-  "Snoopy and Woodstock tending beehives in a wildflower meadow",
-  "Snoopy and Woodstock in an octopus cove at low tide exploring tidepools",
-  "Snoopy and Woodstock at a penguin colony in Antarctica with icebergs behind",
-  "Snoopy and Woodstock watching the sunrise from a city rooftop with coffee",
-  "Snoopy and Woodstock on a foggy bridge in San Francisco at dawn",
-  "Snoopy and Woodstock in a colorful Amsterdam canal street in spring",
-  "Snoopy and Woodstock in a Brooklyn pizza shop on a snowy night",
-  "Snoopy and Woodstock at a food hall with amazing aromas and lights",
-  "Snoopy and Woodstock window shopping on a charming European cobblestone street",
-  "Snoopy and Woodstock on a Tokyo train reading manga in the rain",
-  "Snoopy and Woodstock at a street festival with multicultural foods and music",
-  "Snoopy and Woodstock in a San Francisco cable car climbing a steep foggy hill",
-  "Snoopy and Woodstock at a Paris night market under string lights",
-  "Snoopy hugging Woodstock tight under a starry sky in a meadow",
-  "Snoopy and Woodstock sharing an umbrella in a beautiful spring rain",
-  "Snoopy carrying a sleepy Woodstock home on his back on a warm evening",
-  "Snoopy and Woodstock watching the last sunset of summer together",
-  "Snoopy writing a long letter to Woodstock at a desk by candlelight",
-  "Snoopy and Woodstock building a birdhouse together in a workshop",
-  "Snoopy dancing with Woodstock at a kitchen party late at night",
-  "Snoopy and Woodstock sleeping under the same blanket in autumn leaves",
-  "Snoopy watching Woodstock fly for the first time with proud expression",
-  "Snoopy and Woodstock finding buried treasure on a deserted beach",
-  "Snoopy and Woodstock running a lemonade stand on a perfect summer day",
-  "Snoopy and Woodstock competing in a pie eating contest at a county fair",
-  "Snoopy and Woodstock in a go-kart racing on a colorful outdoor track",
-  "Snoopy and Woodstock playing giant chess on an outdoor stone board",
-  "Snoopy and Woodstock in a treasure hunt map adventure through a forest",
-  "Snoopy and Woodstock at a dog show where Snoopy wins every ribbon",
-  "Snoopy and Woodstock making the world's most elaborate sandcastle",
-  "Snoopy and Woodstock having a dramatic snowball fight behind snow forts",
-  "Snoopy and Woodstock on a ghost train ride through a spooky haunted house",
-  "Snoopy and Woodstock doing a magic show in a backyard with lights",
-  "Cartoon Snoopy at the Aoraki Mount Cook National Park New Zealand, hyper-realistic mirror lake reflection at dawn, POSTER_TITLE:'AORAKI MOUNT COOK NATIONAL'",
-  "Cartoon Snoopy at the Sunflower Fields Tuscany Italy, hyper-realistic rolling hills and cypress trees, POSTER_TITLE:'SUNFLOWER FIELDS TUSCANY ITALY'",
-  "Cartoon Snoopy at the Painted Hills Oregon, hyper-realistic colorful geological formations at sunset, POSTER_TITLE:'PAINTED HILLS OREGON'",
-  "Cartoon Snoopy at the Wave rock formation Arizona, hyper-realistic swirling red and orange sandstone, POSTER_TITLE:'WAVE ROCK FORMATION ARIZONA'",
-  "Cartoon Snoopy in the Enchanted Rock Texas, hyper-realistic pink granite dome and bluebonnet fields, POSTER_TITLE:'ENCHANTED ROCK TEXAS'",
-  "Cartoon Snoopy at the Columbia River Gorge Oregon, hyper-realistic windsurfer and basalt cliffs, POSTER_TITLE:'COLUMBIA RIVER GORGE OREGON'",
-  "Cartoon Snoopy at the Puerto Rico Old San Juan, hyper-realistic colorful colonial fortresses and sea, POSTER_TITLE:'PUERTO RICO OLD SAN'",
-  "Cartoon Snoopy at the Mesa Verde cliff dwellings Colorado, hyper-realistic ancient Pueblo homes, POSTER_TITLE:'MESA VERDE CLIFF DWELLINGS'",
-  "Cartoon Snoopy at the Lake Powell Arizona Utah, hyper-realistic red sandstone canyons and houseboat, POSTER_TITLE:'LAKE POWELL ARIZONA UTAH'",
-  "Cartoon Snoopy at the Ozark National Forest Missouri, hyper-realistic crystal spring and old growth forest, POSTER_TITLE:'OZARK NATIONAL FOREST MISSOURI'",
-  "Cartoon Snoopy at the Apostle Islands Ice Caves Wisconsin, hyper-realistic frozen sea cave formations, POSTER_TITLE:'APOSTLE ISLANDS ICE CAVES'",
-  "Cartoon Snoopy at the Maroon Bells Colorado, hyper-realistic twin peaks mirrored in alpine lake, POSTER_TITLE:'MAROON BELLS COLORADO'",
-  "Cartoon Snoopy at the White Sands New Mexico, hyper-realistic gypsum dunes at sunset, POSTER_TITLE:'WHITE SANDS NEW MEXICO'",
-  "Cartoon Snoopy in the Hudson Valley New York fall foliage, hyper-realistic riverside and Catskills mist, POSTER_TITLE:'HUDSON VALLEY NEW YORK'",
-  "Cartoon Snoopy at the Hoh Rainforest Olympic Peninsula, hyper-realistic mossy cathedral forest, POSTER_TITLE:'HOH RAINFOREST OLYMPIC PENINSULA'",
-  "Cartoon Snoopy at the Kenai Fjords Alaska, hyper-realistic sea otters and glacial fjord, POSTER_TITLE:'KENAI FJORDS ALASKA'",
-  "Cartoon Snoopy at Barton Springs Pool Austin Texas, hyper-realistic spring-fed outdoor swimming, POSTER_TITLE:'BARTON SPRINGS POOL AUSTIN'",
-  "Cartoon Snoopy at the Florida Springs crystal clear, hyper-realistic manatees and turquoise water, POSTER_TITLE:'FLORIDA SPRINGS CRYSTAL CLEAR'",
-  "Cartoon Snoopy at Cumberland Island Georgia, hyper-realistic wild horses and ruins on beach, POSTER_TITLE:'CUMBERLAND ISLAND GEORGIA'",
-  "Cartoon Snoopy at Point Lobos California, hyper-realistic sea lions and cypress on rocky coast, POSTER_TITLE:'POINT LOBOS CALIFORNIA'",
-  "Cartoon Snoopy at the Palouse Washington wheat fields, hyper-realistic rolling green and gold hills, POSTER_TITLE:'PALOUSE WASHINGTON WHEAT FIELDS'",
-  "Cartoon Snoopy at Big Bend Texas Rio Grande, hyper-realistic canyon and river at golden hour, POSTER_TITLE:'BIG BEND TEXAS RIO'",
-  "Cartoon Snoopy at the Boundary Waters Minnesota, hyper-realistic canoe and northern lake wilderness, POSTER_TITLE:'BOUNDARY WATERS MINNESOTA'",
-  "Cartoon Snoopy in the Black Hills South Dakota, hyper-realistic ponderosa pine and granite peaks, POSTER_TITLE:'BLACK HILLS SOUTH DAKOTA'",
-  "Cartoon Snoopy at Voyageurs National Park Minnesota, hyper-realistic waterway and wolf tracks, POSTER_TITLE:'VOYAGEURS NATIONAL PARK MINNESOTA'",
-  "Cartoon Snoopy at Cumberland Falls Kentucky, hyper-realistic moonbow over waterfall at night, POSTER_TITLE:'CUMBERLAND FALLS KENTUCKY'",
-  "Cartoon Snoopy at Clingmans Dome Tennessee, hyper-realistic sea of clouds and forest panorama, POSTER_TITLE:'CLINGMANS DOME TENNESSEE'",
-  "Cartoon Snoopy at the Snowy Range Wyoming, hyper-realistic alpine tundra and wildflowers, POSTER_TITLE:'SNOWY RANGE WYOMING'",
-  "Cartoon Snoopy at Pictured Rocks Michigan, hyper-realistic sandstone cliffs and Lake Superior, POSTER_TITLE:'PICTURED ROCKS MICHIGAN'",
-  "Cartoon Snoopy at the Wrangell-St Elias Alaska wilderness, hyper-realistic vast mountain kingdom, POSTER_TITLE:'WRANGELL-ST ELIAS ALASKA WILDERNESS'",
-  "Cartoon Snoopy at the Algarve sea caves Portugal, hyper-realistic golden cliffs and turquoise arch, POSTER_TITLE:'ALGARVE SEA CAVES PORTUGAL'",
-  "Cartoon Snoopy at the Riomaggiore Cinque Terre harbor Italy, hyper-realistic fishing boats and color, POSTER_TITLE:'RIOMAGGIORE CINQUE TERRE HARBOR'",
-  "Cartoon Snoopy at the Svalbard polar bears Norway Arctic, hyper-realistic ice floe and midnight sun, POSTER_TITLE:'SVALBARD POLAR BEARS NORWAY'",
-  "Cartoon Snoopy at the Eisriesenwelt ice caves Austria, hyper-realistic underground frozen world, POSTER_TITLE:'EISRIESENWELT ICE CAVES AUSTRIA'",
-  "Cartoon Snoopy at the Weissensee Lake Austria, hyper-realistic glass-clear alpine lake and mountains, POSTER_TITLE:'WEISSENSEE LAKE AUSTRIA'",
-  "Cartoon Snoopy at the Pulpit Rock Preikestolen Norway, hyper-realistic flat cliff edge and fjord below, POSTER_TITLE:'PULPIT ROCK PREIKESTOLEN NORWAY'",
-  "Cartoon Snoopy in the Black Forest Germany, hyper-realistic dense dark pine and fairy tale village, POSTER_TITLE:'BLACK FOREST GERMANY'",
-  "Cartoon Snoopy at the Gorge du Verdon France, hyper-realistic turquoise river canyon, POSTER_TITLE:'GORGE DU VERDON FRANCE'",
-  "Cartoon Snoopy at the Wachau Valley Austria wine region, hyper-realistic Danube and vineyard terraces, POSTER_TITLE:'WACHAU VALLEY AUSTRIA WINE'",
-  "Cartoon Snoopy at the Cheddar Gorge England, hyper-realistic limestone cliffs and winding road, POSTER_TITLE:'CHEDDAR GORGE ENGLAND'",
-  "Cartoon Snoopy at the Snowdonia Wales, hyper-realistic mountain reflected in lake, POSTER_TITLE:'SNOWDONIA WALES'",
-  "Cartoon Snoopy at the Peak District England, hyper-realistic purple heather moorland and stone walls, POSTER_TITLE:'PEAK DISTRICT ENGLAND'",
-  "Cartoon Snoopy at the Rila Monastery Bulgaria, hyper-realistic painted exterior and mountain backdrop, POSTER_TITLE:'RILA MONASTERY BULGARIA'",
-  "Cartoon Snoopy at Bigar Waterfall Romania, hyper-realistic cascade over mossy dome, POSTER_TITLE:'BIGAR WATERFALL ROMANIA'",
-  "Cartoon Snoopy at the Transfagarasan mountains Romania, hyper-realistic serpentine road and autumn, POSTER_TITLE:'TRANSFAGARASAN MOUNTAINS ROMANIA'",
-  "Cartoon Snoopy at Kotor Montenegro, hyper-realistic medieval walled city and Adriatic bay, POSTER_TITLE:'KOTOR MONTENEGRO'",
-  "Cartoon Snoopy at the Bay of Kotor Montenegro sunrise, hyper-realistic fortress reflections in water, POSTER_TITLE:'BAY OF KOTOR MONTENEGRO'",
-  "Cartoon Snoopy at the Picos de Europa Spain, hyper-realistic limestone spires and gorge, POSTER_TITLE:'PICOS DE EUROPA SPAIN'",
-  "Cartoon Snoopy in the Basque Country Spain, hyper-realistic rugged coast and green hills, POSTER_TITLE:'BASQUE COUNTRY SPAIN'",
-  "Cartoon Snoopy at the Ronda gorge Spain, hyper-realistic white village on deep cliffside bridge, POSTER_TITLE:'RONDA GORGE SPAIN'",
-  "Cartoon Snoopy at Lake Skadar Montenegro Albania, hyper-realistic waterbird wetlands and karst, POSTER_TITLE:'LAKE SKADAR MONTENEGRO ALBANIA'",
-  "Cartoon Snoopy at the Bosphorus Istanbul Turkey, hyper-realistic mosque domes and bridge at sunset, POSTER_TITLE:'BOSPHORUS ISTANBUL TURKEY'",
-  "Cartoon Snoopy in the Cappadocia valleys Turkey, hyper-realistic fairy chimney rock formations, POSTER_TITLE:'CAPPADOCIA VALLEYS TURKEY'",
-  "Cartoon Snoopy at the Sumela Monastery Turkey, hyper-realistic cliff-carved monastery and forest gorge, POSTER_TITLE:'SUMELA MONASTERY TURKEY'",
-  "Cartoon Snoopy at the cotton castles of Pamukkale Turkey, hyper-realistic white calcium pools, POSTER_TITLE:'COTTON CASTLES OF PAMUKKALE'",
-  "Cartoon Snoopy at the Sea of Galilee Israel, hyper-realistic ancient holy shores at dawn, POSTER_TITLE:'SEA OF GALILEE ISRAEL'",
-  "Cartoon Snoopy in the Wadi Rum desert Jordan, hyper-realistic red rock labyrinth and starry sky, POSTER_TITLE:'WADI RUM DESERT JORDAN'",
-  "Cartoon Snoopy at the Masada fortress Israel, hyper-realistic Dead Sea panorama at sunrise, POSTER_TITLE:'MASADA FORTRESS ISRAEL'",
-  "Cartoon Snoopy at the Rub al Khali Empty Quarter, hyper-realistic giant dunes and silence, POSTER_TITLE:'RUB AL KHALI EMPTY'",
-  "Cartoon Snoopy in the Asir highlands Saudi Arabia, hyper-realistic misty green escarpment villages, POSTER_TITLE:'ASIR HIGHLANDS SAUDI ARABIA'",
-  "Cartoon Snoopy at the Zhangye Danxia rainbow mountains China, hyper-realistic striped geology, POSTER_TITLE:'ZHANGYE DANXIA RAINBOW MOUNTAINS'",
-  "Cartoon Snoopy at the Tiger Leaping Gorge China, hyper-realistic dramatic Yangtze canyon, POSTER_TITLE:'TIGER LEAPING GORGE CHINA'",
-  "Cartoon Snoopy at Jiuzhaigou Valley China, hyper-realistic multicolored mountain lake chain, POSTER_TITLE:'JIUZHAIGOU VALLEY CHINA'",
-  "Cartoon Snoopy in the Tea Horse Ancient Road Yunnan China, hyper-realistic terrace and mist, POSTER_TITLE:'TEA HORSE ANCIENT ROAD'",
-  "Cartoon Snoopy at the Ha Giang Loop Vietnam, hyper-realistic limestone mountains and terraces, POSTER_TITLE:'HA GIANG LOOP VIETNAM'",
-  "Cartoon Snoopy at Sapa rice terraces Vietnam, hyper-realistic hill tribe village and golden harvest, POSTER_TITLE:'SAPA RICE TERRACES VIETNAM'",
-  "Cartoon Snoopy at the Phong Nha caves Vietnam, hyper-realistic underground river and stalactites, POSTER_TITLE:'PHONG NHA CAVES VIETNAM'",
-  "Cartoon Snoopy in Hoi An Vietnam lantern festival, hyper-realistic river reflection of thousand lights, POSTER_TITLE:'HOI AN VIETNAM LANTERN'",
-  "Cartoon Snoopy at the Cardamom Mountains Cambodia, hyper-realistic rainforest and gibbon, POSTER_TITLE:'CARDAMOM MOUNTAINS CAMBODIA'",
-  "Cartoon Snoopy at Luang Prabang Laos, hyper-realistic monks morning procession and temple, POSTER_TITLE:'LUANG PRABANG LAOS'",
-  "Cartoon Snoopy at Inle Lake Myanmar, hyper-realistic leg-rowing fishermen and floating gardens, POSTER_TITLE:'INLE LAKE MYANMAR'",
-  "Cartoon Snoopy at the Mae Klong train market Thailand, hyper-realistic train through market stalls, POSTER_TITLE:'MAE KLONG TRAIN MARKET'",
-  "Cartoon Snoopy at Chiang Rai White Temple Thailand, hyper-realistic reflective mirror mosaic, POSTER_TITLE:'CHIANG RAI WHITE TEMPLE'",
-  "Cartoon Snoopy at the Belum caves Malaysia, hyper-realistic longest cave chamber in Southeast Asia, POSTER_TITLE:'BELUM CAVES MALAYSIA'",
-  "Cartoon Snoopy at Chocolate Hills Philippines, hyper-realistic hundreds of brown cones in dry season, POSTER_TITLE:'CHOCOLATE HILLS PHILIPPINES'",
-  "Cartoon Snoopy at Tubbataha Reef Philippines, hyper-realistic pristine coral atoll from above, POSTER_TITLE:'TUBBATAHA REEF PHILIPPINES'",
-  "Cartoon Snoopy in Ubud Bali forest monkey sanctuary, hyper-realistic jungle temple and macaques, POSTER_TITLE:'UBUD BALI FOREST MONKEY'",
-  "Cartoon Snoopy at the Komodo Island Indonesia, hyper-realistic dragon on pink beach, POSTER_TITLE:'KOMODO ISLAND INDONESIA'",
-  "Cartoon Snoopy at the Banda Islands Indonesia, hyper-realistic nutmeg plantation and turquoise bay, POSTER_TITLE:'BANDA ISLANDS INDONESIA'",
-  "Cartoon Snoopy at the Wai-O-Tapu thermal wonderland New Zealand, hyper-realistic champagne pool, POSTER_TITLE:'WAI-O-TAPU THERMAL WONDERLAND NEW'",
-  "Cartoon Snoopy at the Tongariro Alpine Crossing New Zealand, hyper-realistic volcanic emerald lakes, POSTER_TITLE:'TONGARIRO ALPINE CROSSING NEW'",
-  "Cartoon Snoopy at the Coromandel Peninsula New Zealand, hyper-realistic cathedral cove sea arch, POSTER_TITLE:'COROMANDEL PENINSULA NEW ZEALAND'",
-  "Cartoon Snoopy at the Ningaloo Reef Western Australia, hyper-realistic whale shark snorkeling, POSTER_TITLE:'NINGALOO REEF WESTERN AUSTRALIA'",
-  "Cartoon Snoopy at the Kimberley Bungle Bungle Western Australia, hyper-realistic striped beehive domes, POSTER_TITLE:'KIMBERLEY BUNGLE BUNGLE WESTERN'",
-  "Cartoon Snoopy at the Blue Mountains New South Wales, hyper-realistic eucalyptus haze and Three Sisters, POSTER_TITLE:'BLUE MOUNTAINS NEW SOUTH'",
-  "Cartoon Snoopy at the Flinders Ranges South Australia, hyper-realistic ancient red range and wildflowers, POSTER_TITLE:'FLINDERS RANGES SOUTH AUSTRALIA'",
-  "Cartoon Snoopy at Kakadu National Park Northern Territory, hyper-realistic wetlands and Aboriginal art, POSTER_TITLE:'KAKADU NATIONAL PARK NORTHERN'",
-  "Cartoon Snoopy at Milford Sound New Zealand kayaking, hyper-realistic reflection and waterfalls, POSTER_TITLE:'MILFORD SOUND NEW ZEALAND'",
-  "Cartoon Snoopy at the Kepler Track New Zealand, hyper-realistic alpine meadow and fiord glimpse, POSTER_TITLE:'KEPLER TRACK NEW ZEALAND'",
-  "Cartoon Snoopy at Cape Reinga New Zealand, hyper-realistic two oceans meeting and lighthouse, POSTER_TITLE:'CAPE REINGA NEW ZEALAND'",
-  "Cartoon Snoopy at the Okefenokee Swamp Georgia, hyper-realistic Spanish moss and alligator at dusk, POSTER_TITLE:'OKEFENOKEE SWAMP GEORGIA'",
-  "Cartoon Snoopy at the Mammoth Hot Springs Yellowstone, hyper-realistic travertine terraces and steam, POSTER_TITLE:'MAMMOTH HOT SPRINGS YELLOWSTONE'",
-  "Cartoon Snoopy at the Chesapeake Bay Maryland, hyper-realistic oyster boats and sunset reflections, POSTER_TITLE:'CHESAPEAKE BAY MARYLAND'",
-  "Cartoon Snoopy at the Columbia Icefield Canada, hyper-realistic glacier walk and blue-white ice, POSTER_TITLE:'COLUMBIA ICEFIELD CANADA'",
-  "Cartoon Snoopy at Tofino British Columbia Canada surfing, hyper-realistic Pacific storm and kelp forest, POSTER_TITLE:'TOFINO BRITISH COLUMBIA CANADA'",
-  "Cartoon Snoopy at the Bay of Fundy Canada, hyper-realistic world's highest tidal bore and red cliffs, POSTER_TITLE:'BAY OF FUNDY CANADA'",
-  "Cartoon Snoopy at Churchill Manitoba Canada, hyper-realistic polar bears and tundra buggy, POSTER_TITLE:'CHURCHILL MANITOBA CANADA'",
-  "Cartoon Snoopy at the Icefields Parkway Canada, hyper-realistic glacier-fed turquoise lakes, POSTER_TITLE:'ICEFIELDS PARKWAY CANADA'",
-  "Cartoon Snoopy at the Cabot Trail sunset Cape Breton Nova Scotia, hyper-realistic highlands and sea, POSTER_TITLE:'CABOT TRAIL SUNSET CAPE'",
-  "Cartoon Snoopy at Gros Morne Newfoundland Canada, hyper-realistic fjord and ancient rock puzzle, POSTER_TITLE:'GROS MORNE NEWFOUNDLAND CANADA'",
-  "Cartoon Snoopy at Kluane National Park Yukon, hyper-realistic largest non-polar icefield and mountains, POSTER_TITLE:'KLUANE NATIONAL PARK YUKON'",
-  "Cartoon Snoopy at the Queen Charlotte Islands Canada, hyper-realistic ancient Haida totem and rainforest, POSTER_TITLE:'QUEEN CHARLOTTE ISLANDS CANADA'",
-  "Cartoon Snoopy at Peyto Lake Banff Canada, hyper-realistic turquoise glacier lake and wolf head shape, POSTER_TITLE:'PEYTO LAKE BANFF CANADA'",
-  "Cartoon Snoopy at the Andes condor viewpoint Peru, hyper-realistic condor soaring over canyon, POSTER_TITLE:'ANDES CONDOR VIEWPOINT PERU'",
-  "Cartoon Snoopy at Colca Canyon Peru, hyper-realistic deepest canyon and terraces, POSTER_TITLE:'COLCA CANYON PERU'",
-  "Cartoon Snoopy at the Sacred Valley Peru, hyper-realistic Incan terraces and mountain corridor, POSTER_TITLE:'SACRED VALLEY PERU'",
-  "Cartoon Snoopy in La Paz Bolivia cable car, hyper-realistic highest city and Andes panorama, POSTER_TITLE:'LA PAZ BOLIVIA CABLE'",
-  "Cartoon Snoopy at the Quebrada de Humahuaca Argentina, hyper-realistic painted hills and colonial church, POSTER_TITLE:'QUEBRADA DE HUMAHUACA ARGENTINA'",
-  "Cartoon Snoopy at Cerro Torre Patagonia Argentina, hyper-realistic impossible rock tower and wind, POSTER_TITLE:'CERRO TORRE PATAGONIA ARGENTINA'",
-  "Cartoon Snoopy at the Atacama flamingo lagoons Chile, hyper-realistic pink flamingos and volcanic backdrop, POSTER_TITLE:'ATACAMA FLAMINGO LAGOONS CHILE'",
-  "Cartoon Snoopy at the Valdivian temperate rainforest Chile, hyper-realistic oldest trees in the world, POSTER_TITLE:'VALDIVIAN TEMPERATE RAINFOREST CHILE'",
-  "Cartoon Snoopy at the Pantanal giant anteater, hyper-realistic tropical wetland and sunset, POSTER_TITLE:'PANTANAL GIANT ANTEATER'",
-  "Cartoon Snoopy at the Orinoco Delta Venezuela, hyper-realistic delta waterway and Warao stilt village, POSTER_TITLE:'ORINOCO DELTA VENEZUELA'",
-  "Cartoon Snoopy at the Cloud Forest Monteverde Costa Rica, hyper-realistic quetzal and mossy canopy, POSTER_TITLE:'CLOUD FOREST MONTEVERDE COSTA'",
-  "Cartoon Snoopy at Corcovado National Park Costa Rica, hyper-realistic scarlet macaw and pristine beach, POSTER_TITLE:'CORCOVADO NATIONAL PARK COSTA'",
-  "Cartoon Snoopy at Lake Atitlan Guatemala, hyper-realistic Maya village and three volcano backdrop, POSTER_TITLE:'LAKE ATITLAN GUATEMALA'",
-  "Cartoon Snoopy at Copper Canyon Mexico, hyper-realistic deeper than Grand Canyon and indigenous village, POSTER_TITLE:'COPPER CANYON MEXICO'",
-  "Cartoon Snoopy at the Cenotes of Yucatan Mexico, hyper-realistic crystal underwater cavern and rays, POSTER_TITLE:'CENOTES OF YUCATAN MEXICO'",
-  "Cartoon Snoopy at Hierve el Agua Mexico, hyper-realistic petrified waterfall and valley panorama, POSTER_TITLE:'HIERVE EL AGUA MEXICO'",
-  "Cartoon Snoopy at the monarch butterfly reserve Mexico, hyper-realistic millions of orange wings, POSTER_TITLE:'MONARCH BUTTERFLY RESERVE MEXICO'",
-  "Cartoon Snoopy at the Belize Blue Hole from above, hyper-realistic dark ocean circle and reef ring, POSTER_TITLE:'BELIZE BLUE HOLE FROM'",
-  "Cartoon Snoopy at the Tikal temples Guatemala, hyper-realistic jungle pyramid above the canopy, POSTER_TITLE:'TIKAL TEMPLES GUATEMALA'",
-  "Cartoon Snoopy in the Darien Gap jungle Panama, hyper-realistic untouched primary rainforest, POSTER_TITLE:'DARIEN GAP JUNGLE PANAMA'",
-  "Cartoon Snoopy at Cartagena Colombia, hyper-realistic walled colonial city and Caribbean sea, POSTER_TITLE:'CARTAGENA COLOMBIA'",
-  "Cartoon Snoopy at the Salt Cathedral of Zipaquira Colombia, hyper-realistic underground cathedral, POSTER_TITLE:'SALT CATHEDRAL OF ZIPAQUIRA'",
-  "Cartoon Snoopy at the Coffee Region Colombia, hyper-realistic coffee farm and Andes mist, POSTER_TITLE:'COFFEE REGION COLOMBIA'",
-  "Cartoon Snoopy at Medellin Colombia cable cars, hyper-realistic city and mountain hillside, POSTER_TITLE:'MEDELLIN COLOMBIA CABLE CARS'",
-  "Cartoon Snoopy at the Galapagos land iguana, hyper-realistic prehistoric creature and lava field, POSTER_TITLE:'GALAPAGOS LAND IGUANA'",
-  "Cartoon Snoopy at the Nazca Lines Peru from airplane, hyper-realistic giant geoglyph and desert, POSTER_TITLE:'NAZCA LINES PERU FROM'",
-  "Cartoon Snoopy at the Moray circular terraces Peru, hyper-realistic concentric Inca circles, POSTER_TITLE:'MORAY CIRCULAR TERRACES PERU'",
-  "Cartoon Snoopy at the Lencois Maranhenses Brazil, hyper-realistic white dunes and blue rain pools, POSTER_TITLE:'LENCOIS MARANHENSES BRAZIL'",
-  "Cartoon Snoopy at the Serra Gaucha wine region Brazil, hyper-realistic vineyard and European-style town, POSTER_TITLE:'SERRA GAUCHA WINE REGION'",
-  "Cartoon Snoopy at Jalapao Brazil, hyper-realistic red sand dunes and crystal spring pools, POSTER_TITLE:'JALAPAO BRAZIL'",
-  "Cartoon Snoopy at the Jericoacoara Brazil dunes, hyper-realistic lagoon and kitesurfer at sunset, POSTER_TITLE:'JERICOACOARA BRAZIL DUNES'",
-  "Cartoon Snoopy at the Abrolhos Marine Park Brazil, hyper-realistic humpback whale breach and island, POSTER_TITLE:'ABROLHOS MARINE PARK BRAZIL'",
-  "Cartoon Snoopy at Victoria Lake East Africa, hyper-realistic fishermen and hippos at sunset, POSTER_TITLE:'VICTORIA LAKE EAST AFRICA'",
-  "Cartoon Snoopy at the Sossusvlei Deadvlei Namibia, hyper-realistic dead camel thorn trees in white clay, POSTER_TITLE:'SOSSUSVLEI DEADVLEI NAMIBIA'",
-  "Cartoon Snoopy at the Etosha salt pan Namibia, hyper-realistic elephant at waterhole and dust, POSTER_TITLE:'ETOSHA SALT PAN NAMIBIA'",
-  "Cartoon Snoopy at the Fish River Canyon Namibia, hyper-realistic second largest canyon in world, POSTER_TITLE:'FISH RIVER CANYON NAMIBIA'",
-  "Cartoon Snoopy at the Skeleton Coast Namibia, hyper-realistic fog and shipwreck and seals, POSTER_TITLE:'SKELETON COAST NAMIBIA'",
-  "Cartoon Snoopy at the Boulders penguin colony South Africa, hyper-realistic African penguins on beach, POSTER_TITLE:'BOULDERS PENGUIN COLONY SOUTH'",
-  "Cartoon Snoopy at Kruger National Park lion sunrise, hyper-realistic pride and golden savanna, POSTER_TITLE:'KRUGER NATIONAL PARK LION'",
-  "Cartoon Snoopy at the Garden Route South Africa, hyper-realistic coastal cliff and lagoon, POSTER_TITLE:'GARDEN ROUTE SOUTH AFRICA'",
-  "Cartoon Snoopy at Mozambique Bazaruto Archipelago, hyper-realistic dugong and pristine Indian Ocean, POSTER_TITLE:'MOZAMBIQUE BAZARUTO ARCHIPELAGO'",
-  "Cartoon Snoopy at the Shire River Malawi, hyper-realistic African fish eagle and papyrus reeds, POSTER_TITLE:'SHIRE RIVER MALAWI'",
-  "Cartoon Snoopy at Lake Malawi crystal clear, hyper-realistic cichlid fish and lakeshore village, POSTER_TITLE:'LAKE MALAWI CRYSTAL CLEAR'",
-  "Cartoon Snoopy at the Simien Wolf highlands Ethiopia, hyper-realistic rare wolf and afroalpine plateau, POSTER_TITLE:'SIMIEN WOLF HIGHLANDS ETHIOPIA'",
-  "Cartoon Snoopy at the Rock Churches of Lalibela Ethiopia, hyper-realistic medieval carved churches, POSTER_TITLE:'ROCK CHURCHES OF LALIBELA'",
-  "Cartoon Snoopy at the Danakil Depression Ethiopia, hyper-realistic hottest and most alien landscape, POSTER_TITLE:'DANAKIL DEPRESSION ETHIOPIA'",
-  "Cartoon Snoopy at the Dallol volcano Ethiopia, hyper-realistic acid pools and sulfur crystals, POSTER_TITLE:'DALLOL VOLCANO ETHIOPIA'",
-  "Cartoon Snoopy at the Saharan oasis of Djanet Algeria, hyper-realistic palm and sandstone canyon, POSTER_TITLE:'SAHARAN OASIS OF DJANET'",
-  "Cartoon Snoopy at the Draa Valley Morocco, hyper-realistic ancient kasbahs and palm groves, POSTER_TITLE:'DRAA VALLEY MOROCCO'",
-  "Cartoon Snoopy in the Atlas foothills Morocco, hyper-realistic Berber village and almond blossom, POSTER_TITLE:'ATLAS FOOTHILLS MOROCCO'",
-  "Cartoon Snoopy at the Essaouira coast Morocco, hyper-realistic windy blue-white port town and sea, POSTER_TITLE:'ESSAOUIRA COAST MOROCCO'",
-  "Cartoon Snoopy at the Chefchaouen blue city Morocco, hyper-realistic cobalt walls and flower pots, POSTER_TITLE:'CHEFCHAOUEN BLUE CITY MOROCCO'",
-  "Cartoon Snoopy at the Erg Chebbi dunes Sahara Morocco, hyper-realistic camel and star sky, POSTER_TITLE:'ERG CHEBBI DUNES SAHARA'",
-  "Cartoon Snoopy at the Toubkal summit Atlas Morocco, hyper-realistic North Africa's highest peak, POSTER_TITLE:'TOUBKAL SUMMIT ATLAS MOROCCO'",
-  "Cartoon Snoopy at Bwindi forest Uganda, hyper-realistic mountain gorilla family in mist, POSTER_TITLE:'BWINDI FOREST UGANDA'",
-  "Cartoon Snoopy at the Rwenzori Mountains Uganda, hyper-realistic mystical montane glacial peaks, POSTER_TITLE:'RWENZORI MOUNTAINS UGANDA'",
-  "Cartoon Snoopy at the Nile source Uganda, hyper-realistic historic source of the great river, POSTER_TITLE:'NILE SOURCE UGANDA'",
-  "Cartoon Snoopy at the Congo River Basin, hyper-realistic bonobo and dense equatorial forest, POSTER_TITLE:'CONGO RIVER BASIN'",
-  "Cartoon Snoopy at the Pendjari National Park Benin, hyper-realistic West African elephant herd, POSTER_TITLE:'PENDJARI NATIONAL PARK BENIN'",
-  "Cartoon Snoopy at Bijagos Islands Guinea-Bissau, hyper-realistic sacred hippo island and mangrove, POSTER_TITLE:'BIJAGOS ISLANDS GUINEA-BISSAU'",
-  "Cartoon Snoopy at the Cape Verde volcanic island Fogo, hyper-realistic wine village in crater, POSTER_TITLE:'CAPE VERDE VOLCANIC ISLAND'",
-  "Cartoon Snoopy at the Seychelles Anse Source dArgent, hyper-realistic pink granite boulders and sea, POSTER_TITLE:'SEYCHELLES ANSE SOURCE DARGENT'",
-  "Cartoon Snoopy at the Seychelles Vallee de Mai, hyper-realistic coco de mer palm and rare black parrot, POSTER_TITLE:'SEYCHELLES VALLEE DE MAI'",
-  "Cartoon Snoopy at Mauritius underwater waterfall illusion, hyper-realistic sand cascade from above, POSTER_TITLE:'MAURITIUS UNDERWATER WATERFALL ILLUSION'",
-  "Cartoon Snoopy at Aldabra Atoll Seychelles, hyper-realistic giant tortoises and pristine reef, POSTER_TITLE:'ALDABRA ATOLL SEYCHELLES'",
-  "Cartoon Snoopy at the Comoros islands, hyper-realistic ylang ylang fields and volcanic bay, POSTER_TITLE:'COMOROS ISLANDS'",
-  "Cartoon Snoopy at the Azores whale watching, hyper-realistic sperm whale dive from rib boat, POSTER_TITLE:'AZORES WHALE WATCHING'",
-  "Cartoon Snoopy in the Macaronesian laurisilva Madeira, hyper-realistic ancient cloud forest levada path, POSTER_TITLE:'MACARONESIAN LAURISILVA MADEIRA'",
-  "Cartoon Snoopy at the Tenerife Teide volcano, hyper-realistic sea of clouds and summit at sunrise, POSTER_TITLE:'TENERIFE TEIDE VOLCANO'",
-  "Cartoon Snoopy at Lanzarote lava fields Canary Islands, hyper-realistic black lunar landscape and vineyards, POSTER_TITLE:'LANZAROTE LAVA FIELDS CANARY'",
-  "Cartoon Snoopy at Gran Canaria Roque Nublo, hyper-realistic volcanic monolith and island panorama, POSTER_TITLE:'GRAN CANARIA ROQUE NUBLO'",
-  "Cartoon Snoopy at La Palma Roque de los Muchachos, hyper-realistic highest point and observatory, POSTER_TITLE:'LA PALMA ROQUE DE'",
-  "Cartoon Snoopy at the Waitakere Ranges Auckland New Zealand, hyper-realistic black sand beach and kauri forest, POSTER_TITLE:'WAITAKERE RANGES AUCKLAND NEW'",
-  "Cartoon Snoopy at the Kaikoura mountains and sea New Zealand, hyper-realistic dusky dolphins and snow peaks, POSTER_TITLE:'KAIKOURA MOUNTAINS AND SEA'",
-  "Cartoon Snoopy at Whanganui River New Zealand canoe, hyper-realistic jungle river and bridge to nowhere, POSTER_TITLE:'WHANGANUI RIVER NEW ZEALAND'",
-  "Cartoon Snoopy at Rotorua New Zealand geothermal, hyper-realistic boiling mud pools and Maori carvings, POSTER_TITLE:'ROTORUA NEW ZEALAND GEOTHERMAL'",
-  "Cartoon Snoopy at Cape Palliser New Zealand, hyper-realistic fur seal colony and lighthouse, POSTER_TITLE:'CAPE PALLISER NEW ZEALAND'",
-  "Cartoon Snoopy at the Ruapehu volcano New Zealand ski, hyper-realistic snowy crater lake and clouds, POSTER_TITLE:'RUAPEHU VOLCANO NEW ZEALAND'",
-  "Cartoon Snoopy at the Manawatu Gorge New Zealand, hyper-realistic dramatic river gorge and tui birds, POSTER_TITLE:'MANAWATU GORGE NEW ZEALAND'",
-  "Cartoon Snoopy at Nugget Point New Zealand lighthouse, hyper-realistic wave-lashed rocks and gannets, POSTER_TITLE:'NUGGET POINT NEW ZEALAND'",
-  "Cartoon Snoopy at the Catlins waterfalls New Zealand, hyper-realistic podocarp forest and hidden cascades, POSTER_TITLE:'CATLINS WATERFALLS NEW ZEALAND'",
-  "Cartoon Snoopy at Stewart Island New Zealand, hyper-realistic southern kiwi and aurora australis, POSTER_TITLE:'STEWART ISLAND NEW ZEALAND'",
-  "Snoopy and Woodstock in a vintage photo booth making funny faces",
-  "Snoopy and Woodstock at a farmers market on a sunny Saturday morning",
-  "Snoopy and Woodstock in a pottery studio throwing clay on wheels",
-  "Snoopy and Woodstock in a wildflower honey bee meadow",
-  "Snoopy and Woodstock doing a science experiment with colorful reactions",
-  "Snoopy and Woodstock at a midnight diner after a long day",
-  "Snoopy and Woodstock bird watching at a misty lake at sunrise",
-  "Snoopy and Woodstock learning to tango in an Argentine dance hall",
-  "Snoopy and Woodstock at a sunset sailboat cruise on a calm bay",
-  "Snoopy and Woodstock in a redwood treehouse overlooking fog-filled valley",
-  "Snoopy and Woodstock riding vintage carousel horses at a county fair",
-  "Snoopy and Woodstock making a time capsule in the backyard",
-  "Snoopy and Woodstock at a meteor shower on a rooftop with telescopes",
-  "Snoopy and Woodstock in a coastal lighthouse keeper cottage in a storm",
-  "Snoopy and Woodstock feeding ducks at a peaceful city park pond",
-  "Snoopy and Woodstock in a pumpkin patch corn maze at twilight",
-  "Snoopy and Woodstock on a dog sled through a snowy birch forest",
-  "Snoopy and Woodstock at a cherry picking orchard in Japan spring",
-  "Snoopy and Woodstock building a kite and flying it on a breezy hill",
-  "Snoopy and Woodstock at a rooftop garden watering tomatoes at dawn",
-  "Snoopy and Woodstock in a hot spring pool in the mountains at night",
-  "Snoopy and Woodstock at a pier carnival with lights over the ocean",
-  "Snoopy and Woodstock searching tide pools for sea creatures at low tide",
-  "Snoopy and Woodstock in a mountain cabin making hot cocoa in a snowstorm",
-  "Snoopy and Woodstock at a night baseball game under stadium lights",
-  "Snoopy and Woodstock learning origami in a Japanese paper shop",
-  "Snoopy and Woodstock at a harvest moon bonfire in an open field",
-  "Snoopy and Woodstock riding a Ferris wheel at sunset over the city",
-  "Snoopy and Woodstock in a snow globe paperweight magically come to life",
-  "Snoopy and Woodstock celebrating finishing a puzzle at a rainy window",
-  "Snoopy and Woodstock on a porch swing drinking sweet tea in the South",
-  "Snoopy and Woodstock finding a message in a bottle on a deserted shore",
-  "Snoopy and Woodstock making wind chimes in a garden workshop",
-  "Snoopy and Woodstock at a street painting festival doing chalk art",
-  "Snoopy and Woodstock at a community garden planting season together",
-  "Snoopy and Woodstock releasing sky lanterns over a lakeside",
-  "Snoopy and Woodstock at a beachside bonfire with stars overhead",
-  "Snoopy and Woodstock picking blackberries in a country lane in summer",
-  "Snoopy and Woodstock at a silent disco wearing headphones on a rooftop",
-  "Snoopy and Woodstock in a canyon slot reading shadows in the afternoon",
-  "Snoopy and Woodstock at a Japanese ramen street in winter steam",
-  "Snoopy and Woodstock on a tandem surfboard at a sunrise session",
-  "Snoopy and Woodstock in a flower market at dawn buying tulips",
-  "Snoopy and Woodstock night fishing on a calm moonlit lake",
-  "Snoopy and Woodstock building a fire tower signal on a mountain peak",
-  "Snoopy and Woodstock in a desert at dawn watching a perfect sunrise",
-  "Snoopy and Woodstock toasting marshmallows under a meteor shower",
-  "Snoopy and Woodstock in a canoe exploring a jungle river",
-  "Snoopy and Woodstock at a ski resort hot tub watching mountain alpenglow",
-  "Snoopy and Woodstock in a lavender farm making sachets together",
-  "Snoopy and Woodstock catching fireflies in mason jars at dusk",
-  "Snoopy and Woodstock at a harbor watching tall ships race",
-  "Snoopy and Woodstock in a mountain wildflower meadow painting plein air",
-  "Snoopy and Woodstock foraging mushrooms in a misty autumn forest",
-  "Snoopy and Woodstock at a spring peach orchard in full pink bloom",
-  "Snoopy and Woodstock building a raft and floating down a calm river",
-  "Snoopy and Woodstock watching a spectacular sunrise from a mesa top",
-  "Snoopy and Woodstock in a bookshop with a sleeping cat by the fire",
-  "Snoopy and Woodstock at a farmers market honey and preserves stall",
-  "Snoopy and Woodstock riding bikes through a covered bridge in New England",
-  "Snoopy and Woodstock at a drive-through movie with hot dogs and soda",
-  "Snoopy and Woodstock making sand angels on a deserted winter beach",
-  "Snoopy and Woodstock in a lush greenhouse on a cold rainy day",
-  "Snoopy and Woodstock taking a nap under a spreading oak tree in summer",
-  "Snoopy and Woodstock at a lighthouse on a foggy New England morning",
-  "Snoopy and Woodstock at a patio dinner with candles and string lights",
-  "Snoopy and Woodstock at a folk art fair with handmade quilts and crafts",
-  "Snoopy and Woodstock in a sunlit dory boat rowing through a lily pond",
-  "Snoopy and Woodstock building an epic snowman with personality",
-  "Snoopy and Woodstock at a rain puddle jumping contest in rubber boots",
-  "Snoopy and Woodstock stargazing from a floating dock on a quiet lake",
-  "Snoopy and Woodstock at a spring maple syrup sugarbush tapping trees",
-  "Snoopy and Woodstock in a hammock between coconut palms on a beach",
-  "Snoopy and Woodstock at a ski jump watching from cozy lodge",
-  "Snoopy and Woodstock in a cactus garden at a desert botanical park",
-  "Snoopy and Woodstock at a tropical fish market at dawn with color",
-  "Snoopy and Woodstock watching a pod of dolphins from a sailboat",
-  "Snoopy and Woodstock at a coastal clambake on a rocky Maine beach",
-  "Snoopy and Woodstock in a treehouse studio writing songs in the rain",
-  "Snoopy and Woodstock at a spring kite festival on a windy green hill",
-  "Snoopy and Woodstock at a retro roller rink with disco lights spinning",
-  "Snoopy and Woodstock in a bakery at dawn watching bread come out of oven",
-  "Snoopy and Woodstock watching a classic car parade on Main Street",
-  "Snoopy and Woodstock at a rooftop cinema under the stars in summer",
-  "Snoopy and Woodstock in a peach orchard eating ripe fruit in July",
-  "Snoopy and Woodstock on a snowy toboggan hill shrieking with joy",
-  "Snoopy and Woodstock watching an airshow from the grass below",
-  "Snoopy and Woodstock in a misty vineyard at harvest time treading grapes",
-  "Snoopy and Woodstock at a warm autumn cider mill with donuts",
-  "Snoopy and Woodstock at a rural stargazing festival in a dark sky preserve",
-  "Snoopy and Woodstock in a pine forest after first snow quiet and still",
-  "Snoopy and Woodstock watching humpback whales from a zodiac boat",
-  "Snoopy and Woodstock at a roadside cherry stand in summer sunshine",
-  "Snoopy and Woodstock in a lemon grove in Sicily at golden hour",
-  "Snoopy and Woodstock at a rooftop garden with a city view at dusk",
-  "Snoopy and Woodstock discovering a glowworm grotto in a forest cave",
-  "Snoopy and Woodstock celebrating the first day of spring in a park",
-  "Snoopy and Woodstock at a moonrise over the ocean on a cliff",
-  "Snoopy and Woodstock making elderflower cordial in a country cottage",
-  "Snoopy and Woodstock at a small town parade on the Fourth of July",
-  "Snoopy and Woodstock at a winter solstice bonfire celebration",
-  "Snoopy and Woodstock skipping stones across a mountain stream at dusk",
-  "Snoopy and Woodstock at a spring cherry blossom tea ceremony",
-  "Snoopy and Woodstock surfing a longboard at a perfect dawn session",
-  "Snoopy and Woodstock at a lakeside family reunion with homemade pie",
-  "Snoopy and Woodstock in a field of California poppies at peak bloom",
-  "Snoopy and Woodstock night snorkeling in a warm tropical lagoon",
-  "Snoopy and Woodstock at a cozy Welsh pub in the rain with log fire",
-  "Snoopy and Woodstock watching a blue moon rise over the open sea",
-  "Snoopy and Woodstock on a morning walk in a misty meadow with dew",
-  "Snoopy and Woodstock at a summer evening firefly meadow in Tennessee",
-  "Snoopy and Woodstock exploring sea caves at low tide on a rugged coast",
-  "Snoopy and Woodstock at a traditional Scottish Highland Games",
-  "Snoopy and Woodstock in a Japanese cedar forest with dappled light",
-  "Snoopy and Woodstock at a rooftop New Year fireworks and champagne",
-  "Snoopy and Woodstock on a coastal trail with wildflowers in spring wind",
-  "Snoopy and Woodstock at an Alaskan fish camp during salmon run",
-  "Snoopy and Woodstock in a eucalyptus forest watching koalas sleep",
-  "Snoopy and Woodstock at a street carnival in Brazil with samba music",
-  "Snoopy and Woodstock finding a perfect four-leaf clover field",
-  "Snoopy and Woodstock at a night market in Taiwan with bubble tea",
-  "Snoopy and Woodstock in a Bavarian village at Christmas market",
-  "Snoopy and Woodstock on a canoe watching a moose in Canadian lake",
-  "Snoopy and Woodstock in a sunlit wheat field watching a combine harvest",
-  "Snoopy and Woodstock at a perfect snowy morning opening Christmas gifts",
-  "Snoopy and Woodstock making maple candy at a Vermont sugar house",
-  "Snoopy and Woodstock watching the Super Blood Moon from a hillside",
-  "Snoopy and Woodstock at a winery harvest stomping grapes laughing",
-  "Snoopy and Woodstock at a coastal New England lobster boil at sunset",
-  "Snoopy and Woodstock in a hot chocolate shop on a snowy city street",
-  "Snoopy and Woodstock at a Hawaiian slack key guitar by the ocean fire",
-  "Snoopy and Woodstock in a mountain alpine hut eating cheese fondue",
-  "Snoopy and Woodstock at a desert night sky party with telescopes",
-  "Snoopy and Woodstock in a moss-covered Irish stone cottage in the rain",
-  "Snoopy and Woodstock at a wildflower super bloom in California hills",
-  "Snoopy and Woodstock on a lazy summer river float with inner tubes",
-  "Snoopy and Woodstock at an outdoor Shakespeare play at twilight",
-  "Snoopy and Woodstock at a Mardi Gras parade catching beads",
-  "Snoopy and Woodstock in a mountain town Christmas parade with snow",
-  "Snoopy and Woodstock at a harvest festival square dance with fiddle",
-  "Snoopy and Woodstock on a Vermont covered bridge in peak foliage",
-  "Snoopy and Woodstock at a Scandinavian midsummer celebration with wreath",
-  "Snoopy and Woodstock in a rowboat on a mirror-still alpine lake at dawn",
-  "Snoopy and Woodstock at a traditional Japanese New Year shrine visit",
-  "Snoopy and Woodstock at a Kentucky Derby with mint juleps and hats",
-  "Snoopy and Woodstock watching a pod of narwhals in Arctic waters",
-  "Snoopy and Woodstock at an Icelandic horse farm in autumn",
-  "Snoopy and Woodstock on a ferry watching island hopping in Greece",
-  "Snoopy and Woodstock at a glacier hike in New Zealand in crampons",
-  "Snoopy and Woodstock in a Japanese izakaya after work with lanterns",
-  "Snoopy and Woodstock at a Louisiana bayou sunset fishing",
-  "Snoopy and Woodstock at a high alpine pass watching eagle soar",
-  "Snoopy and Woodstock in a Pacific Northwest old growth forest cathedral",
-  "Snoopy and Woodstock at a summer outdoor opera in an Italian piazza",
-  "Snoopy and Woodstock making a paper boat and floating it down a creek",
-  "Snoopy and Woodstock at a spring sunrise on the Lincoln Memorial steps",
-  "Snoopy and Woodstock in a Turkish carpet bazaar with colorful patterns",
-  "Snoopy and Woodstock at a twilight firefly show in a Southern swamp",
-  "Snoopy and Woodstock on a surfboard at dawn in mist watching sun rise",
-  "Snoopy and Woodstock hiking through autumn aspens in Colorado gold",
-  "Cartoon Snoopy at the Dolomite Tre Cime di Lavaredo Italy, hyper-realistic three rock towers and alpenglow, POSTER_TITLE:'DOLOMITE TRE CIME DI'",
-  "Cartoon Snoopy at the Trollfjord Norway, hyper-realistic narrow mountain fjord and eagle, POSTER_TITLE:'TROLLFJORD NORWAY'",
-  "Cartoon Snoopy at the Aysgarth Falls Yorkshire England, hyper-realistic tiered limestone waterfalls, POSTER_TITLE:'AYSGARTH FALLS YORKSHIRE ENGLAND'",
-  "Cartoon Snoopy at the Dettifoss waterfall Iceland, hyper-realistic most powerful European waterfall, POSTER_TITLE:'DETTIFOSS WATERFALL ICELAND'",
-  "Cartoon Snoopy at the Pamukkale terraces Turkey, hyper-realistic white calcium pools and ruins, POSTER_TITLE:'PAMUKKALE TERRACES TURKEY'",
-  "Cartoon Snoopy at the Kalalau Valley Hawaii, hyper-realistic inaccessible valley and towering green cliffs, POSTER_TITLE:'KALALAU VALLEY HAWAII'",
-  "Cartoon Snoopy at Skeleton Coast Namibia seal colony, hyper-realistic Cape fur seals and Atlantic mist, POSTER_TITLE:'SKELETON COAST NAMIBIA SEAL'",
-  "Cartoon Snoopy at the Tian Chi Heaven Lake China, hyper-realistic volcanic crater lake and snow, POSTER_TITLE:'TIAN CHI HEAVEN LAKE'",
-  "Cartoon Snoopy at Pico Island Azores vineyards, hyper-realistic black lava wall vineyards and Atlantic, POSTER_TITLE:'PICO ISLAND AZORES VINEYARDS'",
-  "Cartoon Snoopy at the Crooked Forest Poland, hyper-realistic mysteriously bent pine trees, POSTER_TITLE:'CROOKED FOREST POLAND'",
-  "Snoopy and Woodstock at a taco truck on a perfect California afternoon",
-  "Snoopy and Woodstock in a wildflower canyon in Utah at peak bloom",
-  "Snoopy and Woodstock at a community pond skating rink with hot cider",
-  "Snoopy and Woodstock watching the Perseverance rover land on Mars",
-  "Snoopy and Woodstock at a thunderstorm chasing the perfect lightning shot",
-  "Snoopy and Woodstock in a forest bathing walk through Japanese cedar",
-  "Snoopy and Woodstock at a foggy San Francisco morning with dim sum",
-  "Snoopy and Woodstock learning to surf at a tropical beach school",
-  "Snoopy and Woodstock at a New England autumn apple cider donut stand",
-  "Snoopy and Woodstock at a southern porch sweet tea and firefly evening",
-  "Snoopy and Woodstock in a Paris bookshop finding the perfect book",
-  "Snoopy and Woodstock watching a spectacular Alaskan aurora from a yurt",
-  "Snoopy and Woodstock at a midnight Hawaiian luau with fire dancers",
-  "Snoopy and Woodstock in a Bavarian beer garden in summer afternoon",
+  "Snoopy on a fire lookout tower at night, folk isolation album cover, star sky and solitude",
+  "Snoopy at a midnight Hawaiian luau with fire dancers, tropical album cover",
+  "Snoopy in a Venice motorboat at speed, Italian indie album cover, spray and palazzo",
+  "Snoopy on a Swiss train through mountain tunnel, folk album cover, dark and glimpse of light",
+  "Snoopy at a Barcelona rooftop at 2am, indie pop album cover, warm city and late night",
+  "Snoopy in a London studio recording session 1969, Beatles era album cover, classic",
+  "Snoopy under a cherry blossom in Kyoto, Japanese folk album cover, pink petals and quiet",
+  "Snoopy at a Glastonbury headliner moment, British festival album cover, crowd sea and beam",
+  "Snoopy in a New York loft with a piano, indie composer album cover, morning light and sheet music",
+  "Snoopy on a South African township street, kwaito album cover, energy and color and life",
+  "Snoopy at a Quebec winter bonfire, francophone folk album cover, snow and accordion",
+  "Snoopy at an Austin Texas live music venue, Americana album cover, warm and real",
+  "Snoopy on a New Mexico desert road at dawn, psychedelic rock album cover, mesas and color",
+  "Snoopy at a Reykjavik hot pot at midnight, Icelandic rock album cover, steam and stars",
+
+  // ── 300 RETRO POSTER STYLE ──
+  "Snoopy as a heroic explorer on a 1930s adventure society poster, bold art deco typography, navy and gold palette",
+  "Snoopy on a WPA-style national park travel poster, flat color blocks, classic American park poster art",
+  "Snoopy as a 1940s wartime pilot on a recruitment poster, bold graphic red white and blue, vintage texture",
+  "Snoopy on a vintage 1950s diner billboard, pop art colors, chrome lettering and checkerboard Americana",
+  "Snoopy as a circus ringmaster on a Victorian playbill poster, ornate typography, worn canvas and red",
+  "Snoopy on a 1960s psychedelic concert poster, swirling Fillmore West typography, Day-Glo colors",
+  "Snoopy on a retro Soviet-style sports achievement poster, constructivist geometry, red and cream",
+  "Snoopy as a film noir detective on a 1940s movie poster, black and shadow, rain-soaked silhouette",
+  "Snoopy on a vintage Route 66 roadside diner poster, hand-painted lettering, dusty western palette",
+  "Snoopy as a surf champion on a 1960s competition poster, woodblock print style, ocean wave graphic",
+  "Snoopy on a retro NASA Apollo-era space mission poster, cool blue and orange, bold sans-serif type",
+  "Snoopy as a vintage boxer on a 1920s fight night poster, old school letterpress, sepia and red",
+  "Snoopy on a 1930s ocean liner travel poster, Cassandre art deco waves, luxury and elegance",
+  "Snoopy as a silent film star on a 1920s movie house poster, ornate art nouveau frame and starlight",
+  "Snoopy on a vintage rodeo poster, rope border, western serif type, dusty sunset palette",
+  "Snoopy as a jazz musician on a 1950s cool jazz poster, abstract shapes, late night blue and amber",
+  "Snoopy on a 1980s action hero poster, airbrushed painting style, fire and explosion and sunglasses",
+  "Snoopy as a Victorian botanist on a natural history print poster, detailed illustration, aged parchment",
+  "Snoopy on a vintage winter Olympics poster, 1932 art deco mountain silhouette and bold type",
+  "Snoopy as a kung fu master on a 1970s Hong Kong movie poster, hand-painted flying action",
+  "Snoopy on a 1950s pulp science fiction magazine cover poster, rocket ships and alien worlds",
+  "Snoopy as a vintage aviator on a 1920s air show poster, biplane and clouds, brave and dashing",
+  "Snoopy on a retro roller derby poster, 1970s bold graphic, skates and speed and attitude",
+  "Snoopy as a strongman on a vintage circus poster, exaggerated muscles, old ornate typography",
+  "Snoopy on a 1960s pop art poster, Lichtenstein Ben-Day dot style, primary colors and bold outline",
+  "Snoopy as a vintage pirate on a 1950s swashbuckler movie poster, treasure map and tall ships",
+  "Snoopy on a retro ski resort poster, 1930s alpine illustration, bold type and chalet charm",
+  "Snoopy as a 1920s jazz age speakeasy poster, Harlem Renaissance style, elegant and smoky",
+  "Snoopy on a vintage gold rush poster, 1900s frontier adventure, panning for gold and mountain",
+  "Snoopy as a retro disco king poster, Studio 54 1970s style, mirror ball and sequin suit",
+  "Snoopy on a vintage Hawaiian tourism poster, 1940s illustration, tropical flowers and breaking surf",
+  "Snoopy as a silent movie villain on a 1915 melodrama poster, mustachio and damsel, sepia drama",
+  "Snoopy on a retro hot rod show poster, 1950s hot rod illustration, chrome flames and speed lines",
+  "Snoopy as a vintage samurai on a Japanese woodblock print style poster, bold ink and red wax seal",
+  "Snoopy on a 1960s counterculture protest poster, Warhol-era silkscreen, flat bold color statement",
+  "Snoopy as a 1920s deco traveler on an Orient Express poster, golden age train and exotic east",
+  "Snoopy on a retro amusement park poster, Coney Island 1920s style, carousel and neon and joy",
+  "Snoopy as a vintage western sheriff on a wanted poster, type-heavy old west design, bullet holes",
+  "Snoopy on a 1970s blacklight poster, UV glow palette, surreal and trippy psychedelic design",
+  "Snoopy as a vintage race car driver on a 1930s Grand Prix poster, Monaco chicane and speed",
+  "Snoopy on a retro magic show poster, Victorian illusionist style, top hat and mysterious glow",
+  "Snoopy as a vintage big band leader on a 1940s ballroom dance poster, swing era elegance",
+  "Snoopy on a retro deep sea expedition poster, 1930s dive bell, dark depths and brave soul",
+  "Snoopy as a 1950s TV show host on a vintage broadcast poster, bowtie and bright studio smile",
+  "Snoopy on a vintage Italian Vespa scooter poster, La Dolce Vita 1950s style, Mediterranean sun",
+  "Snoopy as a futuristic robot in a 1950s atomic age science poster, chrome and radiation symbol",
+  "Snoopy on a vintage Japanese travel poster, 1930s ukiyo-e influenced, Fuji and lantern glow",
+  "Snoopy as a vintage polo player on a country club poster, 1920s equestrian style, mallet and field",
+  "Snoopy on a retro beach resort poster, 1930s coastal elegance, lounge chair and parasol",
+  "Snoopy as a vintage fire prevention poster, 1940s forest service style, trees and prevention",
+  "Snoopy on a 1960s British mod fashion poster, Mary Quant era, geometric pattern and go-go boots",
+  "Snoopy as a vintage roller coaster ad, 1920s Coney Island boardwalk style, screaming thrill",
+  "Snoopy on a retro boxing gym wall poster, inspirational 1940s style, gloves and champion belt",
+  "Snoopy as a vintage French Riviera resort poster, Cannes glamour 1950s, yachts and parasols",
+  "Snoopy as a retro mountaineer on a Swiss Alpine Club poster, 1920s expedition style, roped peak",
+  "Snoopy on a vintage Cuba travel poster, 1950s Havana golden age, cigars and music and color",
+  "Snoopy as a 1960s space age stewardess poster, Pan Am era aviation, globe and jetliner silhouette",
+  "Snoopy on a retro bullfighting corrida poster, Spanish Andalusian art style, matador pose and bull",
+  "Snoopy as a vintage aquatic show poster, 1940s synchronized swimming, underwater glamour",
+  "Snoopy on a 1920s art deco department store sale poster, geometric elegance and bold type",
+  "Snoopy as a vintage strongman athlete on an Olympic Games poster, 1924 Paris Games style",
+  "Snoopy on a retro fishing village poster, 1930s New England wharf, nets and lobster and fog",
+  "Snoopy as a 1950s drive-in movie host poster, pink and turquoise, popcorn and moon and cars",
+  "Snoopy on a retro national fitness poster, 1940s government health campaign, bright and active",
+  "Snoopy as a vintage river boat gambler poster, Mississippi Delta 1880s, cards and steamboat",
+  "Snoopy on a 1960s Mod British music poster, Carnaby Street era, bold color block design",
+  "Snoopy on a retro pinball machine marquee art, 1970s illustration style, neon tubes and chrome",
+  "Snoopy as a vintage telephone operator poster, 1920s Bell era, switchboard and art deco",
+  "Snoopy as a vintage aviator barnstormer poster, 1920s air circus, loop-the-loop and crowd below",
+  "Snoopy as a vintage tropical explorer poster, 1920s National Geographic style, pith helmet",
+  "Snoopy on a retro county fair ribbon poster, 1950s illustrated, pig and pie and blue ribbon",
+  "Snoopy as a vintage lighthouse keeper poster, New England maritime 1930s, fog and beacon light",
+  "Snoopy on a retro grape harvest poster, Burgundy 1940s wine estate illustration, rolling hill",
+  "Snoopy on a vintage pirate radio ship poster, 1960s British offshore radio, waves and transistor",
+  "Snoopy as a vintage hot air balloon race poster, 1900s adventure style, wicker and altitude",
+  "Snoopy on a retro penny farthing cycling poster, 1880s Victorian velocipede race, sepia",
+  "Snoopy as a vintage medicine show poster, 1880s frontier huckster, elixir and crowd and wagon",
+  "Snoopy on a retro traveling circus elephant poster, big top 1920s, gold and crimson and sawdust",
+  "Snoopy as a vintage velodrome racing poster, 1930s track cycling, wooden oval and speed blur",
+  "Snoopy on a retro Caribbean cruise poster, 1950s tropical adventure, steel band and hibiscus",
+  "Snoopy as a vintage sideshow barker poster, 1920s carnival, tuxedo and megaphone and wonder",
+  "Snoopy on a 1960s space-age kitchen appliance ad poster, Googie design, futuristic and atomic",
+  "Snoopy as a vintage zeppelin passenger poster, 1930s Hindenburg era luxury, above the clouds",
+  "Snoopy as a vintage skeet shooting poster, English country estate 1930s, barrels and clay target",
+  "Snoopy on a retro 1950s barbershop quartet poster, harmony and pomade and checkerboard",
+  "Snoopy as a vintage fencing academy poster, 1920s European style, epee and white jacket",
+  "Snoopy on a retro beach boardwalk taffy ad, 1910s Atlantic City style, salt air and stripes",
+  "Snoopy as a vintage Iditarod sled dog race poster, 1920s Alaskan adventure, snow and huskies",
+  "Snoopy on a retro Mardi Gras krewe parade poster, New Orleans 1920s style, mask and feather",
+  "Snoopy as a vintage Appalachian Trail hiking poster, 1930s CCC era illustration, summit vista",
+  "Snoopy on a retro antique car rally poster, 1920s veteran car run, goggles and duster coat",
+  "Snoopy on a retro Cape Cod summer resort poster, 1950s New England charm, lobster and lighthouse",
+  "Snoopy as a vintage Venetian gondolier poster, 1920s Italian tourism, palazzo and serenade",
+  "Snoopy on a retro Mykonos windmill poster, 1950s Greek tourism, whitewash and blue and bright sun",
+  "Snoopy as a vintage 1940s US Navy sailor poster, dress whites and anchor, patriotic and proud",
+  "Snoopy on a retro cattle drive trail poster, 1880s Texas longhorn drive, dust and cowboy horizon",
+  "Snoopy as a vintage swimming hole poster, 1920s summer idyll, rope swing and old swimsuit style",
+  "Snoopy on a retro 1950s malt shop ad poster, soda fountain Americana, poodle skirt and jukebox",
+  "Snoopy on a retro harvest moon festival poster, 1930s rural America, barn dance and lantern",
+  "Snoopy as a vintage Viennese coffee house poster, 1900s Secessionist style, Klimt-inspired frame",
+  "Snoopy on a retro Moroccan caravan trade poster, 1920s Orientalist style, souk and spice",
+  "Snoopy as a vintage Antarctic whaling expedition poster, 1920s South Georgia, ice and courage",
+  "Snoopy on a retro Newfoundland iceberg tour poster, 1950s Canadian maritime, azure and white ice",
+  "Snoopy as a vintage Quebec City winter carnival poster, 1930s Bonhomme style, ice palace",
+  "Snoopy as a vintage Klondike gold rush poster, 1898 Yukon stampede, sluice and fortune",
+  "Snoopy on a retro Oahu pineapple plantation poster, 1930s Dole era, tropical and golden",
+  "Snoopy as a vintage Big Sur California poster, 1940s WPA cliff and cypress, golden state",
+  "Snoopy on a retro Lake Tahoe winter sports poster, 1940s California ski resort, snow and pine",
+  "Snoopy as a vintage Napa Valley wine country poster, 1940s California illustration, oak barrel",
+  "Snoopy on a retro Oregon Trail pioneer poster, 1930s covered wagon, westward and dusty",
+  "Snoopy as a vintage Puget Sound ferry poster, 1930s Seattle waterfront, totem and mountain",
+  "Snoopy on a retro Santa Fe adobe arts poster, 1930s New Mexico, turquoise and pueblo and sky",
+  "Snoopy on a retro Boundary Waters canoe poster, 1930s Minnesota wilderness, mirror lake and pine",
+  "Snoopy on a retro Mackinac Island bicycle poster, 1910s no-car island style, fudge and bridge",
+  "Snoopy as a vintage Cleveland steel mill poster, 1930s industrial heroism, smoke and spark",
+  "Snoopy on a retro Detroit auto factory poster, 1930s assembly line heroism, Ford era strength",
+  "Snoopy as a vintage Iowa state fair poster, 1950s Americana, Ferris wheel and blue ribbon",
+  "Snoopy on a retro Adirondack Great Camp poster, 1920s New York elite escape, canoe and birch",
+  "Snoopy on a retro Newport Jazz Festival poster, 1950s Rhode Island, cool jazz and ocean breeze",
+  "Snoopy on a retro Nantucket whaling museum poster, 1940s New England maritime, harpoon and sea",
+  "Snoopy on a retro Gettysburg battlefield tour poster, 1930s Civil War memorial, cannon and mist",
+  "Snoopy as a vintage Lewis and Clark expedition poster, 1940s adventure style, river and new land",
+  "Snoopy as a vintage Pony Express rider poster, 1920s American West, horse at full gallop",
+  "Snoopy on a retro transcontinental railroad poster, 1869 golden spike era, locomotive and nation",
+  "Snoopy as a vintage Brooklyn Bridge opening poster, 1883 era engineering triumph, cables and crowd",
+  "Snoopy as a vintage Wright Brothers flight poster, 1903 Kitty Hawk, early aviation inspiration",
+  "Snoopy on a retro Model T Ford road trip poster, 1910s automobile adventure, dirt road and picnic",
+  "Snoopy as a vintage Harlem Renaissance cabaret poster, 1920s Cotton Club style, jazz and glamour",
+  "Snoopy on a retro Tin Pan Alley sheet music poster, 1910s New York, upright piano and bowler hat",
+  "Snoopy as a vintage vaudeville circuit poster, 1900s theatrical touring bill, trouper and trunk",
+  "Snoopy on a retro Victory Garden poster, WWII era, vegetables and backyard and patriotic spirit",
+  "Snoopy on a retro war bond poster, 1940s, star-spangled resolve and bold graphic type",
+  "Snoopy on a retro public library reading poster, 1930s WPA library mural style, books and lamp",
+  "Snoopy on a retro union labor day poster, 1930s worker solidarity art, fist and sunrise",
+  "Snoopy on a retro Earth Day environmental poster, 1970s, globe hug and flower power",
+  "Snoopy on a retro moon landing commemorative poster, 1969 achievement, eagle and bootprint",
+  "Snoopy as a vintage robot future poster, 1960s Asimov era, chrome and positronic brain",
+  "Snoopy on a retro monorail of tomorrow poster, 1964 World's Fair, futurism and hope",
+  "Snoopy as a vintage flying car future city poster, 1950s Popular Mechanics style, glass domes",
+  "Snoopy on a retro jet age airline poster, 1958 Pan Am style, globe and stratocruiser silhouette",
+  "Snoopy as a vintage supersonic future poster, 1960s Concorde era, needle nose and sky",
+  "Snoopy on a retro submarine adventure poster, 1950s Jules Verne style, porthole and deep blue",
+  "Snoopy as a vintage time machine adventure poster, H.G. Wells 1895 style, Victorian and future",
+  "Snoopy on a retro rocket ship adventure poster, Buck Rogers 1930s style, ray gun and alien planet",
+  "Snoopy on a retro King Kong-style movie poster, 1930s creature feature, skyscraper and beast",
+  "Snoopy as a vintage Frankenstein movie poster, 1931 Universal style, laboratory and lightning",
+  "Snoopy on a retro Dracula movie poster, 1920s Nosferatu style, shadow and moonlight and castle",
+  "Snoopy on a retro swamp creature poster, 1950s B-movie style, bayou and creature and scream",
+  "Snoopy as a vintage giant bug sci-fi poster, 1954 atomic horror style, terror and small town",
+  "Snoopy on a retro invasion sci-fi poster, 1956 era, paranoia and pods and suburban dread",
+  "Snoopy on a retro drive-in horror double feature poster, 1960s grindhouse, scream queen camp",
+  "Snoopy as a vintage blaxploitation movie poster, 1970s funk era, afro and platform and attitude",
+  "Snoopy on a retro kung fu tournament poster, 1973 Shaw Brothers style, flying kick and Chinese seal",
+  "Snoopy as a vintage spaghetti western movie poster, 1966 Leone style, wide brim and desert dust",
+  "Snoopy on a retro samurai epic movie poster, Kurosawa era, mist and katana and honor",
+  "Snoopy as a vintage French New Wave cinema poster, 1960s, black and white tinted with wit",
+  "Snoopy on a retro Italian neorealism movie poster, Fellini era, cobblestone and raw emotion",
+  "Snoopy as a vintage Soviet propaganda art poster, constructivist 1920s, bold diagonal and cog",
+  "Snoopy on a retro German Bauhaus design poster, 1920s typography master class, pure form",
+  "Snoopy as a vintage Czech surrealist poster, 1960s Prague Spring style, dreamlike and political",
+  "Snoopy on a retro Polish theater poster, 1960s Lenica style, surreal and graphic and strange",
+  "Snoopy on a retro Scandinavian design annual poster, 1960s Nordic style, clean and wood and snow",
+  "Snoopy as a vintage Swiss graphic design poster, 1960s International Style, grid and Helvetica",
+  "Snoopy on a retro Dutch De Stijl inspired poster, Mondrian palette, primary color and right angle",
+  "Snoopy as a vintage Belgian Art Nouveau poster, Mucha-inspired florals, sinuous line and beauty",
+  "Snoopy on a retro London Underground tube art poster, Beck-style design classic, modern and iconic",
+  "Snoopy on a retro Festival of Britain 1951 poster, postwar optimism, atom and national hope",
+  "Snoopy as a vintage Great Exhibition 1851 Crystal Palace poster, Victorian wonder and progress",
+  "Snoopy on a retro Paris 1900 Exposition Universelle poster, Belle Epoque art nouveau splendor",
+  "Snoopy on a retro 1939 New York World's Fair poster, trylon and perisphere, futureworld",
+  "Snoopy on a retro 1970 Osaka Expo poster, Japanese modernism and metabolism architecture wonder",
+  "Snoopy as a vintage Grease movie style poster, 1978 era, leather jacket and convertible at prom",
+  "Snoopy on a retro Saturday Night Fever disco poster, 1977 style, white suit and polyester",
+  "Snoopy as a vintage Flashdance style poster, 1983, torn sweatshirt and water and spotlight",
+  "Snoopy on a retro Top Gun style poster, 1986, aviator glasses and jet exhaust and sky",
+  "Snoopy on a retro Footloose style poster, 1984, banned dancing and warehouse lights and rebellion",
+  "Snoopy as a vintage Say Anything poster, 1989, boombox above head in a suburb at dawn",
+  "Snoopy on a retro Ferris Bueller style poster, 1986 Chicago day off adventure, bold and free",
+  "Snoopy as a vintage Pretty in Pink poster, 1986, pastel prom dress and bittersweet choice",
+  "Snoopy on a retro Dirty Dancing poster, 1987, silhouette lift and mountain resort at dusk",
+  "Snoopy as a vintage Back to the Future poster, 1985, DeLorean and lightning and clock tower",
+  "Snoopy on a retro ET style movie poster, 1982, bicycle silhouette and glowing moon",
+  "Snoopy as a vintage Stand By Me poster, 1986, railroad tracks and four kids and summer",
+  "Snoopy on a retro Goonies adventure poster, 1985, treasure map and underground and gang",
+  "Snoopy as a vintage Karate Kid poster, 1984, crane kick silhouette at sunset",
+  "Snoopy on a retro Ghostbusters style poster, 1984, proton pack and ghost logo and city",
+  "Snoopy as a vintage Indiana Jones style poster, 1981, hat and whip and temple and adventure",
+  "Snoopy on a retro Star Wars style tribute poster, 1977, twin suns and desert and epic horizon",
+  "Snoopy as a vintage Rocky style movie poster, 1976, fist raised on steps in dawn light",
+  "Snoopy on a retro Jaws style poster, 1975, shark fin below and swimmer above, dread",
+  "Snoopy as a vintage Clockwork Orange style poster, 1971, bowler hat and cane and stare",
+  "Snoopy on a retro Easy Rider style poster, 1969, chopper and desert highway and freedom",
+  "Snoopy as a vintage 2001 Space Odyssey style poster, 1968, bone throw and stargate",
+  "Snoopy on a retro Planet of the Apes style poster, 1968, Statue of Liberty and revelation",
+  "Snoopy as a vintage Bullitt style poster, 1968, Mustang and San Francisco hill chase",
+  "Snoopy on a retro Bonnie and Clyde style poster, 1967, sepia gangster couple and car",
+  "Snoopy as a vintage Blow-Up style poster, 1966, London mod photographer and mystery",
+  "Snoopy on a retro Great Escape style poster, 1963, motorcycle and barbed wire and daring",
+  "Snoopy as a vintage Lawrence of Arabia style poster, 1962, desert and camel and epic scale",
+  "Snoopy on a retro Ben-Hur style poster, 1959, chariot race and ancient Rome and triumph",
+  "Snoopy as a vintage Casablanca style poster, 1942, trench coat and fog and airport",
+  "Snoopy on a retro Citizen Kane style poster, 1941, low angle and newspaper and mystery",
+  "Snoopy as a vintage King Kong 1933 style poster, Empire State and biplane and beauty",
+  "Snoopy on a retro Metropolis 1927 style poster, expressionist city and robot and dystopia",
+  "Snoopy as a vintage Birth of a Nation era silent film poster, 1915 illustrated, epic style",
+  "Snoopy on a retro Chaplin Modern Times style poster, 1936, factory gears and little tramp",
+  "Snoopy as a vintage Gone with the Wind style poster, 1939, silhouette and war and passion",
+  "Snoopy on a retro Wizard of Oz style poster, 1939, yellow brick road and emerald city",
+  "Snoopy as a vintage Fantasia style concert poster, 1940, musical and abstract and magical",
+  "Snoopy on a retro Singin in the Rain style poster, 1952, lamppost and umbrella and joy",
+  "Snoopy as a vintage Some Like It Hot poster, 1959, marilyn dress and beach and comedy",
+  "Snoopy on a retro Psycho Hitchcock style poster, 1960, stark typography and shadow and dread",
+  "Snoopy as a vintage Vertigo Hitchcock style poster, 1958, spiral and silhouette and obsession",
+  "Snoopy on a retro North by Northwest style poster, 1959, biplane crop duster and empty field",
+  "Snoopy as a vintage Rear Window style poster, 1954, courtyard and voyeur and tension",
+  "Snoopy on a retro Dial M for Murder style poster, 1954, phone cord and drama and suspense",
+  "Snoopy as a vintage Roman Holiday style poster, 1953, Vespa and Rome and runaway princess",
+  "Snoopy on a retro Breakfast at Tiffanys style poster, 1961, pearls and sunglasses and Fifth Avenue",
+  "Snoopy as a vintage Dr Strangelove style poster, 1964, bomb ride and war room and satire",
+  "Snoopy on a retro Apocalypse Now style poster, 1979, jungle river and fog and darkness",
+  "Snoopy as a vintage The Graduate style poster, 1967, nylon leg and young man and future",
+  "Snoopy on a retro Midnight Cowboy style poster, 1969, two outcasts and New York and survival",
+  "Snoopy as a vintage Chinatown style poster, 1974, Jack Nicholson and mystery and corruption",
+  "Snoopy on a retro Dog Day Afternoon style poster, 1975, bank heist and heat and real life",
+  "Snoopy as a vintage Taxi Driver style poster, 1976, neon night and city and alienation",
+  "Snoopy on a retro Annie Hall style poster, 1977, New York and couple and neurosis and wit",
+  "Snoopy as a vintage Deer Hunter style poster, 1978, mountain wedding and tragedy and war",
+  "Snoopy on a retro Raging Bull style poster, 1980, black and white ring and champion",
+  "Snoopy as a vintage Blade Runner style poster, 1982, neon rain and replicant and future noir",
+  "Snoopy on a retro E.T. bicycle moon silhouette style poster, 1982, iconic and wonder",
+  "Snoopy as a vintage Scarface style poster, 1983, white suit and power and Miami excess",
+  "Snoopy on a retro Amadeus style poster, 1984, Mozart wig and court and genius and madness",
+  "Snoopy as a vintage Platoon style poster, 1986, arms raised in jungle and moral crisis",
+  "Snoopy on a retro Full Metal Jacket style poster, 1987, helmet graffiti and hard face and war",
+  "Snoopy as a vintage Rain Man style poster, 1988, two brothers on a desert road trip",
+  "Snoopy on a retro Do the Right Thing style poster, 1989, Brooklyn summer heat and tension",
+  "Snoopy as a vintage Goodfellas style poster, 1990, mob dinner and sharp suits and loyalty",
+
+  // ── ACTIVITY top-up (to reach 500) ──
+  "Cartoon Snoopy doing a backflip off a diving board, hyper-realistic outdoor pool and blue sky",
+  "Cartoon Snoopy swinging on a trapeze in a circus tent, hyper-realistic sawdust and spotlight",
+  "Cartoon Snoopy doing a wheelie on a BMX bike, hyper-realistic skatepark ramp",
+  "Cartoon Snoopy kiteboarding in turquoise water, hyper-realistic tropical coast",
+  "Cartoon Snoopy wakeboarding behind a speedboat, hyper-realistic lake spray",
+  "Cartoon Snoopy doing a front flip off a snowy jump, hyper-realistic ski resort halfpipe",
+  "Cartoon Snoopy hand-gliding over a vineyard at sunset, hyper-realistic Napa Valley",
+  "Cartoon Snoopy doing crossfit on a rooftop gym, hyper-realistic city skyline backdrop",
+  "Cartoon Snoopy climbing an indoor wall in a bouldering gym, hyper-realistic modern gym",
+  "Cartoon Snoopy doing a cartwheel across a soccer field, hyper-realistic stadium grass",
+  "Cartoon Snoopy swimming butterfly in an Olympic pool, hyper-realistic blue lane water",
+  "Cartoon Snoopy doing high jump at a track meet, hyper-realistic athletics stadium",
+  "Cartoon Snoopy throwing a discus at a track and field event, hyper-realistic stadium",
+  "Cartoon Snoopy doing a vault over a gymnastics horse, hyper-realistic arena floor",
+  "Cartoon Snoopy swinging on uneven bars, hyper-realistic Olympic gymnastics venue",
+  "Cartoon Snoopy doing a split at a dance competition, hyper-realistic stage and lights",
+  "Cartoon Snoopy pirouetting on a stage, hyper-realistic ballet theater and curtain",
+  "Cartoon Snoopy breakdancing at a street festival, hyper-realistic urban plaza crowd",
+  "Cartoon Snoopy waltzing in a grand ballroom, hyper-realistic chandeliers and marble floor",
+  "Cartoon Snoopy doing the Charleston at a 1920s party, hyper-realistic jazz club interior",
+  "Cartoon Snoopy grinding a skateboard rail at sunset, hyper-realistic urban street",
+  "Cartoon Snoopy doing a kickflip on a rooftop, hyper-realistic city skyline background",
+  "Cartoon Snoopy longboarding downhill through a forest road, hyper-realistic autumn leaves",
+  "Cartoon Snoopy doing a handstand on a SUP board, hyper-realistic calm morning lake",
+  "Cartoon Snoopy racing a sea kayak, hyper-realistic coastal fjord and cliffs",
+  "Cartoon Snoopy fly fishing with a chalk stream, hyper-realistic English meadow",
+  "Cartoon Snoopy sailing a Sunfish dinghy, hyper-realistic summer bay",
+  "Cartoon Snoopy rowing a wooden rowboat on a misty lake, hyper-realistic dawn reflection",
+  "Cartoon Snoopy operating a drone in a field, hyper-realistic open meadow and blue sky",
+  "Cartoon Snoopy playing table tennis outdoors in a park, hyper-realistic summer setting",
+  "Cartoon Snoopy playing billiards in a vintage pool hall, hyper-realistic green felt and lamp",
+  "Cartoon Snoopy bowling a perfect strike, hyper-realistic retro bowling alley",
+  "Cartoon Snoopy doing laser tag in a neon arena, hyper-realistic glow and fog",
+  "Cartoon Snoopy doing axe throwing at a bar, hyper-realistic rustic urban venue",
+  "Cartoon Snoopy playing darts at a British pub, hyper-realistic warm pub interior",
+  "Cartoon Snoopy in a pie baking competition, hyper-realistic country kitchen and judges",
+  "Cartoon Snoopy at a spelling bee on stage, hyper-realistic school auditorium and mic",
+  "Cartoon Snoopy doing a cooking show demo, hyper-realistic professional TV kitchen",
+  "Cartoon Snoopy baking croissants at 4am in a Paris bakery, hyper-realistic golden interior",
+  "Cartoon Snoopy decorating a Christmas tree, hyper-realistic cozy living room glow",
+  "Cartoon Snoopy carving a Halloween pumpkin, hyper-realistic autumn porch and candles",
+  "Cartoon Snoopy building a blanket fort, hyper-realistic cozy living room afternoon light",
+  "Cartoon Snoopy doing a giant jigsaw puzzle, hyper-realistic library floor and firelight",
+  "Cartoon Snoopy doing calligraphy at a desk, hyper-realistic Japanese paper and ink",
+  "Cartoon Snoopy sketching portraits in a city park, hyper-realistic European square",
+  "Cartoon Snoopy printing linocuts in an art studio, hyper-realistic hands and press",
+  "Cartoon Snoopy welding a sculpture in an art studio, hyper-realistic spark shower",
+  "Cartoon Snoopy doing mosaic tilework at a Mediterranean villa, hyper-realistic courtyard",
+  "Cartoon Snoopy restoring a fresco on a cathedral ceiling, hyper-realistic scaffolding",
+  "Cartoon Snoopy doing street chalk art on a plaza, hyper-realistic crowd watching",
+  "Cartoon Snoopy building a ship in a bottle, hyper-realistic craftsman workshop",
+  "Cartoon Snoopy making a stained glass window, hyper-realistic studio and light beams",
+  "Cartoon Snoopy spinning wool on a traditional loom, hyper-realistic Scottish highland cottage",
+  "Cartoon Snoopy carving a totem pole, hyper-realistic Pacific Northwest forest",
+  "Cartoon Snoopy making Murano glass beads, hyper-realistic Venice furnace and color",
+  "Cartoon Snoopy doing traditional Japanese calligraphy, hyper-realistic tatami and ink stone",
+  "Cartoon Snoopy building a model train set, hyper-realistic basement hobby workshop",
+  "Cartoon Snoopy doing macro photography of flowers, hyper-realistic spring garden bloom",
+  "Cartoon Snoopy processing film in a darkroom, hyper-realistic red safelight and trays",
+  "Cartoon Snoopy doing wildlife photography on a savanna, hyper-realistic Africa at dawn",
+  "Cartoon Snoopy filming a YouTube video in a studio, hyper-realistic ring light and setup",
+  "Cartoon Snoopy doing magic at a cruise ship show, hyper-realistic deck and sea horizon",
+  "Cartoon Snoopy performing stand-up at a comedy festival, hyper-realistic outdoor stage",
+  "Cartoon Snoopy busking in a New York subway, hyper-realistic tiled underground platform",
+  "Cartoon Snoopy teaching a pottery class, hyper-realistic ceramics studio and students",
+  "Cartoon Snoopy giving a cooking lesson at a Tuscany farmhouse, hyper-realistic kitchen",
+  "Cartoon Snoopy leading a yoga retreat at sunrise, hyper-realistic Bali rice terraces",
+  "Cartoon Snoopy guiding a wine tasting, hyper-realistic French chateau cellar",
+  "Cartoon Snoopy leading a nature hike, hyper-realistic national park trail and forest",
+  "Cartoon Snoopy teaching a ballet class, hyper-realistic dance studio and mirror wall",
+  "Cartoon Snoopy walking a pack of dogs in a city park, hyper-realistic Manhattan morning",
+  "Cartoon Snoopy delivering mail on a bicycle, hyper-realistic Dutch town street",
+  "Cartoon Snoopy running a vintage bookshop, hyper-realistic London Thames book stall",
+  "Cartoon Snoopy painting a fence on a summer day, hyper-realistic Americana backyard",
+  "Cartoon Snoopy sweeping autumn leaves in a park, hyper-realistic golden October light",
+  "Cartoon Snoopy building a birdhouse, hyper-realistic spring backyard workshop",
+  "Cartoon Snoopy delivering a pizza on a moped, hyper-realistic Italian town street",
+  "Cartoon Snoopy driving an ice cream truck, hyper-realistic summer suburb and kids",
+  "Cartoon Snoopy operating a gelato cart in an Italian piazza, hyper-realistic warm square",
+  "Cartoon Snoopy making mole sauce in an Oaxacan kitchen, hyper-realistic Mexican home",
+  "Cartoon Snoopy shucking oysters at a New Orleans oyster bar, hyper-realistic raw bar",
+  "Cartoon Snoopy flambeing a crepe in a Parisian bistro, hyper-realistic candlelit table",
+  "Cartoon Snoopy spinning pizza dough in a Naples pizzeria, hyper-realistic wood-fired oven",
+  "Cartoon Snoopy hand-pulling noodles in a Chinese noodle shop, hyper-realistic steam",
+  "Cartoon Snoopy stacking dim sum baskets in a Hong Kong kitchen, hyper-realistic steam",
+  "Cartoon Snoopy preparing a Japanese bento box, hyper-realistic minimalist kitchen",
+  "Cartoon Snoopy judging a barbecue competition, hyper-realistic Texas smokehouse",
+  "Cartoon Snoopy at a clambake on a New England beach, hyper-realistic coast and fire pit",
+  "Cartoon Snoopy doing a Brazilian BBQ rodizio, hyper-realistic churrascaria and glowing coals",
+  "Cartoon Snoopy stirring a crawfish boil, hyper-realistic Louisiana bayou at sunset",
+  "Cartoon Snoopy doing a competitive hot wings eating contest, hyper-realistic sports bar",
+  "Cartoon Snoopy winning a donut eating contest, hyper-realistic American diner interior",
+  "Cartoon Snoopy making a French macaron tower, hyper-realistic Paris patisserie interior",
+  "Cartoon Snoopy doing a tea ceremony in a Kyoto garden, hyper-realistic tatami and lanterns",
+  "Cartoon Snoopy doing an elaborate afternoon tea, hyper-realistic English country hotel",
+  "Cartoon Snoopy pressing apples at a cider mill, hyper-realistic New England autumn",
+  "Cartoon Snoopy stomping grapes in a barrel, hyper-realistic Tuscan harvest festival",
+  "Cartoon Snoopy paddleboarding under a tropical waterfall, hyper-realistic Hawaii pool",
+  "Cartoon Snoopy racing a jet ski, hyper-realistic ocean spray and blue summer sky",
+  "Cartoon Snoopy doing aerobatics in a biplane, hyper-realistic blue sky and contrails",
+  "Cartoon Snoopy riding a Ducati on Italian Alps switchbacks, hyper-realistic mountain road",
+  "Cartoon Snoopy crossing a marathon finish line, hyper-realistic city street and crowd roar",
+  "Cartoon Snoopy throwing a perfect spiral pass, hyper-realistic NFL stadium and crowd",
+  "Cartoon Snoopy hitting a home run at night, hyper-realistic ballpark lights and roar",
+  "Cartoon Snoopy scoring a hat trick, hyper-realistic Premier League stadium crowd",
+  "Cartoon Snoopy making a diving catch in the end zone, hyper-realistic crowd eruption",
+  "Cartoon Snoopy doing a hole in one, hyper-realistic Augusta golf course green",
+  "Cartoon Snoopy winning the Kentucky Derby, hyper-realistic Louisville track and roses",
+  "Cartoon Snoopy winning a gold medal on the Olympic podium, hyper-realistic ceremony",
+  "Cartoon Snoopy doing a cartwheel on a beach at sunrise, hyper-realistic golden sand",
+  "Cartoon Snoopy doing the high dive at an outdoor pool, hyper-realistic summer sky",
+  "Cartoon Snoopy doing a kickflip over a gap, hyper-realistic city street crowd",
+  "Cartoon Snoopy at an open water triathlon finish, hyper-realistic beach and cheering",
+  "Cartoon Snoopy doing a barrel roll in a small plane, hyper-realistic clear blue sky",
+  "Cartoon Snoopy winning a sandcastle competition, hyper-realistic beach judges",
+  "Cartoon Snoopy at a beach bonfire strumming a guitar, hyper-realistic ocean night sky",
+  "Cartoon Snoopy carving a jack-o-lantern on a porch, hyper-realistic October neighborhood",
+  "Cartoon Snoopy making homemade ice cream, hyper-realistic farmhouse kitchen summer",
+  "Cartoon Snoopy doing starfish pose on a yoga mat, hyper-realistic meadow at dawn",
+  "Cartoon Snoopy at a summer camp arts and crafts table, hyper-realistic rustic cabin",
+  "Cartoon Snoopy on a paddleboat on a lily pond, hyper-realistic garden lake afternoon",
+
+  // ── ALBUM COVER top-up (to reach 200) ──
+  "Snoopy on a rooftop in New Orleans at dusk, jazz album cover, river behind and trumpet",
+  "Snoopy sitting alone in a spotlight in a massive empty stadium, stadium rock album cover",
+  "Snoopy in a flower field at golden hour, folk indie album cover, soft warmth and wind",
+  "Snoopy at a piano bar after midnight, neo-soul album cover, dim light and emotion",
+  "Snoopy looking out a rain-streaked train window, introspective indie album cover",
+  "Snoopy with a drum kit in a garage, punk album cover, peeling walls and raw energy",
+  "Snoopy playing a muted trumpet in a Paris alley, jazz album cover, cobblestone and fog",
+  "Snoopy in a hot tub under desert stars, synth-wave album cover, neon and night sky",
+  "Snoopy on a mountain peak at sunset with a guitar, folk rock album cover, epic alone",
+  "Snoopy in a vinyl record store aisle, indie album cover, warm dust and discovery",
+  "Snoopy on a fire escape at sunrise with coffee, bedroom pop album cover, golden light",
+  "Snoopy in a Japanese ramen shop alone at 2am, city pop album cover, steam and neon",
+  "Snoopy on a skateboard at an empty parking lot at dusk, lo-fi hip-hop album cover",
+  "Snoopy holding a boom box under a window in the rain, 80s pop love album cover",
+  "Snoopy on a rooftop garden surrounded by plants, indie ambient album cover, green",
+  "Snoopy in a sunlit loft with morning coffee and vinyl, jazz album cover, warm intimate",
+  "Snoopy on a night bus in London rain, britpop album cover, wet window and city glow",
+  "Snoopy silhouetted in a doorway at sunset, soul album cover, long shadow warm dust",
+  "Snoopy at a typewriter with a bottle of bourbon, outlaw country album cover, raw",
+  "Snoopy wearing a fisherman knit sweater by the sea, folk album cover, cold grey morning",
+  "Snoopy on a trampoline at night under stars, indie pop album cover, joyful and light",
+  "Snoopy in a photo booth strip, pop album cover, four frames of different expressions",
+  "Snoopy at a beach bonfire at night, folk summer album cover, embers and friends",
+  "Snoopy jumping in a puddle in the rain, feel-good pop album cover, color and joy",
+  "Snoopy looking up at a night sky full of satellites, electronic ambient album cover",
+  "Snoopy in a moonlit cornfield, country gothic album cover, eerie and lonely",
+  "Snoopy in front of a giant amplifier wall, heavy rock album cover, raw power",
+  "Snoopy on a city rooftop with a megaphone at dawn, indie activist album cover",
+
+  // ── RETRO POSTER top-up (to reach 300) ──
+  "Snoopy as a 1940s pin-up pilot on a nose art poster, World War II bomber art style",
+  "Snoopy on a vintage 1920s bootleg whiskey poster, Prohibition-era speakeasy style",
+  "Snoopy on a 1960s surf shop window poster, hand-lettered California beach culture",
+  "Snoopy as a vintage 1950s gas station attendant poster, Route 66 Americana style",
+  "Snoopy as a vintage Olympic weightlifting poster, 1936 Berlin Games graphic style",
+  "Snoopy on a vintage steeplechase horse racing poster, 1920s British turf club style",
+  "Snoopy on a vintage wrestling championship poster, 1950s carnival wrestler bold art",
+  "Snoopy as a vintage safari hunter poster, 1930s African expedition bold illustration",
+  "Snoopy on a vintage 1920s flying club poster, barnstormer illustration and sky",
+  "Snoopy on a vintage polar exploration poster, 1915 Shackleton era, ice and courage",
+  "Snoopy on a retro submarine warfare poster, WWII underwater hunter graphic style",
+  "Snoopy on a vintage parachute troop recruitment poster, WWII airborne graphic",
+  "Snoopy on a retro Pacific island travel poster, 1930s colonial shipping line style",
+  "Snoopy on a vintage Trans-Siberian Railway poster, 1920s Russian graphic style",
+  "Snoopy as a vintage kung fu grandmaster scroll, traditional Chinese brush painting style",
+  "Snoopy on a vintage Chinese New Year poster, bold red and gold and dragon",
+  "Snoopy on a vintage Dia de los Muertos poster, Mexican folk art and marigolds",
+  "Snoopy on a vintage Rio Carnival poster, 1940s Brazilian samba style, feathers and color",
+  "Snoopy on a vintage Oktoberfest beer festival poster, 1920s Munich illustration style",
+  "Snoopy on a vintage Midsummer festival poster, 1920s Scandinavian folk art style",
+  "Snoopy on a vintage Highland Games poster, 1930s Scottish athletic illustration",
+  "Snoopy on a vintage National Cherry Blossom Festival poster, 1920s Washington DC",
+  "Snoopy on a retro Woodstock music festival poster, 1969 psychedelic era, dove and guitar",
+  "Snoopy on a retro CBGB club poster, 1977 punk era, raw and Xerox aesthetic",
+  "Snoopy on a retro Studio 54 nightclub poster, 1978 era, disco glamour and darkness",
+  "Snoopy on a retro Haçienda Manchester nightclub poster, 1989 rave era FAC 51 style",
+  "Snoopy on a retro Lollapalooza 1991 era festival poster, alternative rock and grunge",
+  "Snoopy on a vintage underground zine cover, 1980s DIY culture, Xerox and collage",
+  "Snoopy on a vintage carnival fortune teller poster, 1910s mystical fair aesthetic",
+  "Snoopy on a vintage apothecary poster, 1880s medicine shop, serif type and tinctures",
+  "Snoopy on a vintage Barnum and Bailey Greatest Show poster, 1900s billboard style",
+  "Snoopy on a vintage Wild West show poster, Buffalo Bill 1880s style, horses and guns",
+  "Snoopy on a vintage Snake Charmer sideshow poster, 1920s carnival illustration",
+  "Snoopy on a vintage Brownie camera ad poster, 1900s Kodak illustration style",
+  "Snoopy on a vintage Edison Phonograph ad poster, 1905 era, trumpet horn and wonder",
+  "Snoopy on a vintage radio broadcast recruitment poster, 1930s BBC era illustration",
+  "Snoopy on a vintage television debut ad poster, 1939 World's Fair cathode ray",
+  "Snoopy on a vintage nuclear energy future poster, 1958 atomic optimism style",
+  "Snoopy on a vintage Space Race satellite poster, 1957 Soviet Sputnik constructivist",
+  "Snoopy on a vintage NASA Mission Control poster, 1960s engineering heroism graphic",
+  "Snoopy on a vintage computer mainframe ad poster, 1965 IBM era, clean and modern",
+  "Snoopy on a vintage Apple II era computer ad, 1978 garage startup poster aesthetic",
+  "Snoopy on a vintage environmental Earth summit poster, 1972 Stockholm era graphic",
+  "Snoopy on a retro bicycle lane infrastructure poster, 1970s Dutch cycling advocacy",
+  "Snoopy on a vintage train safety poster, 1930s British Railways illustration",
+  "Snoopy on a vintage school health poster, 1950s posture and hygiene graphic style",
+  "Snoopy on a vintage swimming pool safety poster, 1960s municipal recreation style",
+  "Snoopy on a vintage wildfire prevention poster, 1960s forest service illustration",
+  "Snoopy on a vintage earthquake preparedness poster, 1970s California civil defense",
+  "Snoopy on a vintage tornado shelter poster, 1950s Midwest safety graphic",
+  "Snoopy on a vintage hurricane preparedness poster, 1940s Florida coastal style",
+  "Snoopy on a vintage avalanche warning poster, 1930s Swiss Alpine style",
+  "Snoopy on a vintage industrial worker safety poster, 1940s American factory heroism",
+  "Snoopy on a vintage miners union hall poster, 1910s labor movement illustration",
+  "Snoopy on a vintage steelworkers solidarity poster, 1930s Pittsburgh union hall art",
+  "Snoopy on a vintage vote for suffrage poster, 1912 women's rights march illustration",
+  "Snoopy on a vintage civil rights march poster, 1963 era bold graphic and dignity",
+  "Snoopy on a retro anti-war march poster, 1969 Vietnam era protest graphic",
+  "Snoopy on a vintage Ladies Bicycle Touring Club poster, 1898 New Woman era",
+  "Snoopy on a retro internet is here poster, 1994 early web era, browser window graphic",
+  "Snoopy on a vintage school fire drill poster, 1940s safety program graphic style",
+  "Snoopy on a vintage camping is fun poster, 1950s National Park Service illustration",
+  "Snoopy on a retro bowling league championship poster, 1960s American recreation style",
+  "Snoopy on a vintage community theater opening night poster, 1940s local arts style",
+  "Snoopy on a vintage garden show prize ribbon poster, 1930s horticultural society",
+  "Snoopy on a vintage lighthouse preservation poster, 1920s maritime heritage style",
+  "Snoopy on a retro folk music revival poster, 1963 Newport Folk era illustration",
+
+
+  "Cartoon Snoopy winning an arm wrestling contest at a county fair, hyper-realistic summer crowd",
+  "Cartoon Snoopy doing a wheelbarrow race at a school field day, hyper-realistic outdoor event",
+  "Cartoon Snoopy doing the limbo at a company picnic, hyper-realistic summer corporate party",
+  "Cartoon Snoopy competing in a tug of war at a beach, hyper-realistic sand and waves",
+  "Cartoon Snoopy doing a cannonball off a tall dock, hyper-realistic lake and summer afternoon",
+  "Cartoon Snoopy catching fireflies in a mason jar, hyper-realistic Tennessee meadow at dusk",
+  "Cartoon Snoopy building a fort in a snowy backyard, hyper-realistic winter neighborhood",
+  "Cartoon Snoopy making a leaf pile and jumping in, hyper-realistic golden October neighborhood",
+  "Cartoon Snoopy doing a polar plunge on New Years Day, hyper-realistic icy beach crowd",
+  "Cartoon Snoopy winning a chili cook-off, hyper-realistic Texas state fair and blue ribbon",
+  "Cartoon Snoopy at a milking contest on a Vermont farm, hyper-realistic red barn and cows",
+  "Cartoon Snoopy winning an egg and spoon race, hyper-realistic British school sports day",
+  "Cartoon Snoopy doing a three-legged race at a fair, hyper-realistic summer Americana",
+  "Cartoon Snoopy winning at horseshoes in a backyard, hyper-realistic summer barbecue",
+  "Cartoon Snoopy competing in a corn maze race, hyper-realistic October farm and field",
+  "Cartoon Snoopy doing competitive log splitting, hyper-realistic Maine homestead winter",
+  "Cartoon Snoopy raking a zen garden, hyper-realistic Kyoto temple rock garden",
+  "Cartoon Snoopy doing competitive hedge trimming, hyper-realistic English estate garden",
+  "Cartoon Snoopy in a soap box derby race, hyper-realistic neighborhood hill and crowd",
+  "Cartoon Snoopy operating a model train layout at a fair, hyper-realistic miniature village",
+  "Cartoon Snoopy competing in a model rocketry launch, hyper-realistic open field and sky",
+  "Cartoon Snoopy at a vintage car concours event, hyper-realistic manicured lawn and trophies",
+  "Cartoon Snoopy riding a penny farthing through a park, hyper-realistic Victorian era dress",
+  "Cartoon Snoopy doing competitive kite flying, hyper-realistic coastal meadow and wind",
+  "Cartoon Snoopy at a rubber duck race in a stream, hyper-realistic town festival bridge",
+  "Cartoon Snoopy entering a paper boat race in a fountain, hyper-realistic French jardin",
+  "Cartoon Snoopy competing in a stilts race, hyper-realistic Dutch street festival",
+  "Cartoon Snoopy playing giant outdoor chess, hyper-realistic European plaza summer",
+  "Cartoon Snoopy competing in a competitive dog grooming contest, hyper-realistic fair tent",
+  "Cartoon Snoopy doing an Olympic torch run, hyper-realistic stadium approach and crowd",
+  "Cartoon Snoopy completing an Ironman triathlon, hyper-realistic sunset finish line",
+  "Cartoon Snoopy finishing the Boston Marathon, hyper-realistic Boylston Street and crowd",
+  "Cartoon Snoopy winning a spelling bee, hyper-realistic stage and packed gymnasium",
+  "Cartoon Snoopy at a science olympiad competition, hyper-realistic university lab",
+  "Cartoon Snoopy winning a debate tournament, hyper-realistic Oxford Union chamber",
+  "Cartoon Snoopy competing in a robotics competition, hyper-realistic FIRST Robotics arena",
+  "Cartoon Snoopy at a math olympiad, hyper-realistic international competition venue",
+  "Cartoon Snoopy doing competitive speed painting, hyper-realistic art competition stage",
+  "Cartoon Snoopy at a sandcastle competition on a French beach, hyper-realistic judges",
+  "Cartoon Snoopy winning a flower growing contest, hyper-realistic Chelsea Flower Show",
+  "Cartoon Snoopy competing in a cheesemaking contest, hyper-realistic Swiss mountain dairy",
+  "Cartoon Snoopy in a pie eating contest at a county fair, hyper-realistic summer Americana",
+  "Cartoon Snoopy completing a wilderness survival course, hyper-realistic forest and fire",
+  "Cartoon Snoopy winning a fishing derby, hyper-realistic Maine lake at golden hour",
+  "Snoopy on a vintage community swimming pool poster, 1950s municipal recreation style, bold and summery",
+  "Snoopy on a retro youth hostel travel poster, 1960s backpacker hitchhiker style, Europe and optimism",
 ];
 
 const ALL_VARIANTS = [96924,96925,96926,96927,96928,96929,96930,96931,96932,96933,96934,96935,96936,96937,96938,96939,96940,96941,96942,96943,96944,96945,96946,96947,96948,96949,96950,96951,96952,96953,96954,96956,96957,96958];
 const VERTICAL_VARIANTS = [
-  { id: 96926, w: 2365, h: 2955, price: 5500 },  // 8x10 $55
-  { id: 96930, w: 2955, h: 3546, price: 7000 },  // 10x12 $70
-  { id: 96944, w: 4727, h: 5920, price: 10000 }, // 16x20 $100
-  { id: 96946, w: 5920, h: 7101, price: 13000 }, // 20x24 $130
-  { id: 96956, w: 7101, h: 8884, price: 17000 }, // 24x30 $170
-  { id: 96958, w: 8858, h: 11811, price: 24000 }, // 30x40 $240
+  { id: 96926, w: 2365, h: 2955, price: 5500 },
+  { id: 96930, w: 2955, h: 3546, price: 7000 },
+  { id: 96944, w: 4727, h: 5920, price: 10000 },
+  { id: 96946, w: 5920, h: 7101, price: 13000 },
+  { id: 96956, w: 7101, h: 8884, price: 17000 },
+  { id: 96958, w: 8858, h: 11811, price: 24000 },
 ];
 
 function pickPrompts() {
@@ -1055,20 +1061,14 @@ function pickPrompts() {
 }
 
 async function retry(fn, retries, delay) {
-    retries = retries || 3;
-    delay = delay || 15000;
+    retries = retries || 3; delay = delay || 15000;
     for (var i = 0; i < retries; i++) {
-          try {
-                  return await fn();
-          } catch (err) {
-                  console.error("Attempt " + (i + 1) + " failed: " + err.message);
-                  if (i < retries - 1) {
-                            console.log("Retrying in " + (delay / 1000) + "s...");
-                            await new Promise(function(r) { setTimeout(r, delay); });
-                  } else {
-                            throw err;
-                  }
-          }
+        try { return await fn(); }
+        catch (err) {
+            console.error("Attempt " + (i+1) + " failed: " + err.message);
+            if (i < retries-1) { console.log("Retrying in " + (delay/1000) + "s..."); await new Promise(function(r){setTimeout(r,delay);}); }
+            else throw err;
+        }
     }
 }
 
@@ -1076,131 +1076,114 @@ async function cropToVertical(base64Data) {
     var sharp = require("sharp");
     var inputBuffer = Buffer.from(base64Data, "base64");
     var metadata = await sharp(inputBuffer).metadata();
-    var width = metadata.width;
-    var height = metadata.height;
-    var targetRatio = 4 / 5;
-    var currentRatio = width / height;
+    var width = metadata.width, height = metadata.height;
+    var targetRatio = 4/5, currentRatio = width/height;
     var cropWidth, cropHeight, left, top;
     if (currentRatio > targetRatio) {
-          cropHeight = height;
-          cropWidth = Math.floor(height * targetRatio);
-          left = Math.floor((width - cropWidth) / 2);
-          top = 0;
+        cropHeight = height; cropWidth = Math.floor(height * targetRatio);
+        left = Math.floor((width - cropWidth) / 2); top = 0;
     } else {
-          cropWidth = width;
-          cropHeight = Math.floor(width / targetRatio);
-          left = 0;
-          top = Math.floor((height - cropHeight) / 2);
+        cropWidth = width; cropHeight = Math.floor(width / targetRatio);
+        left = 0; top = Math.floor((height - cropHeight) / 2);
     }
+    // Output 2400x3000 — slightly larger than print area so image bleeds past edges, no white strip
     var outputBuffer = await sharp(inputBuffer)
-      .extract({ left: left, top: top, width: cropWidth, height: cropHeight })
-      .resize(2000, 2500)
-      .jpeg({ quality: 90 })
-      .toBuffer();
-    console.log("Image cropped to 4:5 (" + width + "x" + height + " -> 2000x2500)");
+        .extract({ left: left, top: top, width: cropWidth, height: cropHeight })
+        .resize(2400, 3000)
+        .jpeg({ quality: 92 })
+        .toBuffer();
+    console.log("Image cropped to 4:5 (" + width + "x" + height + " -> 2400x3000)");
     return outputBuffer.toString("base64");
 }
 
 async function generateListing(prompt) {
     console.log("Generating listing content...");
-    // Strip POSTER_TITLE marker from listing prompt — not needed for text generation
-    var cleanPrompt = prompt.replace(/,\s*POSTER_TITLE:'[^']*'/, '').trim();
     var res = await fetch(
-          "https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash-image:generateContent?key=" + NB_API_KEY,
-      {
-              method: "POST",
-              headers: { "Content-Type": "application/json" },
-              body: JSON.stringify({
-                        contents: [{ parts: [{ text: "Based on this Snoopy and Woodstock art description: \"" + cleanPrompt + "\"\n\nGenerate an optimized Etsy product listing. Respond with raw JSON only, no markdown, no backticks:\n{\n \"title\": \"Etsy optimized title under 80 chars. Format: Snoopy Woodstock [Scene] Canvas Print Peanuts [Theme] Wall Decor. NO dashes, NO hyphens, NO special characters.\",\n \"description\": \"3 engaging paragraphs about this specific artwork scene, the canvas print quality, and who would love it as a gift.\",\n \"tags\": [\"IMPORTANT: exactly 13 tags, each tag must be under 20 characters, no special characters, focused on Snoopy Peanuts and the specific scene. Examples: Snoopy wall art, Peanuts poster, Woodstock print, Snoopy gift, Peanuts decor, cartoon art print, Snoopy canvas, kids room art, Peanuts fan gift, Snoopy lover, beagle wall art, nursery art, Peanuts artwork\"]\n}" }] }],
-                        generationConfig: { responseModalities: ["TEXT"] }
-              })
-      }
-        );
+        "https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash-image:generateContent?key=" + NB_API_KEY,
+        {
+            method: "POST", headers: { "Content-Type": "application/json" },
+            body: JSON.stringify({
+                contents: [{ parts: [{ text: "Based on this Snoopy art description: \"" + prompt + "\"\n\nGenerate an optimized Etsy product listing. Respond with raw JSON only, no markdown, no backticks:\n{\n \"title\": \"Etsy title under 80 chars. Format: Snoopy [Scene] Canvas Print Peanuts [Theme] Wall Decor. NO dashes, NO hyphens, NO special characters.\",\n \"description\": \"3 engaging paragraphs about this specific artwork scene, the canvas print quality, and who would love it as a gift.\",\n \"tags\": [\"exactly 13 tags, each under 20 characters, focused on Snoopy Peanuts and the specific scene\"]\n}" }] }],
+                generationConfig: { responseModalities: ["TEXT"] }
+            })
+        }
+    );
     var data = await res.json();
     var text = data && data.candidates && data.candidates[0] && data.candidates[0].content && data.candidates[0].content.parts && data.candidates[0].content.parts[0] && data.candidates[0].content.parts[0].text;
     if (!text) throw new Error("Listing generation failed: " + JSON.stringify(data));
     var clean = text.replace(/```json|```/g, "").trim();
     var listing = JSON.parse(clean);
-    var validTags = [
-        "Snoopy wall art", "Peanuts poster", "Woodstock print", "Snoopy gift",
-        "Peanuts decor", "cartoon art print", "Snoopy canvas", "kids room art",
-        "Peanuts fan gift", "Snoopy lover", "beagle wall art", "nursery art",
-        "Peanuts artwork", "Snoopy print", "Peanuts wall art", "Snoopy home decor",
-        "Woodstock art", "Peanuts gift", "cartoon canvas", "Snoopy art print"
-    ];
+    var validTags = ["Snoopy wall art","Peanuts poster","Woodstock print","Snoopy gift","Peanuts decor","cartoon art print","Snoopy canvas","kids room art","Peanuts fan gift","Snoopy lover","beagle wall art","nursery art","Peanuts artwork","Snoopy print","Peanuts wall art","Snoopy home decor","Woodstock art","Peanuts gift","cartoon canvas","Snoopy art print"];
     if (!listing.tags || !Array.isArray(listing.tags) || listing.tags.length === 0) {
         listing.tags = validTags.slice(0, 13);
     } else {
-        var filtered = listing.tags.filter(function(t) { return t && t.length <= 20 && t.length > 0; });
+        var filtered = listing.tags.filter(function(t){ return t && t.length <= 20 && t.length > 0; });
         while (filtered.length < 13) {
-                var fallback = validTags[filtered.length % validTags.length];
-                if (filtered.indexOf(fallback) === -1) filtered.push(fallback);
-                else filtered.push("Snoopy art " + filtered.length);
+            var fallback = validTags[filtered.length % validTags.length];
+            if (filtered.indexOf(fallback) === -1) filtered.push(fallback);
+            else filtered.push("Snoopy art " + filtered.length);
         }
         listing.tags = filtered.slice(0, 13);
     }
     console.log("Listing generated:", listing.title);
-    console.log("Tags:", listing.tags);
     return listing;
 }
 
 async function generateImage(prompt) {
     console.log("Generating image...");
-
-    // Check if this is a location poster with a title
-    var titleMatch = prompt.match(/POSTER_TITLE:'([^']+)'/);
-    var locationTitle = titleMatch ? titleMatch[1] : null;
-    var cleanPrompt = prompt.replace(/,\s*POSTER_TITLE:'[^']*'/, '').trim();
-
-    var imageSuffix;
-    if (locationTitle) {
-        // Location poster: allow title text, styled to match the image palette
-        imageSuffix = " Generate as a tall vertical portrait travel poster artwork in 4:5 aspect ratio, taller than wide. "
-            + "Fill the entire frame edge to edge with no white borders, no margins. "
-            + "At the bottom of the image, include the location name '" + locationTitle + "' as bold stylized poster title text, "
-            + "colored to complement the image palette (e.g. if the scene is warm golden, use warm gold or cream text; "
-            + "if cool blue ocean, use white or light blue text). "
-            + "The text should look like a vintage travel poster title — clean, bold, all caps, elegant. "
-            + "No other text, no taglines, no URLs. Suitable for canvas wall art print.";
+    var isActivity = prompt.startsWith("Cartoon Snoopy");
+    var isAlbum = prompt.toLowerCase().includes("album cover");
+    var isPoster = prompt.toLowerCase().includes("poster");
+    var suffix;
+    if (isActivity) {
+        suffix = " Generate as a tall vertical portrait artwork in 4:5 aspect ratio, taller than wide. "
+            + "CRITICAL: fill the ENTIRE frame completely edge to edge — zero white space, zero margins, zero borders on any side. "
+            + "The hyper-realistic background must bleed to every edge of the frame. "
+            + "No text, no words, no letters. Canvas wall art suitable for print.";
+    } else if (isAlbum) {
+        suffix = " Generate as a tall 4:5 vertical album cover artwork. "
+            + "Fill the ENTIRE frame edge to edge — no white borders or margins whatsoever. "
+            + "Snoopy is the central artist or character on the cover. "
+            + "Style should feel like an actual professional album cover. Bold, striking, collectible.";
+    } else if (isPoster) {
+        suffix = " Generate as a tall vertical retro poster in 4:5 aspect ratio. "
+            + "Fill the ENTIRE frame edge to edge — no white margins, no borders. "
+            + "Bold vintage poster graphic design with strong composition, rich aged colors, "
+            + "and the authentic feel of a collectible vintage poster. Snoopy prominently featured.";
     } else {
-        // Standard prompt: no text at all
-        imageSuffix = " Generate as a tall vertical portrait poster artwork in 4:5 aspect ratio, taller than wide. "
-            + "Fill the entire frame edge to edge with no white borders, no margins, no shadows, no drop shadows, "
-            + "no perspective distortion, completely flat design. Suitable for canvas wall art print. "
-            + "No text, no words, no letters.";
+        suffix = " Generate as a tall vertical portrait artwork in 4:5 aspect ratio. "
+            + "Fill the ENTIRE frame edge to edge, zero white space or margins. "
+            + "No text, no words, no letters. Canvas wall art suitable for print.";
     }
-
     var res = await fetch(
-          "https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash-image:generateContent?key=" + NB_API_KEY,
-      {
-              method: "POST",
-              headers: { "Content-Type": "application/json" },
-              body: JSON.stringify({
-                        contents: [{ parts: [{ text: cleanPrompt + imageSuffix }] }],
-                        generationConfig: { responseModalities: ["IMAGE", "TEXT"] }
-              })
-      }
-        );
+        "https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash-image:generateContent?key=" + NB_API_KEY,
+        {
+            method: "POST", headers: { "Content-Type": "application/json" },
+            body: JSON.stringify({
+                contents: [{ parts: [{ text: prompt + suffix }] }],
+                generationConfig: { responseModalities: ["IMAGE", "TEXT"] }
+            })
+        }
+    );
     var rawText2 = await res.text();
     var data;
     try { data = JSON.parse(rawText2); } catch(e) { throw new Error("Image generation failed (non-JSON, status " + res.status + "): " + rawText2.substring(0, 200)); }
     var parts = data && data.candidates && data.candidates[0] && data.candidates[0].content && data.candidates[0].content.parts;
-    var imagePart = parts && parts.find(function(p) { return p.inlineData; });
+    var imagePart = parts && parts.find(function(p){ return p.inlineData; });
     if (!imagePart) throw new Error("Image generation failed: " + JSON.stringify(data));
-    console.log("Image generated successfully" + (locationTitle ? " (location title: " + locationTitle + ")" : ""));
+    console.log("Image generated successfully");
     return await cropToVertical(imagePart.inlineData.data);
 }
 
 async function uploadToPrintify(base64Data) {
     console.log("Uploading image to Printify...");
     var res = await fetch("https://api.printify.com/v1/uploads/images.json", {
-          method: "POST",
-          headers: { "Authorization": "Bearer " + PRINTIFY_API_KEY, "Content-Type": "application/json" },
-          body: JSON.stringify({ file_name: "canvas_" + Date.now() + ".jpg", contents: base64Data })
+        method: "POST", headers: { "Authorization": "Bearer " + PRINTIFY_API_KEY, "Content-Type": "application/json" },
+        body: JSON.stringify({ file_name: "canvas_" + Date.now() + ".jpg", contents: base64Data })
     });
     var rawText = await res.text();
     var data;
-    try { data = JSON.parse(rawText); } catch(e) { throw new Error("Upload failed (non-JSON response, status " + res.status + "): " + rawText.substring(0, 200)); }
+    try { data = JSON.parse(rawText); } catch(e) { throw new Error("Upload failed (non-JSON, status " + res.status + "): " + rawText.substring(0, 200)); }
     if (!data.id) throw new Error("Upload failed: " + JSON.stringify(data));
     console.log("Uploaded, image ID:", data.id);
     return data.id;
@@ -1208,29 +1191,14 @@ async function uploadToPrintify(base64Data) {
 
 async function createProduct(imageId, listing) {
     console.log("Creating Printify product...");
-    var enabledIds = new Set(VERTICAL_VARIANTS.map(function(v) { return v.id; }));
+    var enabledIds = new Set(VERTICAL_VARIANTS.map(function(v){ return v.id; }));
     var priceMap = {};
-    VERTICAL_VARIANTS.forEach(function(v) { priceMap[v.id] = v.price; });
-    var variants = ALL_VARIANTS.map(function(id) {
-          return { id: id, is_enabled: enabledIds.has(id), price: enabledIds.has(id) ? priceMap[id] : 500 };
-    });
-    var print_areas = [{
-          variant_ids: VERTICAL_VARIANTS.map(function(v) { return v.id; }),
-          placeholders: [{ position: "front", images: [{ id: imageId, x: 0.5, y: 0.5, scale: 1.3, angle: 0 }] }]
-    }];
+    VERTICAL_VARIANTS.forEach(function(v){ priceMap[v.id] = v.price; });
+    var variants = ALL_VARIANTS.map(function(id){ return { id: id, is_enabled: enabledIds.has(id), price: enabledIds.has(id) ? priceMap[id] : 500 }; });
+    var print_areas = [{ variant_ids: VERTICAL_VARIANTS.map(function(v){ return v.id; }), placeholders: [{ position: "front", images: [{ id: imageId, x: 0.5, y: 0.5, scale: 1.5, angle: 0 }] }] }];
     var res = await fetch("https://api.printify.com/v1/shops/" + SHOP_ID + "/products.json", {
-          method: "POST",
-          headers: { "Authorization": "Bearer " + PRINTIFY_API_KEY, "Content-Type": "application/json" },
-          body: JSON.stringify({
-                  title: listing.title,
-                  description: listing.description,
-                  tags: listing.tags,
-                  blueprint_id: BLUEPRINT_ID,
-                  print_provider_id: PRINT_PROVIDER_ID,
-                  variants: variants,
-                  print_areas: print_areas,
-                  images: [{ id: imageId, x: 0.5, y: 0.5, scale: 1.0, angle: 0, is_default: true, is_selected_for_publishing: true, position: "front", variant_ids: VERTICAL_VARIANTS.map(function(v) { return v.id; }) }]
-          })
+        method: "POST", headers: { "Authorization": "Bearer " + PRINTIFY_API_KEY, "Content-Type": "application/json" },
+        body: JSON.stringify({ title: listing.title, description: listing.description, tags: listing.tags, blueprint_id: BLUEPRINT_ID, print_provider_id: PRINT_PROVIDER_ID, variants: variants, print_areas: print_areas, images: [{ id: imageId, x: 0.5, y: 0.5, scale: 1.0, angle: 0, is_default: true, is_selected_for_publishing: true, position: "front", variant_ids: VERTICAL_VARIANTS.map(function(v){ return v.id; }) }] })
     });
     var data = await res.json();
     if (!data.id) throw new Error("Product creation failed: " + JSON.stringify(data));
@@ -1245,76 +1213,45 @@ var getProduct = shop.getProduct;
 
 async function publishToEtsy(productId) {
     var product = await getProduct(productId);
-    if (isPublishedToEtsy(product)) {
-          console.log('Product ' + productId + ' is already published to Etsy — skipping publish.');
-          return false;
-    }
-    if (product.is_locked) {
-          console.log('Product ' + productId + ' is locked (publish in progress) — skipping publish.');
-          return false;
-    }
+    if (isPublishedToEtsy(product)) { console.log('Product ' + productId + ' already on Etsy — skipping.'); return false; }
+    if (product.is_locked) { console.log('Product ' + productId + ' is locked — skipping.'); return false; }
     console.log("Publishing to Etsy...");
-    var body = JSON.stringify({
-          title: true, description: true, images: true, variants: true,
-          tags: true, keyFeatures: false, shipping_template: true
-    });
-    var attempt = 1;
-    var triggerOk = false;
+    var body = JSON.stringify({ title: true, description: true, images: true, variants: true, tags: true, keyFeatures: false, shipping_template: true });
+    var attempt = 1, triggerOk = false;
     while (attempt <= 3 && !triggerOk) {
-          console.log("Publish attempt " + attempt + "...");
-          var res = await fetch(
-                  "https://api.printify.com/v1/shops/" + SHOP_ID + "/products/" + productId + "/publish.json",
-                  { method: "POST", headers: { "Authorization": "Bearer " + PRINTIFY_API_KEY, "Content-Type": "application/json" }, body: body }
-                );
-          var resText = await res.text();
-          console.log("Publish response (status " + res.status + "): " + resText);
-          if (res.status === 200) {
-                  triggerOk = true;
-          } else {
-                  if (attempt < 3) await new Promise(function(r) { setTimeout(r, 20000); });
-                  attempt++;
-          }
+        console.log("Publish attempt " + attempt + "...");
+        var res = await fetch("https://api.printify.com/v1/shops/" + SHOP_ID + "/products/" + productId + "/publish.json", { method: "POST", headers: { "Authorization": "Bearer " + PRINTIFY_API_KEY, "Content-Type": "application/json" }, body: body });
+        var resText = await res.text();
+        console.log("Publish response (status " + res.status + "): " + resText);
+        if (res.status === 200) { triggerOk = true; }
+        else { if (attempt < 3) await new Promise(function(r){ setTimeout(r, 20000); }); attempt++; }
     }
     if (!triggerOk) throw new Error("Publish trigger failed after 3 attempts");
-    console.log("Publish triggered. Polling for Etsy listing ID (up to 6 min)...");
+    console.log("Polling for Etsy listing ID (up to 6 min)...");
     for (var i = 0; i < 24; i++) {
-          await new Promise(function(r) { setTimeout(r, 15000); });
-          var p = await getProduct(productId);
-          var externalId = p.external && p.external.id;
-          var status = p.publishing_status;
-          console.log("Poll " + (i+1) + "/24: external.id=" + (externalId || "none") + " status=" + (status || "not set") + " locked=" + p.is_locked);
-          if (externalId) {
-                  return true;
-          }
-          if (status === "failed") {
-                  throw new Error("Publishing failed (status=failed) — check Printify→Etsy connection in Printify dashboard");
-          }
+        await new Promise(function(r){ setTimeout(r, 15000); });
+        var p = await getProduct(productId);
+        var externalId = p.external && p.external.id;
+        console.log("Poll " + (i+1) + "/24: external.id=" + (externalId || "none") + " locked=" + p.is_locked);
+        if (externalId) return true;
+        if (p.publishing_status === "failed") throw new Error("Publishing failed — check Printify→Etsy connection");
     }
-    console.log("\u2713 Publish response was 200 OK \u2014 treating as published (external.id sync delay).");
-    console.log("  Product " + productId + " should be live on Etsy shortly.");
+    console.log("\u2713 Treating as published (external.id sync delay). Product should be live on Etsy shortly.");
     return true;
 }
 
 async function toggleOffsiteAds(productId, options) {
     options = options || {};
     var mod = getOffsiteAdsModule();
-    if (!mod) { return; }
+    if (!mod) return;
     var enable = options.enable !== undefined ? options.enable : OFFSITE_ADS_ENABLED;
-    var action = enable ? 'Enabling' : 'Disabling';
-    console.log('\n[automation] ' + action + ' Etsy offsite ads for product ' + productId + '...');
+    console.log('\n[automation] ' + (enable ? 'Enabling' : 'Disabling') + ' offsite ads for ' + productId + '...');
     try {
-        if (!options.skipPublishWait) {
-                await new Promise(function(r) { setTimeout(r, 10000); });
-        }
+        if (!options.skipPublishWait) await new Promise(function(r){ setTimeout(r, 10000); });
         var result = await mod.setOffsiteAds(productId, enable, { retries: 3 });
-        if (result.changed) {
-                console.log('[automation] \u2713 Offsite ads ' + (result.newState ? 'ENABLED' : 'DISABLED') + ' for product ' + productId);
-        } else {
-                console.log('[automation] \u2713 Offsite ads already ' + (result.newState ? 'ENABLED' : 'DISABLED') + ' for product ' + productId + ' \u2014 no change needed');
-        }
+        console.log('[automation] \u2713 Offsite ads ' + (result.newState ? 'ENABLED' : 'DISABLED') + (result.changed ? '' : ' (no change)') + ' for ' + productId);
     } catch (err) {
         console.error('[automation] \u2717 Offsite ads toggle failed for ' + productId + ': ' + err.message);
-        console.error('[automation] The listing was published successfully. Toggle it manually in Printify.');
     }
 }
 
@@ -1322,30 +1259,18 @@ async function processExistingProducts(allProducts, adsEnable) {
     var adsState = adsEnable !== undefined ? adsEnable : OFFSITE_ADS_ENABLED;
     var canvas = allProducts.filter(isCanvasProduct);
     var onEtsy = canvas.filter(isPublishedToEtsy);
-    var drafts = canvas.filter(function(p) { return !isPublishedToEtsy(p) && !p.is_locked; });
-    console.log('Shop scan: ' + canvas.length + ' canvas product(s), ' +
-                    onEtsy.length + ' on Etsy, ' + drafts.length + ' unpublished draft(s)\n');
+    var drafts = canvas.filter(function(p){ return !isPublishedToEtsy(p) && !p.is_locked; });
+    console.log('Shop scan: ' + canvas.length + ' canvas, ' + onEtsy.length + ' on Etsy, ' + drafts.length + ' drafts\n');
     var toggledOnly = [];
-    if (!TOGGLE_ALL_ETSY_PUBLISHED) {
-        console.log('TOGGLE_ALL_ETSY_PUBLISHED=false — skipping ads sync for existing Etsy listings.\n');
-        return { onEtsy: onEtsy, drafts: drafts, toggledOnly: toggledOnly };
-    }
+    if (!TOGGLE_ALL_ETSY_PUBLISHED) { console.log('TOGGLE_ALL_ETSY_PUBLISHED=false — skipping ads sync.\n'); return { onEtsy, drafts, toggledOnly }; }
     for (var i = 0; i < onEtsy.length; i++) {
         var p = onEtsy[i];
-        console.log('\n\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550');
-        console.log(' Already on Etsy (' + (i + 1) + '/' + onEtsy.length + ')');
-        console.log('\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550');
-        console.log('Product:', p.id);
-        console.log('Title:', (p.title || '').substring(0, 60));
-        try {
-                await toggleOffsiteAds(p.id, { skipPublishWait: true, enable: adsState });
-                toggledOnly.push(p.id);
-                if (i < onEtsy.length - 1) await new Promise(function(r) { setTimeout(r, 3000); });
-        } catch (err) {
-                console.error('\u2717 Ads toggle failed for ' + p.id + ':', err.message);
-        }
+        console.log('\n\u2550\u2550\u2550 Already on Etsy (' + (i+1) + '/' + onEtsy.length + ') \u2550\u2550\u2550');
+        console.log('Product:', p.id, '|', (p.title || '').substring(0, 60));
+        try { await toggleOffsiteAds(p.id, { skipPublishWait: true, enable: adsState }); toggledOnly.push(p.id); if (i < onEtsy.length-1) await new Promise(function(r){ setTimeout(r, 3000); }); }
+        catch (err) { console.error('\u2717 Ads toggle failed:', err.message); }
     }
-    return { onEtsy: onEtsy, drafts: drafts, toggledOnly: toggledOnly };
+    return { onEtsy, drafts, toggledOnly };
 }
 
 async function processUnpublishedDrafts(drafts, maxCount, adsEnable) {
@@ -1354,157 +1279,95 @@ async function processUnpublishedDrafts(drafts, maxCount, adsEnable) {
     var toProcess = drafts.slice(0, maxCount);
     for (var i = 0; i < toProcess.length; i++) {
         var p = toProcess[i];
-        console.log('\n\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550');
-        console.log(' Unpublished draft (' + (i + 1) + '/' + toProcess.length + ')');
-        console.log('\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550');
-        console.log('Product:', p.id);
-        console.log('Title:', (p.title || '').substring(0, 60));
+        console.log('\n\u2550\u2550\u2550 Unpublished draft (' + (i+1) + '/' + toProcess.length + ') \u2550\u2550\u2550');
+        console.log('Product:', p.id, '|', (p.title || '').substring(0, 60));
         try {
-                var didPublish = await publishToEtsy(p.id);
-                if (didPublish) {
-                          console.log('\u2713 Published to Etsy:', p.id);
-                          publishedNow.push(p.id);
-                }
-                await toggleOffsiteAds(p.id, { skipPublishWait: !didPublish, enable: adsState });
-                if (i < toProcess.length - 1) await new Promise(function(r) { setTimeout(r, 10000); });
-        } catch (err) {
-                console.error('\u2717 Draft ' + p.id + ' failed:', err.message);
-        }
+            var didPublish = await publishToEtsy(p.id);
+            if (didPublish) { console.log('\u2713 Published:', p.id); publishedNow.push(p.id); }
+            await toggleOffsiteAds(p.id, { skipPublishWait: !didPublish, enable: adsState });
+            if (i < toProcess.length-1) await new Promise(function(r){ setTimeout(r, 10000); });
+        } catch (err) { console.error('\u2717 Draft ' + p.id + ' failed:', err.message); }
     }
     return publishedNow;
 }
 
 async function runAdsOnly(enable) {
     require('./config').validateForPlaywright();
-    console.log('\n\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550');
-    console.log(' Ads-only mode \u2014 Etsy-published canvas products');
-    console.log(' Target: ads ' + (enable ? 'ON' : 'OFF'));
-    console.log('\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\n');
+    console.log('\nAds-only mode — Target: ads ' + (enable ? 'ON' : 'OFF') + '\n');
     var allProducts = await fetchAllShopProducts();
     var onEtsy = allProducts.filter(isCanvasProduct).filter(isPublishedToEtsy);
-    if (onEtsy.length === 0) {
-        console.log('No canvas products published to Etsy found.');
-        var modEmpty = getOffsiteAdsModule();
-        if (modEmpty) await modEmpty.closeBrowser();
-        return;
-    }
+    if (onEtsy.length === 0) { console.log('No canvas products on Etsy found.'); var m = getOffsiteAdsModule(); if (m) await m.closeBrowser(); return; }
     var toggled = [];
     for (var i = 0; i < onEtsy.length; i++) {
-          var p = onEtsy[i];
-          console.log('\n--- Product ' + (i + 1) + '/' + onEtsy.length + ' ---');
-          console.log(p.id, (p.title || '').substring(0, 50));
-          try {
-                  await toggleOffsiteAds(p.id, { skipPublishWait: true, enable: enable });
-                  toggled.push(p.id);
-                  if (i < onEtsy.length - 1) await new Promise(function(r) { setTimeout(r, 3000); });
-          } catch (err) {
-                  console.error('Failed:', err.message);
-          }
+        var p = onEtsy[i];
+        console.log('\n--- ' + (i+1) + '/' + onEtsy.length + ' --- ' + p.id + ' ' + (p.title||'').substring(0,50));
+        try { await toggleOffsiteAds(p.id, { skipPublishWait: true, enable: enable }); toggled.push(p.id); if (i < onEtsy.length-1) await new Promise(function(r){ setTimeout(r, 3000); }); }
+        catch (err) { console.error('Failed:', err.message); }
     }
-    var mod = getOffsiteAdsModule();
-    if (mod) await mod.closeBrowser();
+    var mod = getOffsiteAdsModule(); if (mod) await mod.closeBrowser();
     console.log('\nDone. Ads ' + (enable ? 'ON' : 'OFF') + ' for ' + toggled.length + '/' + onEtsy.length + ' product(s).');
 }
 
 async function run() {
     var validate = require('./config').validateForPipeline;
-    try { validate(); } catch (e) {
-          if (String(e.message).indexOf('NB_API_KEY') >= 0 && SKIP_NEW_LISTINGS) {
-                  require('./config').validateForPlaywright();
-          } else {
-                  throw e;
-          }
-    }
-    try { require("sharp"); } catch (e) {
-        require("child_process").execSync("npm install sharp", { stdio: "inherit" });
-    }
-    console.log('Offsite ads will be: ' + (OFFSITE_ADS_ENABLED ? 'ENABLED' : 'DISABLED'));
-    console.log('Daily new listing target: ' + DAILY_NEW_LISTINGS);
-    if (SKIP_NEW_LISTINGS) console.log('SKIP_NEW_LISTINGS=true — no new Gemini listings\n');
-
+    try { validate(); } catch(e) { if (String(e.message).indexOf('NB_API_KEY') >= 0 && SKIP_NEW_LISTINGS) { require('./config').validateForPlaywright(); } else throw e; }
+    try { require("sharp"); } catch(e) { require("child_process").execSync("npm install sharp", { stdio: "inherit" }); }
+    console.log('Offsite ads: ' + (OFFSITE_ADS_ENABLED ? 'ENABLED' : 'DISABLED'));
+    console.log('Daily new listings: ' + DAILY_NEW_LISTINGS);
+    if (SKIP_NEW_LISTINGS) console.log('SKIP_NEW_LISTINGS=true\n');
     var allProducts = await fetchAllShopProducts();
     var existing = await processExistingProducts(allProducts);
-
     var newSlots = SKIP_NEW_LISTINGS ? 0 : DAILY_NEW_LISTINGS;
     var draftSlots = Math.min(existing.drafts.length, newSlots);
     var publishedFromDrafts = [];
-
     if (draftSlots > 0) {
-        console.log('\nPublishing ' + draftSlots + ' unpublished canvas draft(s) before creating new ones...');
+        console.log('\nPublishing ' + draftSlots + ' draft(s) first...');
         publishedFromDrafts = await processUnpublishedDrafts(existing.drafts, draftSlots);
         newSlots -= publishedFromDrafts.length;
     }
-
-    var createdNew = [];
-    var publishedNew = [];
+    var createdNew = [], publishedNew = [];
     if (newSlots > 0) {
-          var prompts = pickPrompts().slice(0, newSlots);
-          console.log('\nCreating ' + prompts.length + ' new listing(s) from prompts\n');
-          for (var i = 0; i < prompts.length; i++) {
-              var prompt = prompts[i];
-              console.log('\n\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550');
-              console.log(' New listing ' + (i + 1) + ' of ' + prompts.length);
-              console.log('\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550');
-              console.log('Prompt:', prompt.substring(0, 100));
-              try {
-                        var listing = await retry(function() { return generateListing(prompt); });
-                        var base64Img = await retry(function() { return generateImage(prompt); });
-                        var imageId = await uploadToPrintify(base64Img);
-                        var productId = await createProduct(imageId, listing);
-                        createdNew.push(productId);
-                        await new Promise(function(r) { setTimeout(r, 15000); });
-                        var didPublish = await publishToEtsy(productId);
-                        if (didPublish) {
-                                    console.log('\u2713 Listing live on Etsy! Product ID:', productId);
-                                    publishedNew.push(productId);
-                        }
-                        await toggleOffsiteAds(productId, { skipPublishWait: !didPublish, enable: OFFSITE_ADS_ENABLED });
-                        if (i < prompts.length - 1) await new Promise(function(r) { setTimeout(r, 10000); });
-              } catch (err) {
-                        console.error('\u2717 New listing ' + (i + 1) + ' failed:', err.message);
-              }
-          }
+        var prompts = pickPrompts().slice(0, newSlots);
+        console.log('\nCreating ' + prompts.length + ' new listing(s)\n');
+        for (var i = 0; i < prompts.length; i++) {
+            var prompt = prompts[i];
+            console.log('\n\u2550\u2550\u2550 New listing ' + (i+1) + ' of ' + prompts.length + ' \u2550\u2550\u2550');
+            console.log('Prompt:', prompt.substring(0, 100));
+            try {
+                var listing = await retry(function(){ return generateListing(prompt); });
+                var base64Img = await retry(function(){ return generateImage(prompt); });
+                var imageId = await uploadToPrintify(base64Img);
+                var productId = await createProduct(imageId, listing);
+                createdNew.push(productId);
+                await new Promise(function(r){ setTimeout(r, 15000); });
+                var didPublish = await publishToEtsy(productId);
+                if (didPublish) { console.log('\u2713 Live on Etsy! Product ID:', productId); publishedNew.push(productId); }
+                await toggleOffsiteAds(productId, { skipPublishWait: !didPublish, enable: OFFSITE_ADS_ENABLED });
+                if (i < prompts.length-1) await new Promise(function(r){ setTimeout(r, 10000); });
+            } catch(err) { console.error('\u2717 Listing ' + (i+1) + ' failed:', err.message); }
+        }
     } else if (!SKIP_NEW_LISTINGS) {
-          console.log('\nNo new listings to create (drafts filled the daily quota or DAILY_NEW_LISTINGS=0).');
+        console.log('\nNo new listings to create.');
     }
-
-    var mod = getOffsiteAdsModule();
-    if (mod) await mod.closeBrowser();
-
-    console.log('\n\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550');
-    console.log(' Done!');
-    console.log('\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550');
+    var mod = getOffsiteAdsModule(); if (mod) await mod.closeBrowser();
+    console.log('\n\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550 Done! \u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550');
     console.log(' On Etsy (ads only)  : ' + existing.toggledOnly.length);
     console.log(' Drafts published    : ' + publishedFromDrafts.length);
     console.log(' New products created: ' + createdNew.length);
     console.log(' New live on Etsy    : ' + publishedNew.length);
     if (createdNew.length > publishedNew.length) {
-          var unpublishedIds = createdNew.filter(function(id) { return publishedNew.indexOf(id) === -1; });
-          console.log(' \u26a0 Saved as drafts   : ' + unpublishedIds.join(', '));
-          console.log(' \u26a0 To fix: reconnect Etsy in Printify dashboard \u2192 Sales Channels');
+        var unpublished = createdNew.filter(function(id){ return publishedNew.indexOf(id) === -1; });
+        console.log(' \u26a0 Saved as drafts   : ' + unpublished.join(', '));
+        console.log(' \u26a0 To fix: reconnect Etsy in Printify \u2192 Sales Channels');
     }
-    if (existing.toggledOnly.length) {
-          console.log(' Ads toggled (existing): ' + existing.toggledOnly.join(', '));
-    }
-    if (publishedFromDrafts.length) {
-          console.log(' Published from drafts : ' + publishedFromDrafts.join(', '));
-    }
-    if (publishedNew.length) {
-          console.log(' New product IDs       : ' + publishedNew.join(', '));
-    }
+    if (existing.toggledOnly.length) console.log(' Ads toggled         : ' + existing.toggledOnly.join(', '));
+    if (publishedFromDrafts.length) console.log(' Published from drafts: ' + publishedFromDrafts.join(', '));
+    if (publishedNew.length) console.log(' New product IDs     : ' + publishedNew.join(', '));
 }
 
 var cliArgs = process.argv.slice(2);
 if (cliArgs.indexOf('--ads-on') >= 0) {
-    runAdsOnly(true).catch(function(err) {
-          console.error(err);
-          process.exit(1);
-    });
+    runAdsOnly(true).catch(function(err){ console.error(err); process.exit(1); });
 } else if (cliArgs.indexOf('--ads-off') >= 0) {
-    runAdsOnly(false).catch(function(err) {
-          console.error(err);
-          process.exit(1);
-    });
-} else {
-    run();
-}
+    runAdsOnly(false).catch(function(err){ console.error(err); process.exit(1); });
+} else { run(); }
