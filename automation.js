@@ -310,7 +310,7 @@ async function createProduct(imageId, listing) {
                   blueprint_id: BLUEPRINT_ID,
                   print_provider_id: PRINT_PROVIDER_ID,
                   variants: variants,
-                  print_areas: print_areas
+                  print_areas: print_areas, images: [{ id: imageId, x: 0.5, y: 0.5, scale: 1.0, angle: 0, is_default: true, is_selected_for_publishing: true, position: "front", variant_ids: VERTICAL_VARIANTS.map(function(v) { return v.id; }) }]
           })
     });
     var data = await res.json();
