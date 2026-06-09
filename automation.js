@@ -367,7 +367,7 @@ async function publishToEtsy(productId) {
           var externalId = p.external && p.external.id;
           var status = p.publishing_status;
           console.log("Poll " + (i+1) + "/24: external.id=" + (externalId || "none") + " status=" + (status || "not set") + " locked=" + p.is_locked);
-console.warn("⚠ Publish timed out after 6 min                  console.log("Publish succeeded! Etsy listing ID: " + externalId);
+          if (externalId) {
                   return true;
           }
           if (status === "failed") {
