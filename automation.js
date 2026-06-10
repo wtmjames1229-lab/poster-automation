@@ -1084,12 +1084,16 @@ async function cropToVertical(base64Data) {
 
 async function generateListing(prompt) {
     console.log("Generating listing content...");
+    var isAlbumPrompt = prompt.toLowerCase().includes("album cover");
+    var copyrightNote = isAlbumPrompt
+        ? "\n\nCRITICAL COPYRIGHT RULE: Do NOT include any real musician names, band names, or album titles anywhere in the title, description, or tags. Describe the scene generically (e.g. a famous music legend, an iconic rock crossing, a legendary concept album style) without naming the artist or album."
+        : "";
     var res = await fetch(
         "https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash-image:generateContent?key=" + NB_API_KEY,
         {
             method: "POST", headers: { "Content-Type": "application/json" },
             body: JSON.stringify({
-                contents: [{ parts: [{ text: "Based on this Snoopy art description: \"" + prompt + "\"\n\nGenerate an optimized Etsy product listing. Respond with raw JSON only, no markdown, no backticks:\n{\n \"title\": \"Etsy title under 80 chars. Format: Snoopy [Scene] Canvas Print Peanuts [Theme] Wall Decor. NO dashes, NO hyphens, NO special characters.\",\n \"description\": \"3 engaging paragraphs about this specific artwork scene, the canvas print quality, and who would love it as a gift.\",\n \"tags\": [\"exactly 13 tags, each under 20 characters, focused on Snoopy Peanuts and the specific scene\"]\n}" }] }],
+                contents: [{ parts: [{ text: "Based on this Snoopy art description: \"" + prompt + "\"\n\nGenerate an optimized Etsy product listing. Respond with raw JSON only, no markdown, no backticks:\n{\n \"title\": \"Etsy title under 80 chars. Format: Snoopy [Scene] Canvas Print Peanuts [Theme] Wall Decor. NO dashes, NO hyphens, NO special characters.\",\n \"description\": \"3 engaging paragraphs about this specific artwork scene, the canvas print quality, and who would love it as a gift.\",\n \"tags\": [\"exactly 13 tags, each under 20 characters, focused on Snoopy Peanuts and the specific scene\"]\n}" + copyrightNote }] }],
                 generationConfig: { responseModalities: ["TEXT"] }
             })
         }
