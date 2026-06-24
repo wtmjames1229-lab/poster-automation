@@ -1,0 +1,187 @@
+// cleanup.js — Etsy listing renewal script
+// Checks listings aged 100–110 days; renews if views >= 10, lets expire if views < 10.
+// Run with: node cleanup.js
+
+require('dotenv').config();
+
+var ETSY_API_KEY    = process.env.ETSY_API_KEY;
+var ETSY_SHARED_SECRET = process.env.ETSY_SHARED_SECRET;
+var SHOP_ID        = process.env.ETSY_SHOP_ID;
+var ACCESS_TOKEN   = process.env.ETSY_ACCESS_TOKEN;
+
+var BASE_URL = 'https://openapi.etsy.com/v3/application';
+
+var CHECK_WINDOW_MIN = 100; // days
+var CHECK_WINDOW_MAX = 110; // days
+
+// ---------------------------------------------------------------------------
+// helpers
+// ---------------------------------------------------------------------------
+
+function sleep(ms) {
+  return new Promise(function(resolve) { setTimeout(resolve, ms); });
+                             }
+
+                             async function retry(fn, attempts, delayMs) {
+                               attempts = attempts || 3;
+                               delayMs  = delayMs  || 5000;
+                               var lastErr;
+                               for (var i = 0; i < attempts; i++) {
+                                            try {
+                                              return await fn();
+                                            } catch (err) {
+                                              lastErr = err;
+                                              if (i < attempts - 1) {
+                                                console.log('  [retry] attempt ' + (i + 1) + ' failed: ' + err.message + ' — retrying in ' + (delayMs / 1000) + 's');
+                                     await sleep(delayMs);
+                                   }
+                                 }
+                               }
+                               throw lastErr;
+                             }
+
+                             function etsyHeaders() {
+                               return {
+                                 'x-api-key': ETSY_API_KEY,
+                                 'Authorization': 'Bearer ' + ACCESS_TOKEN,
+                                 'Content-Type': 'application/json'
+                               };
+                             }
+
+                             async function etsyFetch(path, options) {
+                               var url = BASE_URL + path;
+                               var res = await fetch(url, Object.assign({ headers: etsyHeaders() }, options || {}));
+                               if (!res.ok) {
+                                 var body = '';
+                                 try { body = await res.text(); } catch(e) {}
+                                 throw new Error('Etsy API ' + res.status + ' for ' + path + ': ' + body);
+                               }
+                               return res.json();
+                             }
+
+                             // ---------------------------------------------------------------------------
+                             // API calls
+                             // ---------------------------------------------------------------------------
+
+                             async function fetchAllActiveListings() {
+                               var allListings = [];
+  var offset = 0;
+  var limit  = 100;
+  while (true) {
+    var data = await retry(function() {
+                                         return etsyFetch('/shops/' + SHOP_ID + '/listings?state=active&limit=' + limit + '&offset=' + offset);
+                                       });
+    var results = data.results || [];
+    allListings = allListings.concat(results);
+    if (results.length < limit) break;
+    offset += limit;
+  }
+  return allListings;
+}
+
+async function fetchListingStats(listingId) {
+  var data = await retry(function() {
+                                     return etsyFetch('/shops/' + SHOP_ID + '/listings/' + listingId + '/stats');
+                                   });
+  return data;
+}
+
+async function renewListing(listingId) {
+  await retry(function() {
+                          return etsyFetch('/shops/' + SHOP_ID + '/listings/' + listingId + '/renew', { method: 'POST' });
+                        });
+}
+
+// ---------------------------------------------------------------------------
+// main
+// ---------------------------------------------------------------------------
+
+async function run() {
+  if (!ETSY_API_KEY)  throw new Error('Missing env var: ETSY_API_KEY');
+  if (!SHOP_ID)       throw new Error('Missing env var: ETSY_SHOP_ID');
+  if (!ACCESS_TOKEN)  throw new Error('Missing env var: ETSY_ACCESS_TOKEN');
+
+  console.log('=== Etsy Listing Cleanup ===');
+  console.log('Shop ID       : ' + SHOP_ID);
+  console.log('Check window  : ' + CHECK_WINDOW_MIN + '–' + CHECK_WINDOW_MAX + ' days old');
+  console.log('');
+
+  var listings = await fetchAllActiveListings();
+  console.log('Total active listings fetched: ' + listings.length);
+  console.log('');
+
+  var now = Date.now();
+
+  var totalChecked  = 0;
+  var totalInWindow = 0;
+  var totalRenewed  = 0;
+  var totalExpire   = 0;
+
+  for (var i = 0; i < listings.length; i++) {
+               var listing = listings[i];
+    var listingId = listing.listing_id;
+
+    // original_creation_tsz is a Unix timestamp in seconds
+    var createdTs = listing.original_creation_tsz;
+    if (!createdTs) {
+      console.log('[' + listingId + '] SKIP — no original_creation_tsz field');
+      continue;
+    }
+
+    var ageDays = (now - createdTs * 1000) / (1000 * 60 * 60 * 24);
+    totalChecked++;
+
+    if (ageDays < CHECK_WINDOW_MIN) {
+      console.log('[' + listingId + '] age=' + ageDays.toFixed(1) + 'd  → too-young (< ' + CHECK_WINDOW_MIN + 'd), ignored');
+      continue;
+    }
+
+    if (ageDays > CHECK_WINDOW_MAX) {
+      console.log('[' + listingId + '] age=' + ageDays.toFixed(1) + 'd  → too-old (> ' + CHECK_WINDOW_MAX + 'd), ignored');
+      continue;
+    }
+
+    // Inside the check window
+    totalInWindow++;
+    console.log('[' + listingId + '] age=' + ageDays.toFixed(1) + 'd  → IN WINDOW — fetching stats...');
+
+    var stats;
+    try {
+      stats = await fetchListingStats(listingId);
+    } catch (err) {
+      console.log('[' + listingId + '] ERROR fetching stats: ' + err.message + ' — skipping');
+      continue;
+    }
+
+    var views = (stats && stats.views != null) ? stats.views : 0;
+
+    if (views < 10) {
+      console.log('[' + listingId + '] age=' + ageDays.toFixed(1) + 'd  views=' + views + '  → SKIPPED (< 10 views, let expire)');
+      totalExpire++;
+    } else {
+      console.log('[' + listingId + '] age=' + ageDays.toFixed(1) + 'd  views=' + views + '  → RENEWING...');
+      try {
+        await renewListing(listingId);
+        console.log('[' + listingId + '] RENEWED successfully');
+        totalRenewed++;
+      } catch (err) {
+        console.log('[' + listingId + '] ERROR renewing: ' + err.message);
+      }
+    }
+
+    // Brief pause between API calls to avoid rate-limiting
+    if (i < listings.length - 1) await sleep(500);
+  }
+
+  console.log('');
+  console.log('=== Summary ===');
+  console.log('Total listings checked  : ' + totalChecked);
+  console.log('In check window (100-110d): ' + totalInWindow);
+  console.log('Renewed (views >= 10)   : ' + totalRenewed);
+  console.log('Left to expire (views < 10): ' + totalExpire);
+}
+
+run().catch(function(err) {
+                      console.error('Fatal error: ' + err.message);
+                      process.exit(1);
+                    });
