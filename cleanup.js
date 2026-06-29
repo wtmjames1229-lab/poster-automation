@@ -41,13 +41,15 @@ function sleep(ms) {
                              }
 
                              function etsyHeaders() {
+                               var apiKeyValue = ETSY_SHARED_SECRET
+                                 ? ETSY_API_KEY + ':' + ETSY_SHARED_SECRET
+                                 : ETSY_API_KEY;
                                return {
-                                 'x-api-key': ETSY_API_KEY,
+                                 'x-api-key': apiKeyValue,
                                  'Authorization': 'Bearer ' + ACCESS_TOKEN,
                                  'Content-Type': 'application/json'
                                };
                              }
-
                              async function etsyFetch(path, options) {
                                var url = BASE_URL + path;
                                var res = await fetch(url, Object.assign({ headers: etsyHeaders() }, options || {}));
