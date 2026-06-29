@@ -1097,7 +1097,7 @@ async function generateListing(prompt) {
         {
             method: "POST", headers: { "Content-Type": "application/json" },
             body: JSON.stringify({
-                contents: [{ parts: [{ text: "Based on this Snoopy art description: \"" + prompt + "\"\n\nGenerate an optimized Etsy product listing. Respond with raw JSON only, no markdown, no backticks:\n{\n \"title\": \"Etsy title under 80 chars. Format: Snoopy [Scene] Canvas Print Peanuts [Theme] Wall Decor. NO dashes, NO hyphens, NO special characters.\",\n \"description\": \"3 engaging paragraphs about this specific artwork scene, the canvas print quality, and who would love it as a gift.\",\n \"tags\": [\"exactly 13 tags, each under 20 characters, focused on Snoopy Peanuts and the specific scene\"]\n}" + copyrightNote }] }],
+                contents: [{ parts: [{ text: "Based on this Snoopy art description: \"" + prompt + "\"\n\nGenerate an optimized Etsy product listing. Respond with raw JSON only, no markdown, no backticks:\n{\n \"title\": \"Etsy title under 80 chars. Format: Snoopy [Scene] Canvas Print Peanuts [Theme] Wall Decor. NO dashes, NO hyphens, NO special characters.\",\n \"description\": \"3 engaging paragraphs about this specific artwork scene, the canvas print quality, and who would love it as a gift.\",\n \"tags\": [\"exactly 13 tags, each under 20 characters, focused on Snoopy Peanuts and the specific scene\"]\n}\n\nCRITICAL RULE: Do NOT use the words 'Peanut', 'Peanuts', 'peanut', or 'peanuts' anywhere in the title, description, or tags. Instead use only generic terms like 'cartoon dog', 'cartoon characters', 'beagle', 'classic cartoon', or 'animated duo'." + copyrightNote }] }],
                 generationConfig: { responseModalities: ["TEXT"] }
             })
         }
@@ -1107,6 +1107,14 @@ async function generateListing(prompt) {
     if (!text) throw new Error("Listing generation failed: " + JSON.stringify(data));
     var clean = text.replace(/```json|```/g, "").trim();
     var listing = JSON.parse(clean);
+        // Post-processing: strip/replace any peanut/peanuts references (case-insensitive)
+        var peanutRe = /peanuts?/gi;
+        var peanutReplace = 'classic cartoon';
+        if (listing.title) listing.title = listing.title.replace(peanutRe, peanutReplace);
+        if (listing.description) listing.description = listing.description.replace(peanutRe, peanutReplace);
+        if (Array.isArray(listing.tags)) {
+                    listing.tags = listing.tags.map(function(tag) { return tag.replace(peanutRe, peanutReplace); });
+        }
     var validTags = ["Snoopy wall art","Peanuts poster","Woodstock print","Snoopy gift","Peanuts decor","cartoon art print","Snoopy canvas","kids room art","Peanuts fan gift","Snoopy lover","beagle wall art","nursery art","Peanuts artwork","Snoopy print","Peanuts wall art","Snoopy home decor","Woodstock art","Peanuts gift","cartoon canvas","Snoopy art print"];
     if (!listing.tags || !Array.isArray(listing.tags) || listing.tags.length === 0) {
         listing.tags = validTags.slice(0, 13);
