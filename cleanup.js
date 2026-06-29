@@ -2,7 +2,7 @@
 // Checks listings aged 100–110 days; renews if views >= 10, lets expire if views < 10.
 // Run with: node cleanup.js
 
-require('dotenv').config();
+require('dotenv').config()
 
 var ETSY_API_KEY    = process.env.ETSY_API_KEY;
 var ETSY_SHARED_SECRET = process.env.ETSY_SHARED_SECRET;
@@ -92,13 +92,24 @@ async function renewListing(listingId) {
                         });
 }
 
+async function fetchShopId() {
+    console.log('ETSY_SHOP_ID not set — fetching from Etsy API...');
+    var data = await retry(function() {
+          return etsyFetch('/users/@me/shops');
+    });
+    var shops = data.results || (Array.isArray(data) ? data : []);
+    if (shops.length === 0) throw new Error('No Etsy shops found for authenticated user');
+    var id = String(shops[0].shop_id);
+    console.log('Discovered Etsy Shop ID: ' + id);
+    return id;
+}
 // ---------------------------------------------------------------------------
 // main
 // ---------------------------------------------------------------------------
 
 async function run() {
   if (!ETSY_API_KEY)  throw new Error('Missing env var: ETSY_API_KEY');
-  if (!SHOP_ID)       throw new Error('Missing env var: ETSY_SHOP_ID');
+    if (!SHOP_ID) { SHOP_ID = await fetchShopId(); }
   if (!ACCESS_TOKEN)  throw new Error('Missing env var: ETSY_ACCESS_TOKEN');
 
   console.log('=== Etsy Listing Cleanup ===');
