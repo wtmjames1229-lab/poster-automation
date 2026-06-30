@@ -4,7 +4,7 @@
 
 require('dotenv').config()
 
-var ETSY_API_KEY      = process.env.ETSY_API_KEY;
+var ETSY_API_KEY       = process.env.ETSY_API_KEY;
 var ETSY_SHARED_SECRET = process.env.ETSY_SHARED_SECRET;
 var ETSY_REFRESH_TOKEN = process.env.ETSY_REFRESH_TOKEN;
 // ETSY_SHOP_ID secret is NOT required -- shop ID is discovered automatically from the access token
@@ -151,10 +151,17 @@ async function fetchShopId() {
 async function fetchAllActiveListings() {
   var allListings = [];
   var offset = 0;
-  var limit  = 100;
+  var limit   = 100;
+  // Etsy v3: created_timestamp is returned by default on listing objects.
+  // No special includes= param is required for this field.
   while (true) {
     var data = await retry(function() {
-      return etsyFetch('/shops/' + SHOP_ID + '/listings?state=active&limit=' + limit + '&offset=' + offset);
+      return etsyFetch(
+        '/shops/' + SHOP_ID + '/listings' +
+        '?state=active' +
+        '&limit=' + limit +
+        '&offset=' + offset
+      );
     });
     var results = data.results || [];
     allListings = allListings.concat(results);
@@ -198,9 +205,22 @@ async function run() {
 
   var listings = await fetchAllActiveListings();
   console.log('Total active listings fetched: ' + listings.length);
+
+  // Log the timestamp fields present on the first listing so we can verify
+  if (listings.length > 0) {
+    var sample = listings[0];
+    console.log('Sample listing fields (timestamp-related): ' + JSON.stringify({
+      listing_id:             sample.listing_id,
+      created_timestamp:      sample.created_timestamp,
+      original_creation_tsz:  sample.original_creation_tsz,
+      creation_tsz:           sample.creation_tsz,
+      updated_timestamp:      sample.updated_timestamp
+    }));
+  }
   console.log('');
 
-  var now = Date.now();
+  // nowSec: current Unix time in seconds (same unit as created_timestamp)
+  var nowSec = Date.now() / 1000;
 
   var totalChecked  = 0;
   var totalInWindow = 0;
@@ -211,13 +231,17 @@ async function run() {
     var listing   = listings[i];
     var listingId = listing.listing_id;
 
-    var createdTs = listing.original_creation_tsz;
+    // Etsy v3 returns created_timestamp (Unix seconds).
+    // Fall back to original_creation_tsz for compatibility if somehow present.
+    var createdTs = listing.created_timestamp || listing.original_creation_tsz || listing.creation_tsz;
+
     if (!createdTs) {
-      console.log('[' + listingId + '] SKIP -- no original_creation_tsz field');
+      console.log('[' + listingId + '] SKIP -- no timestamp field found (keys: ' + Object.keys(listing).filter(function(k) { return k.indexOf('creat') >= 0 || k.indexOf('time') >= 0; }).join(',') + ')');
       continue;
     }
 
-    var ageDays = (now - createdTs * 1000) / (1000 * 60 * 60 * 24);
+    // created_timestamp is Unix seconds; age in days = (nowSec - createdTs) / 86400
+    var ageDays = (nowSec - createdTs) / 86400;
     totalChecked++;
 
     if (ageDays < CHECK_WINDOW_MIN) {
@@ -278,4 +302,3 @@ run().catch(function(err) {
   console.error('Fatal error: ' + err.message);
   process.exit(1);
 });
- 
