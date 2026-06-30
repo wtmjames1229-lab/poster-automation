@@ -4,11 +4,13 @@
 
 require('dotenv').config()
 
-var ETSY_API_KEY       = process.env.ETSY_API_KEY;
+var ETSY_API_KEY      = process.env.ETSY_API_KEY;
 var ETSY_SHARED_SECRET = process.env.ETSY_SHARED_SECRET;
 var ETSY_REFRESH_TOKEN = process.env.ETSY_REFRESH_TOKEN;
-var SHOP_ID            = process.env.ETSY_SHOP_ID;
+// ETSY_SHOP_ID secret is NOT required -- shop ID is discovered automatically from the access token
 var ACCESS_TOKEN       = process.env.ETSY_ACCESS_TOKEN; // fallback only; always refreshed at start
+
+var SHOP_ID; // will be set by fetchShopId() every run
 
 var BASE_URL  = 'https://openapi.etsy.com/v3/application';
 var TOKEN_URL = 'https://api.etsy.com/v3/public/oauth/token';
@@ -47,9 +49,9 @@ function etsyHeaders() {
     ? ETSY_API_KEY + ':' + ETSY_SHARED_SECRET
     : ETSY_API_KEY;
   return {
-    'x-api-key': apiKeyValue,
+    'x-api-key':     apiKeyValue,
     'Authorization': 'Bearer ' + ACCESS_TOKEN,
-    'Content-Type': 'application/json'
+    'Content-Type':  'application/json'
   };
 }
 
@@ -79,9 +81,9 @@ async function refreshAccessToken() {
   body.append('refresh_token', ETSY_REFRESH_TOKEN);
 
   var res = await fetch(TOKEN_URL, {
-    method: 'POST',
+    method:  'POST',
     headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
-    body: body.toString()
+    body:    body.toString()
   });
 
   var data;
@@ -116,22 +118,40 @@ async function refreshAccessToken() {
 // API calls
 // ---------------------------------------------------------------------------
 
+// Extract the numeric user_id from the Etsy access token.
+// Etsy access tokens are formatted as: {user_id}.{random_string}
+// e.g. "960643483.LDyz7Bq68k5ywglm2efY..." => user_id = "960643483"
+function extractUserIdFromToken(token) {
+  if (!token) throw new Error('ACCESS_TOKEN is empty -- cannot extract user_id');
+  var dotIndex = token.indexOf('.');
+  if (dotIndex === -1) throw new Error('Unexpected access token format (no dot): ' + token.substring(0, 20));
+  var userId = token.substring(0, dotIndex);
+  if (!/^[0-9]+$/.test(userId)) throw new Error('Extracted user_id is not numeric: ' + userId);
+  return userId;
+}
+
 async function fetchShopId() {
-  console.log('ETSY_SHOP_ID not set -- fetching from Etsy API...');
+  var userId = extractUserIdFromToken(ACCESS_TOKEN);
+  console.log('Extracted user_id from access token: ' + userId);
+  console.log('Fetching shop list from /application/users/' + userId + '/shops ...');
+
   var data = await retry(function() {
-    return etsyFetch('/users/@me/shops');
+    return etsyFetch('/users/' + userId + '/shops');
   });
-  var shops = data.results || (Array.isArray(data) ? data : []);
-  if (shops.length === 0) throw new Error('No Etsy shops found for authenticated user');
+
+  var shops = data.results || (Array.isArray(data) ? data : [data]);
+  if (!shops || shops.length === 0) throw new Error('No Etsy shops found for user_id ' + userId);
+
   var id = String(shops[0].shop_id);
-  console.log('Discovered Etsy Shop ID: ' + id);
+  var name = shops[0].shop_name || '(unknown)';
+  console.log('Discovered Etsy Shop ID: ' + id + ' (shop name: ' + name + ')');
   return id;
 }
 
 async function fetchAllActiveListings() {
   var allListings = [];
   var offset = 0;
-  var limit = 100;
+  var limit  = 100;
   while (true) {
     var data = await retry(function() {
       return etsyFetch('/shops/' + SHOP_ID + '/listings?state=active&limit=' + limit + '&offset=' + offset);
@@ -168,7 +188,8 @@ async function run() {
   // Always get a fresh access token first -- never rely on the stored token being valid
   await refreshAccessToken();
 
-  if (!SHOP_ID) { SHOP_ID = await fetchShopId(); }
+  // Always discover shop ID from the access token -- no ETSY_SHOP_ID secret needed
+  SHOP_ID = await fetchShopId();
 
   console.log('=== Etsy Listing Cleanup ===');
   console.log('Shop ID      : ' + SHOP_ID);
