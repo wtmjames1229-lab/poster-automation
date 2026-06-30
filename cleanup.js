@@ -1,22 +1,25 @@
 // cleanup.js -- Etsy listing renewal script
-// Checks listings aged 100-110 days; renews if views >= 10, lets expire if views < 10.
+// Scans EXPIRED listings (state=expired); renews high-view ones (>= 10 views) back to active.
+// Etsy v3 does NOT have a dedicated /renew endpoint.
+// Renewal = PATCH /shops/{shop_id}/listings/{listing_id} with { state: "active" }.
+// Listings expire automatically after 120 days. There is no supported way to renew early
+// via the v3 API -- the only valid operation is to republish an already-expired listing.
 // Run with: node cleanup.js
 
 require('dotenv').config()
 
-var ETSY_API_KEY       = process.env.ETSY_API_KEY;
-var ETSY_SHARED_SECRET = process.env.ETSY_SHARED_SECRET;
-var ETSY_REFRESH_TOKEN = process.env.ETSY_REFRESH_TOKEN;
+var ETSY_API_KEY         = process.env.ETSY_API_KEY;
+var ETSY_SHARED_SECRET   = process.env.ETSY_SHARED_SECRET;
+var ETSY_REFRESH_TOKEN   = process.env.ETSY_REFRESH_TOKEN;
 // ETSY_SHOP_ID secret is NOT required -- shop ID is discovered automatically from the access token
-var ACCESS_TOKEN       = process.env.ETSY_ACCESS_TOKEN; // fallback only; always refreshed at start
+var ACCESS_TOKEN         = process.env.ETSY_ACCESS_TOKEN; // fallback only; always refreshed at start
 
 var SHOP_ID; // will be set by fetchShopId() every run
 
-var BASE_URL  = 'https://openapi.etsy.com/v3/application';
-var TOKEN_URL = 'https://api.etsy.com/v3/public/oauth/token';
+var BASE_URL   = 'https://openapi.etsy.com/v3/application';
+var TOKEN_URL  = 'https://api.etsy.com/v3/public/oauth/token';
 
-var CHECK_WINDOW_MIN = 100; // days
-var CHECK_WINDOW_MAX = 110; // days
+var MIN_VIEWS_TO_RENEW = 10; // renew expired listings that had this many views or more
 
 // ---------------------------------------------------------------------------
 // helpers
@@ -142,24 +145,25 @@ async function fetchShopId() {
   var shops = data.results || (Array.isArray(data) ? data : [data]);
   if (!shops || shops.length === 0) throw new Error('No Etsy shops found for user_id ' + userId);
 
-  var id = String(shops[0].shop_id);
+  var id   = String(shops[0].shop_id);
   var name = shops[0].shop_name || '(unknown)';
   console.log('Discovered Etsy Shop ID: ' + id + ' (shop name: ' + name + ')');
   return id;
 }
 
-async function fetchAllActiveListings() {
+// Fetch all expired listings for the shop.
+// Etsy v3 supports ?state=expired on the getListingsByShop endpoint.
+// Expired listings are those that were previously active but passed day 120 without renewal.
+async function fetchAllExpiredListings() {
   var allListings = [];
   var offset = 0;
-  var limit   = 100;
-  // Etsy v3: created_timestamp and views are both returned by default on listing objects.
-  // No special includes= param is needed for either field.
+  var limit  = 100;
   while (true) {
     var data = await retry(function() {
       return etsyFetch(
         '/shops/' + SHOP_ID + '/listings' +
-        '?state=active' +
-        '&limit=' + limit +
+        '?state=expired' +
+        '&limit='  + limit +
         '&offset=' + offset
       );
     });
@@ -171,9 +175,15 @@ async function fetchAllActiveListings() {
   return allListings;
 }
 
+// Renew (republish) an expired listing by PATCHing its state to "active".
+// This is the ONLY documented way to renew a listing in Etsy v3.
+// The old POST /shops/{id}/listings/{id}/renew endpoint does not exist in v3.
 async function renewListing(listingId) {
   await retry(function() {
-    return etsyFetch('/shops/' + SHOP_ID + '/listings/' + listingId + '/renew', { method: 'POST' });
+    return etsyFetch('/shops/' + SHOP_ID + '/listings/' + listingId, {
+      method: 'PATCH',
+      body:   JSON.stringify({ state: 'active' })
+    });
   });
 }
 
@@ -193,17 +203,21 @@ async function run() {
 
   console.log('=== Etsy Listing Cleanup ===');
   console.log('Shop ID      : ' + SHOP_ID);
-  console.log('Check window : ' + CHECK_WINDOW_MIN + '-' + CHECK_WINDOW_MAX + ' days old');
+  console.log('Strategy     : renew expired listings with >= ' + MIN_VIEWS_TO_RENEW + ' views');
+  console.log('');
+  console.log('NOTE: Etsy v3 has no early-renewal endpoint. Active listings expire at day 120.');
+  console.log('      This script republishes already-expired listings that had high engagement.');
   console.log('');
 
-  var listings = await fetchAllActiveListings();
-  console.log('Total active listings fetched: ' + listings.length);
+  var listings = await fetchAllExpiredListings();
+  console.log('Total expired listings fetched: ' + listings.length);
 
-  // Log the fields present on the first listing for diagnostic purposes
+  // Log fields on first listing for diagnostic purposes
   if (listings.length > 0) {
     var sample = listings[0];
-    console.log('Sample listing fields (diagnostic): ' + JSON.stringify({
+    console.log('Sample expired listing fields (diagnostic): ' + JSON.stringify({
       listing_id:        sample.listing_id,
+      state:             sample.state,
       created_timestamp: sample.created_timestamp,
       views:             sample.views,
       updated_timestamp: sample.updated_timestamp
@@ -211,64 +225,33 @@ async function run() {
   }
   console.log('');
 
-  // nowSec: current Unix time in seconds (same unit as created_timestamp)
-  var nowSec = Date.now() / 1000;
-
-  var totalChecked  = 0;
-  var totalInWindow = 0;
-  var totalRenewed  = 0;
-  var totalExpire   = 0;
+  var totalChecked = 0;
+  var totalRenewed = 0;
+  var totalSkipped = 0; // expired but low-view, left alone
 
   for (var i = 0; i < listings.length; i++) {
     var listing   = listings[i];
     var listingId = listing.listing_id;
 
-    // Etsy v3 returns created_timestamp (Unix seconds).
-    var createdTs = listing.created_timestamp;
-
-    if (!createdTs) {
-      console.log('[' + listingId + '] SKIP -- no created_timestamp field');
-      continue;
-    }
-
-    // age in days = (nowSec - created_timestamp) / 86400
-    var ageDays = (nowSec - createdTs) / 86400;
-    totalChecked++;
-
-    if (ageDays < CHECK_WINDOW_MIN) {
-      console.log('[' + listingId + '] age=' + ageDays.toFixed(1) + 'd -> too-young (< ' + CHECK_WINDOW_MIN + 'd), ignored');
-      continue;
-    }
-
-    if (ageDays > CHECK_WINDOW_MAX) {
-      console.log('[' + listingId + '] age=' + ageDays.toFixed(1) + 'd -> too-old (> ' + CHECK_WINDOW_MAX + 'd), ignored');
-      continue;
-    }
-
-    totalInWindow++;
-
-    // FIX: use listing.views directly from the listing object returned by the listings
-    // endpoint. The separate /stats endpoint returns 404 for many listings and is
-    // unreliable. Etsy v3 includes views on the ShopListing object by default.
-    // NOTE: views is null/undefined on very new listings or listings without traffic data;
-    //       treat null as 0 views.
+    // Use listing.views directly -- present on ShopListing object by default
     var views = (listing.views != null) ? listing.views : 0;
 
-    console.log('[' + listingId + '] age=' + ageDays.toFixed(1) + 'd views=' + views + ' -> IN WINDOW');
+    totalChecked++;
 
-    if (views < 10) {
-      console.log('[' + listingId + '] -> DECISION: let expire (views=' + views + ' < 10)');
-      totalExpire++;
+    console.log('[' + listingId + '] state=expired views=' + views);
+
+    if (views < MIN_VIEWS_TO_RENEW) {
+      console.log('[' + listingId + '] -> SKIP (views=' + views + ' < ' + MIN_VIEWS_TO_RENEW + ', not worth renewing)');
+      totalSkipped++;
     } else {
-      console.log('[' + listingId + '] -> DECISION: RENEWING (views=' + views + ' >= 10)...');
+      console.log('[' + listingId + '] -> RENEWING (views=' + views + ' >= ' + MIN_VIEWS_TO_RENEW + ')...');
       try {
         await renewListing(listingId);
-        console.log('[' + listingId + '] RENEWED successfully');
+        console.log('[' + listingId + '] RENEWED successfully (state set to active)');
         totalRenewed++;
       } catch (err) {
-        console.log('[' + listingId + '] ERROR renewing: ' + err.message + ' -- counting as expire');
-        // A renewal error still means the listing will expire; count it.
-        totalExpire++;
+        console.log('[' + listingId + '] ERROR renewing: ' + err.message + ' -- skipping');
+        totalSkipped++;
       }
     }
 
@@ -277,19 +260,20 @@ async function run() {
 
   console.log('');
   console.log('=== Summary ===');
-  console.log('Total listings checked     : ' + totalChecked);
-  console.log('In check window (100-110d) : ' + totalInWindow);
-  console.log('Renewed (views >= 10)      : ' + totalRenewed);
-  console.log('Left to expire (views < 10): ' + totalExpire);
+  console.log('Expired listings checked  : ' + totalChecked);
+  console.log('Renewed (views >= ' + MIN_VIEWS_TO_RENEW + ')     : ' + totalRenewed);
+  console.log('Skipped (low-view/error)  : ' + totalSkipped);
   console.log('');
-  // Invariant check: renewed + expired must equal totalInWindow
-  var accounted = totalRenewed + totalExpire;
-  if (accounted !== totalInWindow) {
-    console.log('WARNING: accounted (' + accounted + ') != totalInWindow (' + totalInWindow + ') -- bug!');
+
+  // Invariant check
+  var accounted = totalRenewed + totalSkipped;
+  if (accounted !== totalChecked) {
+    console.log('WARNING: accounted (' + accounted + ') != totalChecked (' + totalChecked + ') -- bug!');
   } else {
-    console.log('Check: ' + totalRenewed + ' renewed + ' + totalExpire + ' expire = ' + accounted + ' (matches ' + totalInWindow + ' in-window) OK');
+    console.log('Check: ' + totalRenewed + ' renewed + ' + totalSkipped + ' skipped = ' + accounted + ' (matches ' + totalChecked + ' expired checked) OK');
   }
   console.log('');
+
   if (ETSY_REFRESH_TOKEN && ETSY_REFRESH_TOKEN !== process.env.ETSY_REFRESH_TOKEN) {
     console.log('=== ACTION REQUIRED ===');
     console.log('Etsy issued a new refresh token. Update your ETSY_REFRESH_TOKEN GitHub secret:');
