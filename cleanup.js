@@ -152,8 +152,8 @@ async function fetchAllActiveListings() {
   var allListings = [];
   var offset = 0;
   var limit   = 100;
-  // Etsy v3: created_timestamp is returned by default on listing objects.
-  // No special includes= param is required for this field.
+  // Etsy v3: created_timestamp and views are both returned by default on listing objects.
+  // No special includes= param is needed for either field.
   while (true) {
     var data = await retry(function() {
       return etsyFetch(
@@ -169,13 +169,6 @@ async function fetchAllActiveListings() {
     offset += limit;
   }
   return allListings;
-}
-
-async function fetchListingStats(listingId) {
-  var data = await retry(function() {
-    return etsyFetch('/shops/' + SHOP_ID + '/listings/' + listingId + '/stats');
-  });
-  return data;
 }
 
 async function renewListing(listingId) {
@@ -206,15 +199,14 @@ async function run() {
   var listings = await fetchAllActiveListings();
   console.log('Total active listings fetched: ' + listings.length);
 
-  // Log the timestamp fields present on the first listing so we can verify
+  // Log the fields present on the first listing for diagnostic purposes
   if (listings.length > 0) {
     var sample = listings[0];
-    console.log('Sample listing fields (timestamp-related): ' + JSON.stringify({
-      listing_id:             sample.listing_id,
-      created_timestamp:      sample.created_timestamp,
-      original_creation_tsz:  sample.original_creation_tsz,
-      creation_tsz:           sample.creation_tsz,
-      updated_timestamp:      sample.updated_timestamp
+    console.log('Sample listing fields (diagnostic): ' + JSON.stringify({
+      listing_id:        sample.listing_id,
+      created_timestamp: sample.created_timestamp,
+      views:             sample.views,
+      updated_timestamp: sample.updated_timestamp
     }));
   }
   console.log('');
@@ -232,15 +224,14 @@ async function run() {
     var listingId = listing.listing_id;
 
     // Etsy v3 returns created_timestamp (Unix seconds).
-    // Fall back to original_creation_tsz for compatibility if somehow present.
-    var createdTs = listing.created_timestamp || listing.original_creation_tsz || listing.creation_tsz;
+    var createdTs = listing.created_timestamp;
 
     if (!createdTs) {
-      console.log('[' + listingId + '] SKIP -- no timestamp field found (keys: ' + Object.keys(listing).filter(function(k) { return k.indexOf('creat') >= 0 || k.indexOf('time') >= 0; }).join(',') + ')');
+      console.log('[' + listingId + '] SKIP -- no created_timestamp field');
       continue;
     }
 
-    // created_timestamp is Unix seconds; age in days = (nowSec - createdTs) / 86400
+    // age in days = (nowSec - created_timestamp) / 86400
     var ageDays = (nowSec - createdTs) / 86400;
     totalChecked++;
 
@@ -255,29 +246,29 @@ async function run() {
     }
 
     totalInWindow++;
-    console.log('[' + listingId + '] age=' + ageDays.toFixed(1) + 'd -> IN WINDOW -- fetching stats...');
 
-    var stats;
-    try {
-      stats = await fetchListingStats(listingId);
-    } catch (err) {
-      console.log('[' + listingId + '] ERROR fetching stats: ' + err.message + ' -- skipping');
-      continue;
-    }
+    // FIX: use listing.views directly from the listing object returned by the listings
+    // endpoint. The separate /stats endpoint returns 404 for many listings and is
+    // unreliable. Etsy v3 includes views on the ShopListing object by default.
+    // NOTE: views is null/undefined on very new listings or listings without traffic data;
+    //       treat null as 0 views.
+    var views = (listing.views != null) ? listing.views : 0;
 
-    var views = (stats && stats.views != null) ? stats.views : 0;
+    console.log('[' + listingId + '] age=' + ageDays.toFixed(1) + 'd views=' + views + ' -> IN WINDOW');
 
     if (views < 10) {
-      console.log('[' + listingId + '] age=' + ageDays.toFixed(1) + 'd views=' + views + ' -> SKIPPED (< 10 views, let expire)');
+      console.log('[' + listingId + '] -> DECISION: let expire (views=' + views + ' < 10)');
       totalExpire++;
     } else {
-      console.log('[' + listingId + '] age=' + ageDays.toFixed(1) + 'd views=' + views + ' -> RENEWING...');
+      console.log('[' + listingId + '] -> DECISION: RENEWING (views=' + views + ' >= 10)...');
       try {
         await renewListing(listingId);
         console.log('[' + listingId + '] RENEWED successfully');
         totalRenewed++;
       } catch (err) {
-        console.log('[' + listingId + '] ERROR renewing: ' + err.message);
+        console.log('[' + listingId + '] ERROR renewing: ' + err.message + ' -- counting as expire');
+        // A renewal error still means the listing will expire; count it.
+        totalExpire++;
       }
     }
 
@@ -290,6 +281,14 @@ async function run() {
   console.log('In check window (100-110d) : ' + totalInWindow);
   console.log('Renewed (views >= 10)      : ' + totalRenewed);
   console.log('Left to expire (views < 10): ' + totalExpire);
+  console.log('');
+  // Invariant check: renewed + expired must equal totalInWindow
+  var accounted = totalRenewed + totalExpire;
+  if (accounted !== totalInWindow) {
+    console.log('WARNING: accounted (' + accounted + ') != totalInWindow (' + totalInWindow + ') -- bug!');
+  } else {
+    console.log('Check: ' + totalRenewed + ' renewed + ' + totalExpire + ' expire = ' + accounted + ' (matches ' + totalInWindow + ' in-window) OK');
+  }
   console.log('');
   if (ETSY_REFRESH_TOKEN && ETSY_REFRESH_TOKEN !== process.env.ETSY_REFRESH_TOKEN) {
     console.log('=== ACTION REQUIRED ===');
